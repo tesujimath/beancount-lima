@@ -92,60 +92,55 @@ impl LedgerBuilder {
     fn transaction(&mut self, transaction: &parser::Transaction) {}
 
     fn post(&mut self, posting: &Spanned<parser::Posting>) {
-        match self
+        if self
             .open_accounts
-            .entry(posting.account().item().to_string())
+            .contains_key(&posting.account().item().to_string())
         {
-            hash_map::Entry::Occupied(open_entry) => {
-                let account = self
-                    .accounts
-                    .get_mut(&posting.account().item().to_string())
-                    .unwrap();
+            let account = self
+                .accounts
+                .get_mut(&posting.account().item().to_string())
+                .unwrap();
 
-                match (posting.amount(), posting.currency()) {
-                    (Some(amount), Some(currency)) => {
-                        let currency = currency.to_string();
-                        if account.currencies.contains(&currency) {
-                            account.postings.push(spanned(
-                                Posting::new(amount.value(), currency),
-                                *posting.span(),
-                            ));
-                        } else {
-                            self.errors.push(spanned(
-                                BuilderError::InvalidCurrencyForAccount(account.opened),
-                                *posting.span(),
-                            ));
-                        }
-                    }
-                    (None, Some(_)) => {
-                        self.errors
-                            .push(spanned(BuilderError::MissingAmount, *posting.span()));
-                    }
-                    (Some(_), None) => {
-                        self.errors
-                            .push(spanned(BuilderError::MissingCurrency, *posting.span()));
-                    }
-                    (None, None) => {
-                        self.errors
-                            .push(spanned(BuilderError::MissingAmount, *posting.span()));
-                        // and currency, but hey
+            match (posting.amount(), posting.currency()) {
+                (Some(amount), Some(currency)) => {
+                    let currency = currency.to_string();
+                    if account.currencies.contains(&currency) {
+                        account.postings.push(spanned(
+                            Posting::new(amount.value(), currency),
+                            *posting.span(),
+                        ));
+                    } else {
+                        self.errors.push(spanned(
+                            BuilderError::InvalidCurrencyForAccount(account.opened),
+                            *posting.span(),
+                        ));
                     }
                 }
-            }
-            hash_map::Entry::Vacant(open_entry) => {
-                if let Some(closed) = self
-                    .closed_accounts
-                    .get(&posting.account().item().to_string())
-                {
-                    self.errors.push(spanned(
-                        BuilderError::AccountAlreadyClosed(*closed),
-                        *posting.span(),
-                    ));
-                } else {
+                (None, Some(_)) => {
                     self.errors
-                        .push(spanned(BuilderError::AccountNotOpen, *posting.span()));
+                        .push(spanned(BuilderError::MissingAmount, *posting.span()));
+                }
+                (Some(_), None) => {
+                    self.errors
+                        .push(spanned(BuilderError::MissingCurrency, *posting.span()));
+                }
+                (None, None) => {
+                    self.errors
+                        .push(spanned(BuilderError::MissingAmount, *posting.span()));
+                    // and currency, but hey
                 }
             }
+        } else if let Some(closed) = self
+            .closed_accounts
+            .get(&posting.account().item().to_string())
+        {
+            self.errors.push(spanned(
+                BuilderError::AccountAlreadyClosed(*closed),
+                *posting.span(),
+            ));
+        } else {
+            self.errors
+                .push(spanned(BuilderError::AccountNotOpen, *posting.span()));
         }
     }
 
