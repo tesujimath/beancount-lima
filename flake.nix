@@ -51,8 +51,12 @@
             ];
 
             shellHook = ''
-              export STEEL_HOME=$(pwd)/steel-home
+              export STEEL_HOME=$(pwd)/steel
               mkdir -p $STEEL_HOME
+
+              # LSP config
+              # https://github.com/mattwparas/steel/tree/master/crates/steel-language-server#configuration
+              export STEEL_LSP_HOME=$(pwd)/steel-lsp
             '';
           };
         }
