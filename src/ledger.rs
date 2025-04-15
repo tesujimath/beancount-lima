@@ -1,3 +1,5 @@
+// TODO remove:
+#![allow(dead_code, unused_variables)]
 use beancount_parser_lima::{
     self as parser, spanned, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span,
     Spanned,
@@ -9,7 +11,7 @@ use std::{
     io::{self, Write},
     path::Path,
 };
-use steel::steel_vm::engine::Engine;
+use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
 #[derive(Clone, Debug, Steel)]
@@ -52,6 +54,11 @@ impl Ledger {
         drop(parser);
 
         builder.map(|builder| builder.build(sources))
+    }
+
+    fn accounts(&self) -> Vec<String> {
+        // TODO ugh, do we really have to clone here?
+        self.accounts.keys().cloned().collect::<Vec<_>>()
     }
 }
 
@@ -269,6 +276,7 @@ pub struct Amount {
 pub enum Error {
     Io(io::Error),
     Parser,
+    LedgerCog,
 }
 
 impl Display for Error {
@@ -278,6 +286,7 @@ impl Display for Error {
         match self {
             Io(e) => e.fmt(f),
             Parser => f.write_str("parser error"),
+            LedgerCog => f.write_str("error in Ledger cog"),
         }
     }
 }
@@ -311,4 +320,5 @@ impl Display for BuilderError {
 
 pub fn register_types_and_functions(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("Ledger");
+    steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
 }

@@ -20,10 +20,18 @@ fn main() -> Result<(), ledger::Error> {
 
             register_types_and_functions(&mut steel_engine);
             steel_engine
-                .register_external_value("ledger", ledger)
+                .register_external_value("*ffi-ledger*", ledger)
                 .unwrap(); // can't fail
 
-            run_repl(steel_engine).map_err(ledger::Error::Io)
+            // load ledger cog
+            let ledger_cog = include_str!("../../cogs/ledger.scm");
+            match steel_engine.run(ledger_cog) {
+                Ok(_) => run_repl(steel_engine).map_err(ledger::Error::Io),
+                Err(e) => {
+                    e.emit_result("cogs/ledger.scm", ledger_cog);
+                    Err(ledger::Error::LedgerCog)
+                }
+            }
         }
         Err(e) => Err(e),
     }
