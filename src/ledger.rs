@@ -1,8 +1,7 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima::{
-    self as parser, spanned, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span,
-    Spanned,
+    self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
 use hashbrown::{hash_map, HashMap, HashSet};
 use rust_decimal::Decimal;
@@ -11,7 +10,10 @@ use std::{
     io::{self, Write},
     path::Path,
 };
-use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
+use steel::{
+    rvals::Custom,
+    steel_vm::{engine::Engine, register_fn::RegisterFn},
+};
 use steel_derive::Steel;
 
 #[derive(Clone, Debug, Steel)]
@@ -60,9 +62,8 @@ impl Ledger {
         }
     }
 
-    fn accounts(&self) -> Vec<String> {
-        // TODO ugh, do we really have to clone here?
-        self.accounts.keys().cloned().collect::<Vec<_>>()
+    fn accounts(&self) -> HashMap<String, Account> {
+        self.accounts.clone()
     }
 }
 
@@ -70,7 +71,7 @@ impl Ledger {
 struct LedgerBuilder {
     open_accounts: HashMap<String, Span>,
     closed_accounts: HashMap<String, Span>,
-    accounts: HashMap<String, Account>,
+    accounts: HashMap<String, AccountBuilder>,
     errors: Vec<parser::Error>,
 }
 
@@ -82,7 +83,11 @@ impl LedgerBuilder {
         if self.errors.is_empty() {
             Ok(Ledger {
                 sources,
-                accounts: self.accounts,
+                accounts: self
+                    .accounts
+                    .into_iter()
+                    .map(|(name, account)| (name, account.build()))
+                    .collect(),
             })
         } else {
             sources.write(error_w, self.errors).map_err(Error::Io)?;
@@ -113,6 +118,9 @@ impl LedgerBuilder {
         transaction: &parser::Transaction,
         directive: &Spanned<parser::Directive>,
     ) {
+        for posting in transaction.postings() {
+            self.post(posting);
+        }
     }
 
     fn post(&mut self, posting: &Spanned<parser::Posting>) {
@@ -129,10 +137,9 @@ impl LedgerBuilder {
                 (Some(amount), Some(currency)) => {
                     let currency = currency.to_string();
                     if account.currencies.contains(&currency) {
-                        account.postings.push(spanned(
-                            Posting::new(amount.value(), currency),
-                            *posting.span(),
-                        ));
+                        account
+                            .postings
+                            .push((Posting::new(amount.value(), currency), *posting.span()));
                     } else {
                         self.errors.push(posting.error_with_contexts(
                             "invalid currency for account",
@@ -191,7 +198,7 @@ impl LedgerBuilder {
                 } else {
                     self.accounts.insert(
                         open.account().item().to_string(),
-                        Account::with_currencies(
+                        AccountBuilder::with_currencies(
                             open.currencies().map(|c| c.item().to_string()),
                             span,
                         ),
@@ -244,18 +251,37 @@ impl LedgerBuilder {
 #[derive(Clone, Debug, Steel)]
 pub struct Account {
     pub(crate) currencies: HashSet<String>,
+    // TODO
+    // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
+    pub(crate) postings: Vec<Posting>,
+}
+
+#[derive(Debug)]
+pub struct AccountBuilder {
+    pub(crate) currencies: HashSet<String>,
     pub(crate) opened: Span,
     // TODO
     // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
-    pub(crate) postings: Vec<Spanned<Posting>>,
+    pub(crate) postings: Vec<(Posting, Span)>,
 }
 
-impl Account {
+impl AccountBuilder {
+    fn build(self) -> Account {
+        Account {
+            currencies: self.currencies,
+            postings: self
+                .postings
+                .into_iter()
+                .map(|(posting, span)| posting)
+                .collect(),
+        }
+    }
+
     fn with_currencies<I>(currencies: I, opened: Span) -> Self
     where
         I: Iterator<Item = String>,
     {
-        Account {
+        AccountBuilder {
             currencies: HashSet::from_iter(currencies),
             opened,
             postings: Vec::default(),
@@ -277,7 +303,7 @@ impl Posting {
     fn new(amount: Decimal, currency: String) -> Self {
         Posting {
             amount: Amount {
-                number: amount,
+                number: Rational(amount),
                 currency,
             },
         }
@@ -286,8 +312,31 @@ impl Posting {
 
 #[derive(Clone, Debug, Steel)]
 pub struct Amount {
-    pub(crate) number: Decimal,
+    pub(crate) number: Rational,
     pub(crate) currency: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct Rational(Decimal);
+
+impl Custom for Rational {}
+
+impl Rational {
+    fn new(num: i64, scale: u32) -> Rational {
+        Rational(Decimal::new(num, scale))
+    }
+
+    fn str(&self) -> String {
+        self.0.to_string()
+    }
+
+    fn numerator(&self) -> isize {
+        self.0.mantissa() as isize
+    }
+
+    fn denominator(&self) -> isize {
+        10isize.pow(self.0.scale())
+    }
 }
 
 #[derive(Debug)]
@@ -339,6 +388,12 @@ impl Display for BuilderError {
 // TODO write BuilderError using BeancountSources and all references
 
 pub fn register_types_and_functions(steel_engine: &mut Engine) {
-    steel_engine.register_type::<Ledger>("Ledger");
-    steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
+    steel_engine.register_type::<Ledger>("Ledger?");
+    // steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
+
+    steel_engine.register_type::<Rational>("FFIRational?");
+    steel_engine.register_fn("FFIRational-new", Rational::new);
+    steel_engine.register_fn("FFIRational-str", Rational::str);
+    steel_engine.register_fn("FFIRational-numerator", Rational::numerator);
+    steel_engine.register_fn("FFIRational-denominator", Rational::denominator);
 }

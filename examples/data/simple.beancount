@@ -1,0 +1,20 @@
+; an example Beancount file
+
+1970-01-01 commodity NZD
+
+2016-03-01 open Assets:Bank:Current NZD
+
+2016-03-01 open Expenses:Groceries NZD
+
+2016-03-01 open Expenses:Entertainment:Drinks-and-snacks NZD
+
+2023-05-29 * "New World Gardens North East Va ;"
+  Assets:Bank:Current                           -39.65 NZD
+  ofxid: "0.12-3456-1234567-01.29May2023.1"  ; from ledger-autosync
+  Expenses:Groceries                             39.65 NZD
+
+2023-05-31 * "EMERSON S TAPROOM DUNEDIN ;"
+  ; indented comment
+  Assets:Bank:Current                           -25.00 NZD
+  ofxid: "0.12-3456-1234567-01.31May2023.3"
+  Expenses:Entertainment:Drinks-and-snacks       25.00 NZD
