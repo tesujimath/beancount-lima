@@ -49,11 +49,15 @@ impl Ledger {
                 sources.write(error_w, warnings).map_err(Error::Io)?;
                 Err(Error::Parser)
             }
-        };
+        }?;
 
         drop(parser);
 
-        builder.map(|builder| builder.build(sources))
+        match builder.build(sources, error_w) {
+            Err(errors) => Err(Error::Builder),
+
+            Ok(ledger) => Ok(ledger),
+        }
     }
 
     fn accounts(&self) -> Vec<String> {
@@ -67,14 +71,22 @@ struct LedgerBuilder {
     open_accounts: HashMap<String, Span>,
     closed_accounts: HashMap<String, Span>,
     accounts: HashMap<String, Account>,
-    errors: Vec<Spanned<BuilderError>>,
+    errors: Vec<parser::Error>,
 }
 
 impl LedgerBuilder {
-    fn build(self, sources: BeancountSources) -> Ledger {
-        Ledger {
-            sources,
-            accounts: self.accounts,
+    fn build<W>(self, sources: BeancountSources, error_w: W) -> Result<Ledger, Error>
+    where
+        W: Write + Copy,
+    {
+        if self.errors.is_empty() {
+            Ok(Ledger {
+                sources,
+                accounts: self.accounts,
+            })
+        } else {
+            sources.write(error_w, self.errors).map_err(Error::Io)?;
+            Err(Error::Builder)
         }
     }
 
@@ -82,21 +94,26 @@ impl LedgerBuilder {
         use parser::DirectiveVariant::*;
 
         match directive.variant() {
-            Transaction(transaction) => self.transaction(transaction),
-            Price(price) => self.price(price),
-            Balance(balance) => self.balance(balance),
-            Open(open) => self.open(open, *directive.span()),
-            Close(close) => self.close(close, *directive.span()),
-            Commodity(commodity) => self.commodity(commodity),
-            Pad(pad) => self.pad(pad),
-            Document(document) => self.document(document),
-            Note(note) => self.note(note),
-            Event(event) => self.event(event),
-            Query(query) => self.query(query),
+            Transaction(transaction) => self.transaction(transaction, directive),
+            Price(price) => self.price(price, directive),
+            Balance(balance) => self.balance(balance, directive),
+            Open(open) => self.open(open, directive),
+            Close(close) => self.close(close, directive),
+            Commodity(commodity) => self.commodity(commodity, directive),
+            Pad(pad) => self.pad(pad, directive),
+            Document(document) => self.document(document, directive),
+            Note(note) => self.note(note, directive),
+            Event(event) => self.event(event, directive),
+            Query(query) => self.query(query, directive),
         }
     }
 
-    fn transaction(&mut self, transaction: &parser::Transaction) {}
+    fn transaction(
+        &mut self,
+        transaction: &parser::Transaction,
+        directive: &Spanned<parser::Directive>,
+    ) {
+    }
 
     fn post(&mut self, posting: &Spanned<parser::Posting>) {
         if self
@@ -117,59 +134,60 @@ impl LedgerBuilder {
                             *posting.span(),
                         ));
                     } else {
-                        self.errors.push(spanned(
-                            BuilderError::InvalidCurrencyForAccount(account.opened),
-                            *posting.span(),
+                        self.errors.push(posting.error_with_contexts(
+                            "invalid currency for account",
+                            vec![("open".to_string(), account.opened)],
                         ));
                     }
                 }
                 (None, Some(_)) => {
-                    self.errors
-                        .push(spanned(BuilderError::MissingAmount, *posting.span()));
+                    self.errors.push(posting.error("missing amount"));
                 }
                 (Some(_), None) => {
-                    self.errors
-                        .push(spanned(BuilderError::MissingCurrency, *posting.span()));
+                    self.errors.push(posting.error("missing currency"));
                 }
                 (None, None) => {
                     self.errors
-                        .push(spanned(BuilderError::MissingAmount, *posting.span()));
-                    // and currency, but hey
+                        .push(posting.error("missing amount and currency"));
                 }
             }
         } else if let Some(closed) = self
             .closed_accounts
             .get(&posting.account().item().to_string())
         {
-            self.errors.push(spanned(
-                BuilderError::AccountAlreadyClosed(*closed),
-                *posting.span(),
-            ));
+            self.errors.push(
+                posting.error_with_contexts(
+                    "account was closed",
+                    vec![("close".to_string(), *closed)],
+                ),
+            );
         } else {
-            self.errors
-                .push(spanned(BuilderError::AccountNotOpen, *posting.span()));
+            self.errors.push(posting.error("account not open"));
         }
     }
 
-    fn price(&mut self, price: &parser::Price) {}
+    fn price(&mut self, price: &parser::Price, directive: &Spanned<parser::Directive>) {}
 
-    fn balance(&mut self, balance: &parser::Balance) {}
+    fn balance(&mut self, balance: &parser::Balance, directive: &Spanned<parser::Directive>) {}
 
-    fn open(&mut self, open: &parser::Open, span: Span) {
+    fn open(&mut self, open: &parser::Open, directive: &Spanned<parser::Directive>) {
         match self.open_accounts.entry(open.account().item().to_string()) {
             hash_map::Entry::Occupied(open_entry) => {
-                self.errors.push(spanned(
-                    BuilderError::AccountAlreadyOpen(*open_entry.get()),
-                    span,
+                self.errors.push(directive.error_with_contexts(
+                    "account already opened",
+                    vec![("open".to_string(), *open_entry.get())],
                 ));
             }
             hash_map::Entry::Vacant(open_entry) => {
+                let span = *directive.span();
                 open_entry.insert(span);
 
                 // cannot reopen a closed account
                 if let Some(closed) = self.closed_accounts.get(&open.account().item().to_string()) {
-                    self.errors
-                        .push(spanned(BuilderError::AccountAlreadyClosed(*closed), span));
+                    self.errors.push(directive.error_with_contexts(
+                        "account was closed",
+                        vec![("close".to_string(), *closed)],
+                    ));
                 } else {
                     self.accounts.insert(
                         open.account().item().to_string(),
@@ -183,7 +201,7 @@ impl LedgerBuilder {
         }
     }
 
-    fn close(&mut self, close: &parser::Close, span: Span) {
+    fn close(&mut self, close: &parser::Close, directive: &Spanned<parser::Directive>) {
         match self.open_accounts.entry(close.account().item().to_string()) {
             hash_map::Entry::Occupied(open_entry) => {
                 match self
@@ -192,35 +210,35 @@ impl LedgerBuilder {
                 {
                     hash_map::Entry::Occupied(closed_entry) => {
                         // cannot reclose a closed account
-                        self.errors.push(spanned(
-                            BuilderError::AccountAlreadyClosed(*closed_entry.get()),
-                            span,
+                        self.errors.push(directive.error_with_contexts(
+                            "account was already closed",
+                            vec![("close".to_string(), *closed_entry.get())],
                         ));
                     }
                     hash_map::Entry::Vacant(closed_entry) => {
                         open_entry.remove_entry();
-                        closed_entry.insert(span);
+                        closed_entry.insert(*directive.span());
                     }
                 }
             }
             hash_map::Entry::Vacant(_) => {
-                self.errors
-                    .push(spanned(BuilderError::AccountNotOpen, span));
+                self.errors.push(directive.error("account not open"));
             }
         }
     }
 
-    fn commodity(&mut self, commodity: &parser::Commodity) {}
+    fn commodity(&mut self, commodity: &parser::Commodity, directive: &Spanned<parser::Directive>) {
+    }
 
-    fn pad(&mut self, pad: &parser::Pad) {}
+    fn pad(&mut self, pad: &parser::Pad, directive: &Spanned<parser::Directive>) {}
 
-    fn document(&mut self, document: &parser::Document) {}
+    fn document(&mut self, document: &parser::Document, directive: &Spanned<parser::Directive>) {}
 
-    fn note(&mut self, note: &parser::Note) {}
+    fn note(&mut self, note: &parser::Note, directive: &Spanned<parser::Directive>) {}
 
-    fn event(&mut self, event: &parser::Event) {}
+    fn event(&mut self, event: &parser::Event, directive: &Spanned<parser::Directive>) {}
 
-    fn query(&mut self, query: &parser::Query) {}
+    fn query(&mut self, query: &parser::Query, directive: &Spanned<parser::Directive>) {}
 }
 
 #[derive(Clone, Debug, Steel)]
@@ -276,6 +294,7 @@ pub struct Amount {
 pub enum Error {
     Io(io::Error),
     Parser,
+    Builder,
     LedgerCog,
 }
 
@@ -286,6 +305,7 @@ impl Display for Error {
         match self {
             Io(e) => e.fmt(f),
             Parser => f.write_str("parser error"),
+            Builder => f.write_str("builder errors"),
             LedgerCog => f.write_str("error in Ledger cog"),
         }
     }
