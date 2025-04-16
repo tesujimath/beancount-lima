@@ -62,8 +62,12 @@ impl Ledger {
         }
     }
 
-    fn accounts(&self) -> HashMap<String, Account> {
-        self.accounts.clone()
+    fn accounts(&self) -> std::collections::HashMap<String, Account> {
+        // can't return a hashbrown::HashMap, but have to clone anyway, so this is not bad
+        self.accounts
+            .iter()
+            .map(|(name, account)| (name.clone(), account.clone()))
+            .collect()
     }
 }
 
@@ -377,11 +381,9 @@ impl Display for BuilderError {
     }
 }
 
-// TODO write BuilderError using BeancountSources and all references
-
 pub fn register_types_and_functions(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("Ledger?");
-    // steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
+    steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
 
     steel_engine.register_type::<Rational>("FFIRational?");
     steel_engine.register_fn("FFIRational-numerator", Rational::numerator);
