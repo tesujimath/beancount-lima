@@ -322,14 +322,6 @@ pub struct Rational(Decimal);
 impl Custom for Rational {}
 
 impl Rational {
-    fn new(num: i64, scale: u32) -> Rational {
-        Rational(Decimal::new(num, scale))
-    }
-
-    fn str(&self) -> String {
-        self.0.to_string()
-    }
-
     fn numerator(&self) -> isize {
         self.0.mantissa() as isize
     }
@@ -392,8 +384,6 @@ pub fn register_types_and_functions(steel_engine: &mut Engine) {
     // steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
 
     steel_engine.register_type::<Rational>("FFIRational?");
-    steel_engine.register_fn("FFIRational-new", Rational::new);
-    steel_engine.register_fn("FFIRational-str", Rational::str);
     steel_engine.register_fn("FFIRational-numerator", Rational::numerator);
     steel_engine.register_fn("FFIRational-denominator", Rational::denominator);
 }

@@ -1,3 +1,6 @@
+;; convert FFIRational to native rational
+(define (FFIRational->rational r) (/ (FFIRational-numerator r) (FFIRational-denominator r)))
+
 ;; Steel does not allow construction of arbitrary native Steel values from Rust,
 ;; so we convert from FFI values to native values here.
 (struct ledger (accounts))
