@@ -120,12 +120,61 @@ impl LedgerBuilder {
         transaction: &parser::Transaction,
         directive: &Spanned<parser::Directive>,
     ) {
+        // determine auto-posting for at most one unspecified account
+        let mut residual = hashbrown::HashMap::<&parser::Currency<'_>, Decimal>::default();
+        let mut unspecified: Vec<&Spanned<parser::Posting<'_>>> = Vec::default();
+
         for posting in transaction.postings() {
-            self.post(posting, *directive.date().item());
+            use hashbrown::hash_map::Entry::*;
+
+            if let (Some(amount), Some(currency)) = (posting.amount(), posting.currency()) {
+                match residual.entry(currency.item()) {
+                    Occupied(mut residual_entry) => {
+                        let accumulated = residual_entry.get() + amount.value();
+                        residual_entry.insert(accumulated);
+                    }
+                    Vacant(residual_entry) => {
+                        residual_entry.insert(amount.value());
+                    }
+                }
+            } else {
+                unspecified.push(posting);
+            }
+        }
+
+        // record each posting for which we have both amount and currency
+        for posting in transaction
+            .postings()
+            .filter(|posting| posting.amount().is_some() && posting.currency().is_some())
+        {
+            self.post(*directive.date().item(), posting, None, None);
+        }
+
+        // auto-post if required
+        if let Some(unspecified) = unspecified.pop() {
+            for (currency, amount) in residual {
+                self.post(
+                    *directive.date().item(),
+                    unspecified,
+                    Some(-amount),
+                    Some(currency),
+                );
+            }
+        }
+        // any other unspecified postings are errors
+        for unspecified in unspecified.iter() {
+            self.errors
+                .push(unspecified.error("more than one posting without amount/currency"));
         }
     }
 
-    fn post(&mut self, posting: &Spanned<parser::Posting>, date: Date) {
+    fn post(
+        &mut self,
+        date: Date,
+        posting: &Spanned<parser::Posting>,
+        default_amount: Option<Decimal>,
+        default_currency: Option<&parser::Currency>,
+    ) {
         if self
             .open_accounts
             .contains_key(&posting.account().item().to_string())
@@ -135,16 +184,23 @@ impl LedgerBuilder {
                 .get_mut(&posting.account().item().to_string())
                 .unwrap();
 
-            match (posting.amount(), posting.currency()) {
+            let amount = posting
+                .amount()
+                .map(|amount| amount.item().value())
+                .or(default_amount);
+
+            let currency = posting
+                .currency()
+                .map(|currency| currency.item())
+                .or(default_currency);
+
+            match (amount, currency) {
                 (Some(amount), Some(currency)) => {
                     let currency = currency.to_string();
                     match account.inventory.get_mut(&currency) {
                         Some(position) => {
-                            position.add_decimal(amount.value());
-                            account.postings.push((
-                                Posting::new(date, amount.value(), currency),
-                                *posting.span(),
-                            ));
+                            position.add_decimal(amount);
+                            account.postings.push(Posting::new(date, amount, currency));
                         }
                         None => {
                             self.errors.push(posting.error_with_contexts(
@@ -301,18 +357,14 @@ pub struct AccountBuilder {
     pub(crate) opened: Span,
     // TODO
     // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
-    pub(crate) postings: Vec<(Posting, Span)>,
+    pub(crate) postings: Vec<Posting>,
 }
 
 impl AccountBuilder {
     fn build(self) -> Account {
         Account {
             inventory: self.inventory.into_iter().collect(),
-            postings: self
-                .postings
-                .into_iter()
-                .map(|(posting, span)| posting)
-                .collect(),
+            postings: self.postings.into_iter().collect(),
         }
     }
 

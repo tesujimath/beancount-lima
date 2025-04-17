@@ -1,0 +1,25 @@
+; simple Beancount file to explore balancing of postings
+
+1970-01-01 commodity NZD
+
+1970-01-01 commodity GBP
+
+1970-01-01 open Equity:Opening-Balances NZD,GBP
+
+2016-03-01 open Assets:Bank:Current NZD,GBP
+
+2016-03-01 open Assets:Bank:British GBP
+
+2016-03-01 open Expenses:Groceries NZD
+
+2016-03-01 open Expenses:Entertainment NZD,GBP
+
+2023-05-01 * "New World ;"
+  Assets:Bank:Current                         -9.65 NZD
+  Expenses:Groceries
+
+2023-05-02 * "Trip ;"
+  Assets:Bank:Current
+  Assets:Bank:British                  -95 GBP
+  Expenses:Groceries                    20 NZD
+  Expenses:Entertainment               100 GBP
