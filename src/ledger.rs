@@ -3,9 +3,9 @@
 use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
-use hashbrown::{hash_map, HashMap, HashSet};
 use rust_decimal::Decimal;
 use std::{
+    collections::{HashMap, HashSet},
     fmt::Display,
     io::{self, Write},
     path::Path,
@@ -15,6 +15,7 @@ use steel::{
     steel_vm::{engine::Engine, register_fn::RegisterFn},
 };
 use steel_derive::Steel;
+use time::Date;
 
 #[derive(Clone, Debug, Steel)]
 pub struct Ledger {
@@ -62,19 +63,16 @@ impl Ledger {
         }
     }
 
-    fn accounts(&self) -> std::collections::HashMap<String, Account> {
-        // can't return a hashbrown::HashMap, but have to clone anyway, so this is not bad
-        self.accounts
-            .iter()
-            .map(|(name, account)| (name.clone(), account.clone()))
-            .collect()
+    fn accounts(&self) -> HashMap<String, Account> {
+        self.accounts.clone()
     }
 }
 
 #[derive(Default, Debug)]
 struct LedgerBuilder {
-    open_accounts: HashMap<String, Span>,
-    closed_accounts: HashMap<String, Span>,
+    // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
+    open_accounts: hashbrown::HashMap<String, Span>,
+    closed_accounts: hashbrown::HashMap<String, Span>,
     accounts: HashMap<String, AccountBuilder>,
     errors: Vec<parser::Error>,
 }
@@ -123,11 +121,11 @@ impl LedgerBuilder {
         directive: &Spanned<parser::Directive>,
     ) {
         for posting in transaction.postings() {
-            self.post(posting);
+            self.post(posting, *directive.date().item());
         }
     }
 
-    fn post(&mut self, posting: &Spanned<parser::Posting>) {
+    fn post(&mut self, posting: &Spanned<parser::Posting>, date: Date) {
         if self
             .open_accounts
             .contains_key(&posting.account().item().to_string())
@@ -141,9 +139,10 @@ impl LedgerBuilder {
                 (Some(amount), Some(currency)) => {
                     let currency = currency.to_string();
                     if account.currencies.contains(&currency) {
-                        account
-                            .postings
-                            .push((Posting::new(amount.value(), currency), *posting.span()));
+                        account.postings.push((
+                            Posting::new(date, amount.value(), currency),
+                            *posting.span(),
+                        ));
                     } else {
                         self.errors.push(posting.error_with_contexts(
                             "invalid currency for account",
@@ -182,14 +181,15 @@ impl LedgerBuilder {
     fn balance(&mut self, balance: &parser::Balance, directive: &Spanned<parser::Directive>) {}
 
     fn open(&mut self, open: &parser::Open, directive: &Spanned<parser::Directive>) {
+        use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(open.account().item().to_string()) {
-            hash_map::Entry::Occupied(open_entry) => {
+            Occupied(open_entry) => {
                 self.errors.push(directive.error_with_contexts(
                     "account already opened",
                     vec![("open".to_string(), *open_entry.get())],
                 ));
             }
-            hash_map::Entry::Vacant(open_entry) => {
+            Vacant(open_entry) => {
                 let span = *directive.span();
                 open_entry.insert(span);
 
@@ -213,26 +213,27 @@ impl LedgerBuilder {
     }
 
     fn close(&mut self, close: &parser::Close, directive: &Spanned<parser::Directive>) {
+        use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(close.account().item().to_string()) {
-            hash_map::Entry::Occupied(open_entry) => {
+            Occupied(open_entry) => {
                 match self
                     .closed_accounts
                     .entry(close.account().item().to_string())
                 {
-                    hash_map::Entry::Occupied(closed_entry) => {
+                    Occupied(closed_entry) => {
                         // cannot reclose a closed account
                         self.errors.push(directive.error_with_contexts(
                             "account was already closed",
                             vec![("close".to_string(), *closed_entry.get())],
                         ));
                     }
-                    hash_map::Entry::Vacant(closed_entry) => {
+                    Vacant(closed_entry) => {
                         open_entry.remove_entry();
                         closed_entry.insert(*directive.span());
                     }
                 }
             }
-            hash_map::Entry::Vacant(_) => {
+            Vacant(_) => {
                 self.errors.push(directive.error("account not open"));
             }
         }
@@ -258,6 +259,30 @@ pub struct Account {
     // TODO
     // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
     pub(crate) postings: Vec<Posting>,
+}
+
+impl Account {
+    fn currencies(&self) -> HashSet<String> {
+        self.currencies.clone()
+    }
+
+    fn postings(&self) -> Vec<Posting> {
+        self.postings.clone()
+    }
+}
+
+impl Display for Account {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("account-currencies:")?;
+        for currency in &self.currencies {
+            writeln!(f, " {}", currency)?;
+        }
+        f.write_str("\n")?;
+        for p in &self.postings {
+            writeln!(f, "  {}", &p)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -295,6 +320,7 @@ impl AccountBuilder {
 
 #[derive(Clone, Debug, Steel)]
 pub struct Posting {
+    pub(crate) date: String,
     pub(crate) amount: Amount,
     // TODO:
     // pub(crate) flag: Option<String>,
@@ -304,13 +330,28 @@ pub struct Posting {
 }
 
 impl Posting {
-    fn new(amount: Decimal, currency: String) -> Self {
+    fn new(date: Date, amount: Decimal, currency: String) -> Self {
         Posting {
+            date: date.to_string(),
             amount: Amount {
                 number: Rational(amount),
                 currency,
             },
         }
+    }
+
+    fn date(&self) -> String {
+        self.date.clone()
+    }
+
+    fn amount(&self) -> Amount {
+        self.amount.clone()
+    }
+}
+
+impl Display for Posting {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", &self.date, &self.amount)
     }
 }
 
@@ -318,6 +359,24 @@ impl Posting {
 pub struct Amount {
     pub(crate) number: Rational,
     pub(crate) currency: String,
+}
+
+// TODO derive getters one this is resolved:
+// https://github.com/mattwparas/steel/issues/365
+impl Amount {
+    fn number(&self) -> Rational {
+        self.number.clone()
+    }
+
+    fn currency(&self) -> String {
+        self.currency.clone()
+    }
+}
+
+impl Display for Amount {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", &self.number, &self.currency)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -332,6 +391,12 @@ impl Rational {
 
     fn denominator(&self) -> isize {
         10isize.pow(self.0.scale())
+    }
+}
+
+impl Display for Rational {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -385,7 +450,23 @@ pub fn register_types_and_functions(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("Ledger?");
     steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
 
+    steel_engine.register_type::<Account>("Account?");
+    steel_engine.register_fn("Account->string", Account::to_string);
+    steel_engine.register_fn("Account-currencies", Account::currencies);
+    steel_engine.register_fn("Account-postings", Account::postings);
+
+    steel_engine.register_type::<Posting>("Posting?");
+    steel_engine.register_fn("Posting->string", Posting::to_string);
+    steel_engine.register_fn("Posting-date", Posting::date);
+    steel_engine.register_fn("Posting-amount", Posting::amount);
+
+    steel_engine.register_type::<Amount>("Amount?");
+    steel_engine.register_fn("Amount->string", Amount::to_string);
+    steel_engine.register_fn("Amount-number", Amount::number);
+    steel_engine.register_fn("Amount-currency", Amount::currency);
+
     steel_engine.register_type::<Rational>("FFIRational?");
+    steel_engine.register_fn("FFIRational->string", Rational::to_string);
     steel_engine.register_fn("FFIRational-numerator", Rational::numerator);
     steel_engine.register_fn("FFIRational-denominator", Rational::denominator);
 }

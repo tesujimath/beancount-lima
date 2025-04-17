@@ -175,6 +175,7 @@ dependencies = [
  "steel-core",
  "steel-derive",
  "steel-repl",
+ "time",
  "xflags",
 ]
 
