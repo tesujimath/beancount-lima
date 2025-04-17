@@ -3,9 +3,9 @@
 use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
-use rust_decimal::Decimal;
+use rust_decimal::{prelude::Zero, Decimal};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::Display,
     io::{self, Write},
     path::Path,
@@ -138,16 +138,20 @@ impl LedgerBuilder {
             match (posting.amount(), posting.currency()) {
                 (Some(amount), Some(currency)) => {
                     let currency = currency.to_string();
-                    if account.currencies.contains(&currency) {
-                        account.postings.push((
-                            Posting::new(date, amount.value(), currency),
-                            *posting.span(),
-                        ));
-                    } else {
-                        self.errors.push(posting.error_with_contexts(
-                            "invalid currency for account",
-                            vec![("open".to_string(), account.opened)],
-                        ));
+                    match account.inventory.get_mut(&currency) {
+                        Some(position) => {
+                            position.add_decimal(amount.value());
+                            account.postings.push((
+                                Posting::new(date, amount.value(), currency),
+                                *posting.span(),
+                            ));
+                        }
+                        None => {
+                            self.errors.push(posting.error_with_contexts(
+                                "invalid currency for account",
+                                vec![("open".to_string(), account.opened)],
+                            ));
+                        }
                     }
                 }
                 (None, Some(_)) => {
@@ -255,15 +259,16 @@ impl LedgerBuilder {
 
 #[derive(Clone, Debug, Steel)]
 pub struct Account {
-    pub(crate) currencies: HashSet<String>,
+    // TODO support cost in the inventory
+    pub(crate) inventory: HashMap<String, Rational>,
     // TODO
     // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
     pub(crate) postings: Vec<Posting>,
 }
 
 impl Account {
-    fn currencies(&self) -> HashSet<String> {
-        self.currencies.clone()
+    fn inventory(&self) -> HashMap<String, Rational> {
+        self.inventory.clone()
     }
 
     fn postings(&self) -> Vec<Posting> {
@@ -273,21 +278,26 @@ impl Account {
 
 impl Display for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("account-currencies:")?;
-        for currency in &self.currencies {
-            writeln!(f, " {}", currency)?;
+        let mut pad = "";
+        for (currency, number) in &self.inventory {
+            write!(f, "{}{} {}", pad, number, currency)?;
+            pad = " ";
         }
+
         f.write_str("\n")?;
+
         for p in &self.postings {
             writeln!(f, "  {}", &p)?;
         }
+
         Ok(())
     }
 }
 
 #[derive(Debug)]
 pub struct AccountBuilder {
-    pub(crate) currencies: HashSet<String>,
+    // TODO support cost in inventory
+    pub(crate) inventory: hashbrown::HashMap<String, Rational>,
     pub(crate) opened: Span,
     // TODO
     // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
@@ -297,7 +307,7 @@ pub struct AccountBuilder {
 impl AccountBuilder {
     fn build(self) -> Account {
         Account {
-            currencies: self.currencies,
+            inventory: self.inventory.into_iter().collect(),
             postings: self
                 .postings
                 .into_iter()
@@ -311,7 +321,7 @@ impl AccountBuilder {
         I: Iterator<Item = String>,
     {
         AccountBuilder {
-            currencies: HashSet::from_iter(currencies),
+            inventory: currencies.map(|cur| (cur, Rational::zero())).collect(),
             opened,
             postings: Vec::default(),
         }
@@ -385,6 +395,14 @@ pub struct Rational(Decimal);
 impl Custom for Rational {}
 
 impl Rational {
+    fn zero() -> Self {
+        Rational(Decimal::zero())
+    }
+
+    fn add_decimal(&mut self, x: Decimal) {
+        self.0 += x;
+    }
+
     fn numerator(&self) -> isize {
         self.0.mantissa() as isize
     }
@@ -452,7 +470,7 @@ pub fn register_types_and_functions(steel_engine: &mut Engine) {
 
     steel_engine.register_type::<Account>("Account?");
     steel_engine.register_fn("Account->string", Account::to_string);
-    steel_engine.register_fn("Account-currencies", Account::currencies);
+    steel_engine.register_fn("Account-inventory", Account::inventory);
     steel_engine.register_fn("Account-postings", Account::postings);
 
     steel_engine.register_type::<Posting>("Posting?");
