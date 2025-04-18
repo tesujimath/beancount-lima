@@ -54,9 +54,17 @@
               export STEEL_HOME=$(pwd)/steel
               mkdir -p $STEEL_HOME
 
+              # There's no cog path AFAIK, so for now we symlink them in
+              mkdir -p $STEEL_HOME/cogs
+              for coglib in srfi steel; do
+                ln -sf "${flakePkgs.steel}/lib/steel/cogs/$coglib" $STEEL_HOME/cogs
+              done
+
               # LSP config
               # https://github.com/mattwparas/steel/tree/master/crates/steel-language-server#configuration
               export STEEL_LSP_HOME=$(pwd)/steel-lsp
+
+              PATH=$PATH:$(pwd)/target/debug
             '';
           };
         }

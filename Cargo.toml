@@ -3,10 +3,6 @@ name = "beancount-lima"
 version = "0.1.0"
 edition = "2024"
 
-[[bin]]
-name = "beancount-repl"
-path = "src/bin/beancount-repl.rs"
-
 [dependencies]
 abi_stable = "0.11.3"
 beancount-parser-lima = { version = "0.8.0-alpha.1", path = "../beancount-parser-lima/beancount-parser-lima" }

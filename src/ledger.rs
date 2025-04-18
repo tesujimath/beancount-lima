@@ -487,7 +487,7 @@ pub enum Error {
     Io(io::Error),
     Parser,
     Builder,
-    LedgerCog,
+    Scheme,
 }
 
 impl Display for Error {
@@ -498,7 +498,7 @@ impl Display for Error {
             Io(e) => e.fmt(f),
             Parser => f.write_str("parser error"),
             Builder => f.write_str("builder errors"),
-            LedgerCog => f.write_str("error in Ledger cog"),
+            Scheme => f.write_str("error in Scheme"),
         }
     }
 }
