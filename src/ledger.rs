@@ -313,7 +313,7 @@ impl LedgerBuilder {
     fn query(&mut self, query: &parser::Query, directive: &Spanned<parser::Directive>) {}
 }
 
-#[derive(Clone, Debug, Steel)]
+#[derive(Clone, Debug)]
 pub struct Account {
     // TODO support cost in the inventory
     pub(crate) inventory: HashMap<String, Rational>,
@@ -332,19 +332,31 @@ impl Account {
     }
 }
 
+impl Custom for Account {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
+    }
+}
+
 impl Display for Account {
+    // display the inventory like a Clojure literal hash
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut pad = "";
-        for (currency, number) in &self.inventory {
-            write!(f, "{}{} {}", pad, number, currency)?;
-            pad = " ";
+        f.write_str("{")?;
+        // sort so output is deterministic
+        let mut currencies = self.inventory.keys().collect::<Vec<_>>();
+        currencies.sort();
+        for currency in currencies.into_iter() {
+            write!(
+                f,
+                "{}\"{}\" {}",
+                pad,
+                currency,
+                self.inventory.get(currency).unwrap()
+            )?;
+            pad = ", ";
         }
-
-        f.write_str("\n")?;
-
-        for p in &self.postings {
-            writeln!(f, "  {}", &p)?;
-        }
+        f.write_str("}")?;
 
         Ok(())
     }
