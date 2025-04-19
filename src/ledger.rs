@@ -614,4 +614,6 @@ pub fn register_types_and_functions(steel_engine: &mut Engine) {
     steel_engine.register_fn("FFIRational->string", Rational::to_string);
     steel_engine.register_fn("FFIRational-numerator", Rational::numerator);
     steel_engine.register_fn("FFIRational-denominator", Rational::denominator);
+
+    steel_engine.register_fn("tabulate", crate::tabulate::tabulate);
 }

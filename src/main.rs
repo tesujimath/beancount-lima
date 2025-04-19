@@ -52,3 +52,4 @@ fn main() -> Result<(), ledger::Error> {
 
 pub mod ledger;
 use ledger::*;
+pub mod tabulate;
