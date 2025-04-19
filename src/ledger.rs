@@ -20,6 +20,7 @@ use steel_derive::Steel;
 #[derive(Clone, Debug, Steel)]
 pub struct Ledger {
     sources: BeancountSources,
+    currencies: HashSet<String>,
     accounts: HashMap<String, Account>,
 }
 
@@ -63,6 +64,18 @@ impl Ledger {
         }
     }
 
+    fn currencies(&self) -> Vec<String> {
+        let mut currencies = self.currencies.iter().cloned().collect::<Vec<_>>();
+        currencies.sort();
+        currencies
+    }
+
+    fn account_names(&self) -> Vec<String> {
+        let mut account_names = self.accounts.keys().cloned().collect::<Vec<_>>();
+        account_names.sort();
+        account_names
+    }
+
     fn accounts(&self) -> HashMap<String, Account> {
         self.accounts.clone()
     }
@@ -83,8 +96,18 @@ impl LedgerBuilder {
         W: Write + Copy,
     {
         if self.errors.is_empty() {
+            // determine all currencies actually used
+            let mut currencies = HashSet::<&str>::default();
+            for account in self.accounts.values() {
+                for currency in account.inventory.keys() {
+                    currencies.insert(currency.as_str());
+                }
+            }
+            let currencies = currencies.into_iter().map(|s| s.to_string()).collect();
+
             Ok(Ledger {
                 sources,
+                currencies,
                 accounts: self
                     .accounts
                     .into_iter()
@@ -593,6 +616,8 @@ impl Display for Error {
 
 pub fn register_types_and_functions(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("Ledger?");
+    steel_engine.register_fn("Ledger-currencies", Ledger::currencies);
+    steel_engine.register_fn("Ledger-account-names", Ledger::account_names);
     steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
 
     steel_engine.register_type::<Account>("Account?");
