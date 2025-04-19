@@ -3,9 +3,9 @@
 use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
-use rust_decimal::{prelude::Zero, Decimal};
+use rust_decimal::Decimal;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::Display,
     io::{self, Write},
     path::Path,
@@ -196,18 +196,27 @@ impl LedgerBuilder {
 
             match (amount, currency) {
                 (Some(amount), Some(currency)) => {
+                    use hashbrown::hash_map::Entry::*;
                     let currency = currency.to_string();
-                    match account.inventory.get_mut(&currency) {
-                        Some(position) => {
-                            position.add_decimal(amount);
-                            account.postings.push(Posting::new(date, amount, currency));
+
+                    if account.is_currency_valid(&currency) {
+                        account
+                            .postings
+                            .push(Posting::new(date, amount, currency.clone()));
+                        match account.inventory.entry(currency) {
+                            Occupied(mut position) => {
+                                let position = position.get_mut();
+                                position.add_decimal(amount);
+                            }
+                            Vacant(position) => {
+                                position.insert(amount.into());
+                            }
                         }
-                        None => {
-                            self.errors.push(posting.error_with_contexts(
-                                "invalid currency for account",
-                                vec![("open".to_string(), account.opened)],
-                            ));
-                        }
+                    } else {
+                        self.errors.push(posting.error_with_contexts(
+                            "invalid currency for account",
+                            vec![("open".to_string(), account.opened)],
+                        ));
                     }
                 }
                 (None, Some(_)) => {
@@ -365,6 +374,7 @@ impl Display for Account {
 #[derive(Debug)]
 pub struct AccountBuilder {
     // TODO support cost in inventory
+    pub(crate) currencies: HashSet<String>,
     pub(crate) inventory: hashbrown::HashMap<String, Rational>,
     pub(crate) opened: Span,
     // TODO
@@ -385,10 +395,16 @@ impl AccountBuilder {
         I: Iterator<Item = String>,
     {
         AccountBuilder {
-            inventory: currencies.map(|cur| (cur, Rational::zero())).collect(),
+            currencies: currencies.collect(),
+            inventory: hashbrown::HashMap::default(),
             opened,
             postings: Vec::default(),
         }
+    }
+
+    /// all currencies are valid unless any were specified during open
+    fn is_currency_valid(&self, currency: &String) -> bool {
+        self.currencies.is_empty() || self.currencies.contains(currency)
     }
 }
 
@@ -456,13 +472,13 @@ impl Display for Amount {
 #[derive(Clone, Debug)]
 pub struct Rational(Decimal);
 
-impl Custom for Rational {}
+impl Custom for Rational {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.0.to_string()))
+    }
+}
 
 impl Rational {
-    fn zero() -> Self {
-        Rational(Decimal::zero())
-    }
-
     fn add_decimal(&mut self, x: Decimal) {
         self.0 += x;
     }
@@ -473,6 +489,12 @@ impl Rational {
 
     fn denominator(&self) -> isize {
         10isize.pow(self.0.scale())
+    }
+}
+
+impl From<Decimal> for Rational {
+    fn from(value: Decimal) -> Self {
+        Self(value)
     }
 }
 
@@ -499,31 +521,6 @@ impl Display for Error {
             Parser => f.write_str("parser error"),
             Builder => f.write_str("builder errors"),
             Scheme => f.write_str("error in Scheme"),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum BuilderError {
-    AccountAlreadyOpen(Span),
-    AccountNotOpen,
-    AccountAlreadyClosed(Span),
-    InvalidCurrencyForAccount(Span),
-    MissingAmount,
-    MissingCurrency,
-}
-
-impl Display for BuilderError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use BuilderError::*;
-
-        match self {
-            AccountAlreadyOpen(_) => f.write_str("account already open"),
-            AccountNotOpen => f.write_str("account not open"),
-            AccountAlreadyClosed(_) => f.write_str("account already closed"),
-            InvalidCurrencyForAccount(_) => f.write_str("invalid currency for account"),
-            MissingAmount => f.write_str("missing amount"),
-            MissingCurrency => f.write_str("missing currency"),
         }
     }
 }
