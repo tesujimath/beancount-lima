@@ -8,6 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     io::{self, Write},
+    ops::{Deref, DerefMut},
     path::Path,
 };
 use steel::{
@@ -15,7 +16,6 @@ use steel::{
     steel_vm::{engine::Engine, register_fn::RegisterFn},
 };
 use steel_derive::Steel;
-use time::Date;
 
 #[derive(Clone, Debug, Steel)]
 pub struct Ledger {
@@ -170,7 +170,7 @@ impl LedgerBuilder {
 
     fn post(
         &mut self,
-        date: Date,
+        date: time::Date,
         posting: &Spanned<parser::Posting>,
         default_amount: Option<Decimal>,
         default_currency: Option<&parser::Currency>,
@@ -341,12 +341,6 @@ impl Account {
     }
 }
 
-impl Custom for Account {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.to_string()))
-    }
-}
-
 impl Display for Account {
     // display the inventory like a Clojure literal hash
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -368,6 +362,12 @@ impl Display for Account {
         f.write_str("}")?;
 
         Ok(())
+    }
+}
+
+impl Custom for Account {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
     }
 }
 
@@ -408,9 +408,9 @@ impl AccountBuilder {
     }
 }
 
-#[derive(Clone, Debug, Steel)]
+#[derive(Clone, Debug)]
 pub struct Posting {
-    pub(crate) date: String,
+    pub(crate) date: Date,
     pub(crate) amount: Amount,
     // TODO:
     // pub(crate) flag: Option<String>,
@@ -420,9 +420,9 @@ pub struct Posting {
 }
 
 impl Posting {
-    fn new(date: Date, amount: Decimal, currency: String) -> Self {
+    fn new(date: time::Date, amount: Decimal, currency: String) -> Self {
         Posting {
-            date: date.to_string(),
+            date: date.into(),
             amount: Amount {
                 number: Rational(amount),
                 currency,
@@ -430,7 +430,7 @@ impl Posting {
         }
     }
 
-    fn date(&self) -> String {
+    fn date(&self) -> Date {
         self.date.clone()
     }
 
@@ -445,7 +445,13 @@ impl Display for Posting {
     }
 }
 
-#[derive(Clone, Debug, Steel)]
+impl Custom for Posting {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Amount {
     pub(crate) number: Rational,
     pub(crate) currency: String,
@@ -469,14 +475,16 @@ impl Display for Amount {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Rational(Decimal);
-
-impl Custom for Rational {
+impl Custom for Amount {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.0.to_string()))
+        Some(Ok(self.to_string()))
     }
 }
+
+type Date = Wrapped<time::Date>;
+
+#[derive(Clone, Debug)]
+pub struct Rational(Decimal);
 
 impl Rational {
     fn add_decimal(&mut self, x: Decimal) {
@@ -501,6 +509,64 @@ impl From<Decimal> for Rational {
 impl Display for Rational {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+impl Custom for Rational {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.0.to_string()))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Wrapped<T>(T)
+where
+    T: Clone;
+
+impl<T> Custom for Wrapped<T>
+where
+    T: Clone + Display + 'static,
+{
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.0.to_string()))
+    }
+}
+
+impl<T> From<T> for Wrapped<T>
+where
+    T: Clone,
+{
+    fn from(value: T) -> Self {
+        Wrapped(value)
+    }
+}
+
+impl<T> Display for Wrapped<T>
+where
+    T: Clone + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl<T> Deref for Wrapped<T>
+where
+    T: Clone,
+{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> DerefMut for Wrapped<T>
+where
+    T: Clone,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
