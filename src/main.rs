@@ -1,6 +1,28 @@
-use std::{fs::read_to_string, path::PathBuf};
+use std::path::PathBuf;
 use steel::steel_vm::engine::Engine;
 use steel_repl::run_repl;
+
+const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
+
+fn set_search_path(steel_engine: &mut Engine) {
+    // setup search path for cogs
+    if let Ok(path) = std::env::var(BEANCOUNT_LIMA_COGPATH) {
+        for path in path.split(":") {
+            if path.is_empty() {
+                continue;
+            }
+            let dir = PathBuf::from(path);
+            if dir.is_dir() {
+                steel_engine.add_search_directory(dir);
+            } else {
+                eprintln!(
+                    "warning: ${} contains directory {} which does not exist",
+                    BEANCOUNT_LIMA_COGPATH, path
+                )
+            }
+        }
+    }
+}
 
 fn main() -> Result<(), ledger::Error> {
     let flags = xflags::parse_or_exit! {
@@ -10,8 +32,8 @@ fn main() -> Result<(), ledger::Error> {
         /// Beancount ledger path
         required beancount_path: PathBuf
 
-        /// Steel Scheme files to load
-        repeated scheme_path: PathBuf
+        /// additional Steel cogs to load
+        repeated cog: String
     };
 
     let stderr = &std::io::stderr();
@@ -20,23 +42,27 @@ fn main() -> Result<(), ledger::Error> {
 
     let mut steel_engine = Engine::new();
 
+    set_search_path(&mut steel_engine);
+
     register_types_and_functions(&mut steel_engine);
     steel_engine
         .register_external_value("*ffi-ledger*", ledger)
         .unwrap(); // can't fail
 
-    // load ledger cog
-    let ledger_cog = include_str!("../cogs/ledger.scm");
-    if let Err(e) = steel_engine.run(ledger_cog) {
-        e.emit_result("cogs/ledger.scm", ledger_cog);
+    // // TODO make this a function
+    // load ledger prelude
+    let prelude = "lima/prelude.scm";
+    let load_prelude_command = format!("(require \"{}\")", prelude);
+    if let Err(e) = steel_engine.run(load_prelude_command.clone()) {
+        e.emit_result(prelude, &load_prelude_command);
         return Err(ledger::Error::Scheme);
     }
 
     // load additional scheme files, if any
-    for scheme_path in &flags.scheme_path {
-        let content = read_to_string(scheme_path).map_err(ledger::Error::Io)?;
-        if let Err(e) = steel_engine.run(content) {
-            e.emit_result(scheme_path.to_string_lossy().as_ref(), ledger_cog);
+    for cog in &flags.cog {
+        let load_cog_command = format!("(require \"{}\")", cog);
+        if let Err(e) = steel_engine.run(load_cog_command.clone()) {
+            e.emit_result(cog, &load_cog_command);
             return Err(ledger::Error::Scheme);
         }
     }

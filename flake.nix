@@ -55,6 +55,8 @@
               # https://github.com/mattwparas/steel/tree/master/crates/steel-language-server#configuration
               export STEEL_LSP_HOME=$(pwd)/steel-lsp
 
+              export BEANCOUNT_LIMA_COGPATH="$BEANCOUNT_LIMA_COGPATH:$(pwd)/examples/cogs:$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
+
               PATH=$PATH:$(pwd)/target/debug
             '';
           };
