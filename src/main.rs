@@ -51,8 +51,8 @@ fn main() -> Result<(), ledger::Error> {
 
     // // TODO make this a function
     // load ledger prelude
-    let prelude = "lima/prelude.scm";
-    let load_prelude_command = format!("(require \"{}\")", prelude);
+    let prelude = "lima/prelude";
+    let load_prelude_command = format!("(require \"{}.scm\")", prelude);
     if let Err(e) = steel_engine.run(load_prelude_command.clone()) {
         e.emit_result(prelude, &load_prelude_command);
         return Err(ledger::Error::Scheme);
@@ -60,7 +60,7 @@ fn main() -> Result<(), ledger::Error> {
 
     // load additional scheme files, if any
     for cog in &flags.cog {
-        let load_cog_command = format!("(require \"{}\")", cog);
+        let load_cog_command = format!("(require \"{}.scm\")", cog);
         if let Err(e) = steel_engine.run(load_cog_command.clone()) {
             e.emit_result(cog, &load_cog_command);
             return Err(ledger::Error::Scheme);

@@ -3,4 +3,4 @@ build:
 
 test: build
     cargo test
-    beancount-lima tests/auto-posting.beancount tests/auto-posting-tests.scm
+    beancount-lima --batch tests/auto-posting.beancount tests/auto-posting-tests
