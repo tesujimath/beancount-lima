@@ -27,7 +27,7 @@ fn set_search_path(steel_engine: &mut Engine) {
 fn main() -> Result<(), ledger::Error> {
     let flags = xflags::parse_or_exit! {
         /// Exit after loading and validating all files
-        optional --check
+        optional --batch
 
         /// Beancount ledger path
         required beancount_path: PathBuf
@@ -67,7 +67,7 @@ fn main() -> Result<(), ledger::Error> {
         }
     }
 
-    if flags.check {
+    if flags.batch {
         return Ok(());
     }
 
