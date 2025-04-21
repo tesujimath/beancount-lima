@@ -170,17 +170,16 @@ impl LedgerBuilder {
             .postings()
             .filter(|posting| posting.amount().is_some() && posting.currency().is_some())
         {
-            self.post(*directive.date().item(), posting, None, None);
+            self.post(*directive.date().item(), posting, None);
         }
 
         // auto-post if required
         if let Some(unspecified) = unspecified.pop() {
-            for (currency, amount) in residual {
+            for (currency, number) in residual {
                 self.post(
                     *directive.date().item(),
                     unspecified,
-                    Some(-amount),
-                    Some(currency),
+                    Some((-number, currency.to_string()).into()),
                 );
             }
         }
@@ -195,8 +194,7 @@ impl LedgerBuilder {
         &mut self,
         date: time::Date,
         posting: &Spanned<parser::Posting>,
-        default_amount: Option<rust_decimal::Decimal>,
-        default_currency: Option<&parser::Currency>,
+        amount: Option<Amount>,
     ) {
         if self
             .open_accounts
@@ -207,50 +205,49 @@ impl LedgerBuilder {
                 .get_mut(&posting.account().item().to_string())
                 .unwrap();
 
-            let amount = posting
-                .amount()
-                .map(|amount| amount.item().value())
-                .or(default_amount);
+            // if amount is specified explicitly we use it, otherwise we extract it from the post
+            let amount = amount.or_else(|| {
+                let amount = posting.amount().map(|amount| amount.item().value());
 
-            let currency = posting
-                .currency()
-                .map(|currency| currency.item())
-                .or(default_currency);
+                let currency = posting.currency().map(|currency| currency.item());
 
-            match (amount, currency) {
-                (Some(amount), Some(currency)) => {
-                    use hashbrown::hash_map::Entry::*;
-                    let currency = currency.to_string();
-
-                    if account.is_currency_valid(&currency) {
-                        account
-                            .postings
-                            .push(Posting::new(date.into(), (amount, currency.clone()).into()));
-                        match account.inventory.entry(currency) {
-                            Occupied(mut position) => {
-                                let position = position.get_mut();
-                                position.add(amount.into());
-                            }
-                            Vacant(position) => {
-                                position.insert(amount.into());
-                            }
-                        }
-                    } else {
-                        self.errors.push(posting.error_with_contexts(
-                            "invalid currency for account",
-                            vec![("open".to_string(), account.opened)],
-                        ));
+                match (amount, currency) {
+                    (Some(amount), Some(currency)) => Some((amount, currency.to_string()).into()),
+                    (None, Some(_)) => {
+                        self.errors.push(posting.error("missing amount"));
+                        None
+                    }
+                    (Some(_), None) => {
+                        self.errors.push(posting.error("missing currency"));
+                        None
+                    }
+                    (None, None) => {
+                        self.errors
+                            .push(posting.error("missing amount and currency"));
+                        None
                     }
                 }
-                (None, Some(_)) => {
-                    self.errors.push(posting.error("missing amount"));
-                }
-                (Some(_), None) => {
-                    self.errors.push(posting.error("missing currency"));
-                }
-                (None, None) => {
-                    self.errors
-                        .push(posting.error("missing amount and currency"));
+            });
+
+            if let Some(amount) = amount {
+                use hashbrown::hash_map::Entry::*;
+
+                if account.is_currency_valid(&amount.currency) {
+                    match account.inventory.entry(amount.currency.clone()) {
+                        Occupied(mut position) => {
+                            let position = position.get_mut();
+                            position.add(amount.number);
+                        }
+                        Vacant(position) => {
+                            position.insert(amount.number);
+                        }
+                    }
+                    account.postings.push(Posting::new(date.into(), amount));
+                } else {
+                    self.errors.push(posting.error_with_contexts(
+                        "invalid currency for account",
+                        vec![("open".to_string(), account.opened)],
+                    ));
                 }
             }
         } else if let Some(closed) = self
@@ -478,7 +475,7 @@ pub struct Amount {
 // https://github.com/mattwparas/steel/issues/365
 impl Amount {
     fn number(&self) -> Decimal {
-        self.number.clone()
+        self.number
     }
 
     fn currency(&self) -> String {
@@ -509,7 +506,7 @@ impl From<(rust_decimal::Decimal, String)> for Amount {
 
 type Date = Wrapped<time::Date>;
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Decimal(rust_decimal::Decimal);
 
 impl Decimal {
