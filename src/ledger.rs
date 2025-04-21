@@ -3,7 +3,6 @@
 use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
-use rust_decimal::Decimal;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -144,7 +143,8 @@ impl LedgerBuilder {
         directive: &Spanned<parser::Directive>,
     ) {
         // determine auto-posting for at most one unspecified account
-        let mut residual = hashbrown::HashMap::<&parser::Currency<'_>, Decimal>::default();
+        let mut residual =
+            hashbrown::HashMap::<&parser::Currency<'_>, rust_decimal::Decimal>::default();
         let mut unspecified: Vec<&Spanned<parser::Posting<'_>>> = Vec::default();
 
         for posting in transaction.postings() {
@@ -195,7 +195,7 @@ impl LedgerBuilder {
         &mut self,
         date: time::Date,
         posting: &Spanned<parser::Posting>,
-        default_amount: Option<Decimal>,
+        default_amount: Option<rust_decimal::Decimal>,
         default_currency: Option<&parser::Currency>,
     ) {
         if self
@@ -225,11 +225,11 @@ impl LedgerBuilder {
                     if account.is_currency_valid(&currency) {
                         account
                             .postings
-                            .push(Posting::new(date, amount, currency.clone()));
+                            .push(Posting::new(date.into(), (amount, currency.clone()).into()));
                         match account.inventory.entry(currency) {
                             Occupied(mut position) => {
                                 let position = position.get_mut();
-                                position.add_decimal(amount);
+                                position.add(amount.into());
                             }
                             Vacant(position) => {
                                 position.insert(amount.into());
@@ -348,14 +348,14 @@ impl LedgerBuilder {
 #[derive(Clone, Debug)]
 pub struct Account {
     // TODO support cost in the inventory
-    pub(crate) inventory: HashMap<String, Rational>,
+    pub(crate) inventory: HashMap<String, Decimal>,
     // TODO
     // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
     pub(crate) postings: Vec<Posting>,
 }
 
 impl Account {
-    fn inventory(&self) -> HashMap<String, Rational> {
+    fn inventory(&self) -> HashMap<String, Decimal> {
         self.inventory.clone()
     }
 
@@ -398,7 +398,7 @@ impl Custom for Account {
 pub struct AccountBuilder {
     // TODO support cost in inventory
     pub(crate) currencies: HashSet<String>,
-    pub(crate) inventory: hashbrown::HashMap<String, Rational>,
+    pub(crate) inventory: hashbrown::HashMap<String, Decimal>,
     pub(crate) opened: Span,
     // TODO
     // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
@@ -443,14 +443,8 @@ pub struct Posting {
 }
 
 impl Posting {
-    fn new(date: time::Date, amount: Decimal, currency: String) -> Self {
-        Posting {
-            date: date.into(),
-            amount: Amount {
-                number: Rational(amount),
-                currency,
-            },
-        }
+    fn new(date: Date, amount: Amount) -> Self {
+        Posting { date, amount }
     }
 
     fn date(&self) -> Date {
@@ -476,14 +470,14 @@ impl Custom for Posting {
 
 #[derive(Clone, Debug)]
 pub struct Amount {
-    pub(crate) number: Rational,
+    pub(crate) number: Decimal,
     pub(crate) currency: String,
 }
 
 // TODO derive getters one this is resolved:
 // https://github.com/mattwparas/steel/issues/365
 impl Amount {
-    fn number(&self) -> Rational {
+    fn number(&self) -> Decimal {
         self.number.clone()
     }
 
@@ -504,14 +498,23 @@ impl Custom for Amount {
     }
 }
 
+impl From<(rust_decimal::Decimal, String)> for Amount {
+    fn from(value: (rust_decimal::Decimal, String)) -> Self {
+        Amount {
+            number: value.0.into(),
+            currency: value.1,
+        }
+    }
+}
+
 type Date = Wrapped<time::Date>;
 
 #[derive(Clone, Debug)]
-pub struct Rational(Decimal);
+pub struct Decimal(rust_decimal::Decimal);
 
-impl Rational {
-    fn add_decimal(&mut self, x: Decimal) {
-        self.0 += x;
+impl Decimal {
+    fn add(&mut self, other: Decimal) {
+        self.0 += other.0;
     }
 
     fn numerator(&self) -> isize {
@@ -523,19 +526,19 @@ impl Rational {
     }
 }
 
-impl From<Decimal> for Rational {
-    fn from(value: Decimal) -> Self {
+impl From<rust_decimal::Decimal> for Decimal {
+    fn from(value: rust_decimal::Decimal) -> Self {
         Self(value)
     }
 }
 
-impl Display for Rational {
+impl Display for Decimal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl Custom for Rational {
+impl Custom for Decimal {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.0.to_string()))
     }
@@ -635,10 +638,10 @@ pub fn register_types_and_functions(steel_engine: &mut Engine) {
     steel_engine.register_fn("Amount-number", Amount::number);
     steel_engine.register_fn("Amount-currency", Amount::currency);
 
-    steel_engine.register_type::<Rational>("FFIRational?");
-    steel_engine.register_fn("FFIRational->string", Rational::to_string);
-    steel_engine.register_fn("FFIRational-numerator", Rational::numerator);
-    steel_engine.register_fn("FFIRational-denominator", Rational::denominator);
+    steel_engine.register_type::<Decimal>("Decimal?");
+    steel_engine.register_fn("Decimal->string", Decimal::to_string);
+    steel_engine.register_fn("Decimal-numerator", Decimal::numerator);
+    steel_engine.register_fn("Decimal-denominator", Decimal::denominator);
 
     steel_engine.register_fn("tabulate", crate::tabulate::tabulate);
 }

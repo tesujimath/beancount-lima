@@ -1,12 +1,12 @@
 (provide
-  FFIRational->rational
+  Decimal->rational
   ledger-currencies
   ledger-account-names
   ledger-accounts
   *ledger*)
 
-;; convert FFIRational to native rational
-(define (FFIRational->rational r) (/ (FFIRational-numerator r) (FFIRational-denominator r)))
+;; convert Decimal to native rational
+(define (Decimal->rational r) (/ (Decimal-numerator r) (Decimal-denominator r)))
 
 ;; Steel does not allow construction of arbitrary native Steel values from Rust,
 ;; so we convert from FFI values to native values here.

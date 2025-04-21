@@ -8,7 +8,7 @@
 (define __module__ "tests")
 
 (test-module "auto-posting-tests"
-  (let ((current-gbp (FFIRational->rational (hash-get (Account-inventory (hash-get (ledger-accounts *ledger*) "Assets:Bank:Current")) "GBP"))))
+  (let ((current-gbp (Decimal->rational (hash-get (Account-inventory (hash-get (ledger-accounts *ledger*) "Assets:Bank:Current")) "GBP"))))
     (check-equal? "current-gbp" -5 current-gbp)))
 
 ;; -------------- Report ------------------
