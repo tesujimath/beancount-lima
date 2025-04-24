@@ -43,7 +43,7 @@ where
     }
 }
 
-pub fn tabulate(rows: Vec<Vec<String>>) -> String {
+pub(crate) fn tabulate(rows: Vec<Vec<String>>) -> String {
     Tabulated(rows).to_string()
 }
 

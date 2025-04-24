@@ -5,26 +5,14 @@ use beancount_parser_lima::{
 };
 use std::{
     collections::{HashMap, HashSet},
-    fmt::Display,
-    io::{self, Write},
-    ops::{Deref, DerefMut},
+    io::Write,
     path::Path,
 };
-use steel::{
-    rvals::Custom,
-    steel_vm::{engine::Engine, register_fn::RegisterFn},
-};
-use steel_derive::Steel;
 
-#[derive(Clone, Debug, Steel)]
-pub struct Ledger {
-    sources: BeancountSources,
-    currencies: HashSet<String>,
-    accounts: HashMap<String, Account>,
-}
+use super::{types::*, Error};
 
 impl Ledger {
-    pub fn parse_from<W>(path: &Path, error_w: W) -> Result<Ledger, Error>
+    pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Ledger, Error>
     where
         W: Write + Copy,
     {
@@ -61,22 +49,6 @@ impl Ledger {
 
             Ok(ledger) => Ok(ledger),
         }
-    }
-
-    fn currencies(&self) -> Vec<String> {
-        let mut currencies = self.currencies.iter().cloned().collect::<Vec<_>>();
-        currencies.sort();
-        currencies
-    }
-
-    fn account_names(&self) -> Vec<String> {
-        let mut account_names = self.accounts.keys().cloned().collect::<Vec<_>>();
-        account_names.sort();
-        account_names
-    }
-
-    fn accounts(&self) -> HashMap<String, Account> {
-        self.accounts.clone()
     }
 }
 
@@ -342,64 +314,15 @@ impl LedgerBuilder {
     fn query(&mut self, query: &parser::Query, directive: &Spanned<parser::Directive>) {}
 }
 
-#[derive(Clone, Debug)]
-pub struct Account {
-    // TODO support cost in the inventory
-    pub(crate) inventory: HashMap<String, Decimal>,
-    // TODO
-    // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
-    pub(crate) postings: Vec<Posting>,
-}
-
-impl Account {
-    fn inventory(&self) -> HashMap<String, Decimal> {
-        self.inventory.clone()
-    }
-
-    fn postings(&self) -> Vec<Posting> {
-        self.postings.clone()
-    }
-}
-
-impl Display for Account {
-    // display the inventory like a Clojure literal hash
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut pad = "";
-        f.write_str("{")?;
-        // sort so output is deterministic
-        let mut currencies = self.inventory.keys().collect::<Vec<_>>();
-        currencies.sort();
-        for currency in currencies.into_iter() {
-            write!(
-                f,
-                "{}\"{}\" {}",
-                pad,
-                currency,
-                self.inventory.get(currency).unwrap()
-            )?;
-            pad = ", ";
-        }
-        f.write_str("}")?;
-
-        Ok(())
-    }
-}
-
-impl Custom for Account {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.to_string()))
-    }
-}
-
 #[derive(Debug)]
-pub struct AccountBuilder {
+struct AccountBuilder {
     // TODO support cost in inventory
-    pub(crate) currencies: HashSet<String>,
-    pub(crate) inventory: hashbrown::HashMap<String, Decimal>,
-    pub(crate) opened: Span,
+    currencies: HashSet<String>,
+    inventory: hashbrown::HashMap<String, Decimal>,
+    opened: Span,
     // TODO
-    // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
-    pub(crate) postings: Vec<Posting>,
+    //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
+    postings: Vec<Posting>,
 }
 
 impl AccountBuilder {
@@ -426,219 +349,4 @@ impl AccountBuilder {
     fn is_currency_valid(&self, currency: &String) -> bool {
         self.currencies.is_empty() || self.currencies.contains(currency)
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct Posting {
-    pub(crate) date: Date,
-    pub(crate) amount: Amount,
-    // TODO:
-    // pub(crate) flag: Option<String>,
-    // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
-    // pub(crate) price_annotation: Option<Spanned<PriceSpec<'a>>>,
-    // pub(crate) metadata: Metadata<'a>,
-}
-
-impl Posting {
-    fn new(date: Date, amount: Amount) -> Self {
-        Posting { date, amount }
-    }
-
-    fn date(&self) -> Date {
-        self.date.clone()
-    }
-
-    fn amount(&self) -> Amount {
-        self.amount.clone()
-    }
-}
-
-impl Display for Posting {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", &self.date, &self.amount)
-    }
-}
-
-impl Custom for Posting {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.to_string()))
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Amount {
-    pub(crate) number: Decimal,
-    pub(crate) currency: String,
-}
-
-// TODO derive getters one this is resolved:
-// https://github.com/mattwparas/steel/issues/365
-impl Amount {
-    fn number(&self) -> Decimal {
-        self.number
-    }
-
-    fn currency(&self) -> String {
-        self.currency.clone()
-    }
-}
-
-impl Display for Amount {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", &self.number, &self.currency)
-    }
-}
-
-impl Custom for Amount {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.to_string()))
-    }
-}
-
-impl From<(rust_decimal::Decimal, String)> for Amount {
-    fn from(value: (rust_decimal::Decimal, String)) -> Self {
-        Amount {
-            number: value.0.into(),
-            currency: value.1,
-        }
-    }
-}
-
-type Date = Wrapped<time::Date>;
-
-#[derive(Copy, Clone, Debug)]
-pub struct Decimal(rust_decimal::Decimal);
-
-impl Decimal {
-    fn add(&mut self, other: Decimal) {
-        self.0 += other.0;
-    }
-
-    fn numerator(&self) -> isize {
-        self.0.mantissa() as isize
-    }
-
-    fn denominator(&self) -> isize {
-        10isize.pow(self.0.scale())
-    }
-}
-
-impl From<rust_decimal::Decimal> for Decimal {
-    fn from(value: rust_decimal::Decimal) -> Self {
-        Self(value)
-    }
-}
-
-impl Display for Decimal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl Custom for Decimal {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.0.to_string()))
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct Wrapped<T>(T)
-where
-    T: Clone;
-
-impl<T> Custom for Wrapped<T>
-where
-    T: Clone + Display + 'static,
-{
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.0.to_string()))
-    }
-}
-
-impl<T> From<T> for Wrapped<T>
-where
-    T: Clone,
-{
-    fn from(value: T) -> Self {
-        Wrapped(value)
-    }
-}
-
-impl<T> Display for Wrapped<T>
-where
-    T: Clone + Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl<T> Deref for Wrapped<T>
-where
-    T: Clone,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> DerefMut for Wrapped<T>
-where
-    T: Clone,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    Io(io::Error),
-    Parser,
-    Builder,
-    Scheme,
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Error::*;
-
-        match self {
-            Io(e) => e.fmt(f),
-            Parser => f.write_str("parser error"),
-            Builder => f.write_str("builder errors"),
-            Scheme => f.write_str("error in Scheme"),
-        }
-    }
-}
-
-pub fn register_types_and_functions(steel_engine: &mut Engine) {
-    steel_engine.register_type::<Ledger>("Ledger?");
-    steel_engine.register_fn("Ledger-currencies", Ledger::currencies);
-    steel_engine.register_fn("Ledger-account-names", Ledger::account_names);
-    steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
-
-    steel_engine.register_type::<Account>("Account?");
-    steel_engine.register_fn("Account->string", Account::to_string);
-    steel_engine.register_fn("Account-inventory", Account::inventory);
-    steel_engine.register_fn("Account-postings", Account::postings);
-
-    steel_engine.register_type::<Posting>("Posting?");
-    steel_engine.register_fn("Posting->string", Posting::to_string);
-    steel_engine.register_fn("Posting-date", Posting::date);
-    steel_engine.register_fn("Posting-amount", Posting::amount);
-
-    steel_engine.register_type::<Amount>("Amount?");
-    steel_engine.register_fn("Amount->string", Amount::to_string);
-    steel_engine.register_fn("Amount-number", Amount::number);
-    steel_engine.register_fn("Amount-currency", Amount::currency);
-
-    steel_engine.register_type::<Decimal>("Decimal?");
-    steel_engine.register_fn("Decimal->string", Decimal::to_string);
-    steel_engine.register_fn("Decimal-numerator", Decimal::numerator);
-    steel_engine.register_fn("Decimal-denominator", Decimal::denominator);
-
-    steel_engine.register_fn("tabulate", crate::tabulate::tabulate);
 }
