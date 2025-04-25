@@ -11,6 +11,10 @@
   account?
   account-inventory
   account-postings
+  period
+  period?
+  period-within?
+  make-period-within?
   posting
   posting?
   posting-date

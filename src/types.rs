@@ -9,6 +9,7 @@ use std::{
 use steel::{
     rvals::Custom,
     steel_vm::{engine::Engine, register_fn::RegisterFn},
+    SteelErr,
 };
 use steel_derive::Steel;
 
@@ -192,8 +193,39 @@ impl From<(rust_decimal::Decimal, String)> for Amount {
 type Date = Wrapped<time::Date>;
 
 impl Date {
+    fn new(y: i32, m: i32, d: i32) -> steel::rvals::Result<Self> {
+        u8::try_from(m)
+            .ok()
+            .and_then(|m| time::Month::try_from(m).ok())
+            .and_then(|m| u8::try_from(d).ok().map(|d| (m, d)))
+            .and_then(|(m, d)| time::Date::from_calendar_date(y, m, d).ok())
+            .map(|date| date.into())
+            .ok_or(SteelErr::new(
+                steel::rerrs::ErrorKind::ConversionError,
+                "bad date".to_string(),
+            ))
+    }
+
+    // beginning of time
+    fn bot() -> Date {
+        time::Date::MIN.into()
+    }
+
+    // end of time
+    fn eot() -> Date {
+        time::Date::MAX.into()
+    }
+
     fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Date>("date?");
+        steel_engine.register_fn("date", Date::new);
+        steel_engine.register_fn("date-bot", Date::bot);
+        steel_engine.register_fn("date-eot", Date::eot);
+        steel_engine.register_fn("date=?", Date::eq);
+        steel_engine.register_fn("date>?", Date::gt);
+        steel_engine.register_fn("date<?", Date::lt);
+        steel_engine.register_fn("date>=?", Date::ge);
+        steel_engine.register_fn("date<=?", Date::le);
     }
 }
 
@@ -259,6 +291,35 @@ where
 {
     fn from(value: T) -> Self {
         Wrapped(value)
+    }
+}
+
+impl<T> PartialEq for Wrapped<T>
+where
+    T: Clone + PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<T> PartialOrd for Wrapped<T>
+where
+    T: Clone + PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+impl<T> Eq for Wrapped<T> where T: Clone + Eq {}
+
+impl<T> Ord for Wrapped<T>
+where
+    T: Clone + Ord,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
     }
 }
 
