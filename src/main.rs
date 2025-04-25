@@ -6,6 +6,9 @@ const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
 
 fn main() -> Result<(), Error> {
     let flags = xflags::parse_or_exit! {
+        /// Don't load the prelude
+        optional --no-prelude
+
         /// Exit after loading and validating all files
         optional --batch
 
@@ -24,7 +27,7 @@ fn main() -> Result<(), Error> {
 
     set_search_path(&mut steel_engine);
 
-    load_cogs(&mut steel_engine, &flags.cog)?;
+    load_cogs(&mut steel_engine, !flags.no_prelude, &flags.cog)?;
 
     if flags.batch {
         return Ok(());
@@ -65,13 +68,19 @@ fn set_search_path(steel_engine: &mut Engine) {
     }
 }
 
-fn load_cogs(steel_engine: &mut Engine, cli_cog: &Option<String>) -> Result<(), Error> {
-    // load ledger prelude
-    let prelude = "lima/prelude";
-    let load_prelude_command = format!("(require \"{}.scm\")", prelude);
-    if let Err(e) = steel_engine.run(load_prelude_command.clone()) {
-        e.emit_result(prelude, &load_prelude_command);
-        return Err(Error::Scheme);
+fn load_cogs(
+    steel_engine: &mut Engine,
+    load_prelude: bool,
+    cli_cog: &Option<String>,
+) -> Result<(), Error> {
+    if load_prelude {
+        // load ledger prelude
+        let prelude = "lima/prelude";
+        let load_prelude_command = format!("(require \"{}.scm\")", prelude);
+        if let Err(e) = steel_engine.run(load_prelude_command.clone()) {
+            e.emit_result(prelude, &load_prelude_command);
+            return Err(Error::Scheme);
+        }
     }
 
     // load additional CLI cog if any

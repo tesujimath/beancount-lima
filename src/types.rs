@@ -37,10 +37,10 @@ impl Ledger {
     }
 
     fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Ledger>("Ledger?");
-        steel_engine.register_fn("Ledger-currencies", Ledger::currencies);
-        steel_engine.register_fn("Ledger-account-names", Ledger::account_names);
-        steel_engine.register_fn("Ledger-accounts", Ledger::accounts);
+        steel_engine.register_type::<Ledger>("ffi-ledger?");
+        steel_engine.register_fn("ffi-ledger-currencies", Ledger::currencies);
+        steel_engine.register_fn("ffi-ledger-account-names", Ledger::account_names);
+        steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
     }
 }
 
@@ -63,10 +63,10 @@ impl Account {
     }
 
     fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Account>("Account?");
-        steel_engine.register_fn("Account->string", Account::to_string);
-        steel_engine.register_fn("Account-inventory", Account::inventory);
-        steel_engine.register_fn("Account-postings", Account::postings);
+        steel_engine.register_type::<Account>("ffi-account?");
+        steel_engine.register_fn("ffi-account->string", Account::to_string);
+        steel_engine.register_fn("ffi-account-inventory", Account::inventory);
+        steel_engine.register_fn("ffi-account-postings", Account::postings);
     }
 }
 
@@ -125,10 +125,10 @@ impl Posting {
     }
 
     fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Posting>("Posting?");
-        steel_engine.register_fn("Posting->string", Posting::to_string);
-        steel_engine.register_fn("Posting-date", Posting::date);
-        steel_engine.register_fn("Posting-amount", Posting::amount);
+        steel_engine.register_type::<Posting>("ffi-posting?");
+        steel_engine.register_fn("ffi-posting->string", Posting::to_string);
+        steel_engine.register_fn("ffi-posting-date", Posting::date);
+        steel_engine.register_fn("ffi-posting-amount", Posting::amount);
     }
 }
 
@@ -150,7 +150,6 @@ pub(crate) struct Amount {
     pub(crate) currency: String,
 }
 
-// TODO derive getters one this is resolved:
 // https://github.com/mattwparas/steel/issues/365
 impl Amount {
     fn number(&self) -> Decimal {
@@ -162,10 +161,10 @@ impl Amount {
     }
 
     fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Amount>("Amount?");
-        steel_engine.register_fn("Amount->string", Amount::to_string);
-        steel_engine.register_fn("Amount-number", Amount::number);
-        steel_engine.register_fn("Amount-currency", Amount::currency);
+        steel_engine.register_type::<Amount>("ffi-amount?");
+        steel_engine.register_fn("ffi-amount->string", Amount::to_string);
+        steel_engine.register_fn("ffi-amount-number", Amount::number);
+        steel_engine.register_fn("ffi-amount-currency", Amount::currency);
     }
 }
 
@@ -192,6 +191,12 @@ impl From<(rust_decimal::Decimal, String)> for Amount {
 
 type Date = Wrapped<time::Date>;
 
+impl Date {
+    fn register_with_engine(steel_engine: &mut Engine) {
+        steel_engine.register_type::<Date>("date?");
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Decimal(rust_decimal::Decimal);
 
@@ -209,10 +214,10 @@ impl Decimal {
     }
 
     fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Decimal>("Decimal?");
-        steel_engine.register_fn("Decimal->string", Decimal::to_string);
-        steel_engine.register_fn("Decimal-numerator", Decimal::numerator);
-        steel_engine.register_fn("Decimal-denominator", Decimal::denominator);
+        steel_engine.register_type::<Decimal>("decimal?");
+        steel_engine.register_fn("decimal->string", Decimal::to_string);
+        steel_engine.register_fn("decimal-numerator", Decimal::numerator);
+        steel_engine.register_fn("decimal-denominator", Decimal::denominator);
     }
 }
 
@@ -289,6 +294,7 @@ where
 pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
     Account::register_with_engine(steel_engine);
     Amount::register_with_engine(steel_engine);
+    Date::register_with_engine(steel_engine);
     Decimal::register_with_engine(steel_engine);
     Ledger::register_with_engine(steel_engine);
     Posting::register_with_engine(steel_engine);

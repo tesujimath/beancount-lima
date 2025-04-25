@@ -1,7 +1,7 @@
 (define (inventory-for-currencies-as-strings inv currencies)
   (map (lambda (cur)
         (if (hash-contains? inv cur)
-          (Decimal->string (hash-get inv cur))
+          (decimal->string (hash-get inv cur))
           ""))
     currencies))
 

@@ -1,16 +1,27 @@
+(require "lima/types.scm")
 (provide
-  Decimal->rational
+  decimal->rational
+  ledger
+  ledger?
   ledger-currencies
   ledger-account-names
   ledger-accounts
+  ffi-ledger->ledger
+  account
+  account?
+  account-inventory
+  account-postings
+  posting
+  posting?
+  posting-date
+  posting-amount
+  amount
+  amount?
+  amount-number
+  amount-currency)
+
+(provide
   *ledger*)
-
-;; convert Decimal to native rational
-(define (Decimal->rational r) (/ (Decimal-numerator r) (Decimal-denominator r)))
-
-;; Steel does not allow construction of arbitrary native Steel values from Rust,
-;; so we convert from FFI values to native values here.
-(struct ledger (currencies account-names accounts))
 
 ;; The FFI ledger is called `*ffi-ledger*`.
 ;; Here we create a native Steel ledger called `*ledger*`.
@@ -18,8 +29,4 @@
 ; The reason we convert all FFIValues into native Steel ones is to avoid
 ; keeping having to pass these across the FFI, as that requires cloning of values
 ; rather than simply passing references.
-(define *ledger*
-  (ledger
-    (Ledger-currencies *ffi-ledger*)
-    (Ledger-account-names *ffi-ledger*)
-    (Ledger-accounts *ffi-ledger*)))
+(define *ledger* (ffi-ledger->ledger *ffi-ledger*))
