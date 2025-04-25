@@ -24,6 +24,9 @@
   amount-number
   amount-currency)
 
+(require "lima/tabulate.scm")
+(provide tabulate)
+
 (provide
   *ledger*)
 

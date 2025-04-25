@@ -245,11 +245,40 @@ impl Decimal {
         10isize.pow(self.0.scale())
     }
 
+    fn new(m: i64, e: u32) -> Self {
+        rust_decimal::Decimal::new(m, e).into()
+    }
+
+    // width of digits and/or sign to left of decimal point
+    fn width_left(&self) -> u32 {
+        let sign_width = if self.0.is_sign_negative() { 1u32 } else { 0 };
+        let mut mantissa_width = 0u32;
+        let mut abs_mantissa = self.0.mantissa().abs();
+        while abs_mantissa > 0 {
+            abs_mantissa /= 10;
+            mantissa_width += 1;
+        }
+
+        if sign_width + mantissa_width > self.0.scale() {
+            sign_width + mantissa_width - self.0.scale()
+        } else {
+            1
+        }
+    }
+
+    // width of digits  to right of decimal point
+    fn width_right(&self) -> u32 {
+        self.0.scale()
+    }
+
     fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Decimal>("decimal?");
+        steel_engine.register_fn("decimal-new", Decimal::new);
         steel_engine.register_fn("decimal->string", Decimal::to_string);
         steel_engine.register_fn("decimal-numerator", Decimal::numerator);
         steel_engine.register_fn("decimal-denominator", Decimal::denominator);
+        steel_engine.register_fn("decimal-width-left", Decimal::width_left);
+        steel_engine.register_fn("decimal-width-right", Decimal::width_right);
     }
 }
 

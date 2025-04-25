@@ -1,5 +1,5 @@
 use std::{fmt::Display, io, path::PathBuf};
-use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
+use steel::steel_vm::engine::Engine;
 use steel_repl::run_repl;
 
 const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
@@ -39,8 +39,6 @@ fn main() -> Result<(), Error> {
 }
 
 fn register(steel_engine: &mut Engine, ledger: Ledger) {
-    steel_engine.register_fn("tabulate", crate::tabulate::tabulate);
-
     types::register_types_with_engine(steel_engine);
 
     steel_engine
@@ -117,6 +115,5 @@ impl Display for Error {
 }
 
 pub(crate) mod ledger;
-pub(crate) mod tabulate;
 pub(crate) mod types;
 pub(crate) use types::*;

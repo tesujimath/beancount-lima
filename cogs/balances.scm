@@ -1,22 +1,22 @@
-(define (inventory-for-currencies-as-strings inv currencies)
+(define (inventory-for-currencies inv currencies)
   (map (lambda (cur)
         (if (hash-contains? inv cur)
-          (decimal->string (hash-get inv cur))
+          (hash-get inv cur)
           ""))
     currencies))
 
-(define (balances ledger)
+(define (format-balances ledger)
   (let ((all-currencies (ledger-currencies ledger)))
     (cons
       (cons "" all-currencies)
       (map
         (lambda (account-name)
           (let* ((account (hash-get (ledger-accounts ledger) account-name))
-                 (inv (Account-inventory account)) #| ((currencies (ledger-currencies ledger)))|##| (currency-totals (map (lambda (cur))))|#)
-            (cons account-name (inventory-for-currencies-as-strings inv all-currencies))))
+                 (inv (account-inventory account)) #| ((currencies (ledger-currencies ledger)))|##| (currency-totals (map (lambda (cur))))|#)
+            (cons account-name (inventory-for-currencies inv all-currencies))))
         (ledger-account-names ledger)))))
 
 (define (display-balances ledger)
-  (display (tabulate (balances ledger))))
+  (display (tabulate (format-balances ledger) 'left 'centre)))
 
 (display-balances *ledger*)
