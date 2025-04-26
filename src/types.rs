@@ -233,8 +233,8 @@ impl Date {
 pub(crate) struct Decimal(rust_decimal::Decimal);
 
 impl Decimal {
-    pub(crate) fn add(&mut self, other: Decimal) {
-        self.0 += other.0;
+    pub(crate) fn add(&mut self, other: Decimal) -> Decimal {
+        (self.0 + other.0).into()
     }
 
     fn numerator(&self) -> isize {
@@ -247,6 +247,10 @@ impl Decimal {
 
     fn new(m: i64, e: u32) -> Self {
         rust_decimal::Decimal::new(m, e).into()
+    }
+
+    fn zero() -> Self {
+        rust_decimal::Decimal::ZERO.into()
     }
 
     // width of digits and/or sign to left of decimal point
@@ -273,7 +277,9 @@ impl Decimal {
 
     fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Decimal>("decimal?");
-        steel_engine.register_fn("decimal-new", Decimal::new);
+        steel_engine.register_fn("decimal", Decimal::new);
+        steel_engine.register_fn("decimal-zero", Decimal::zero);
+        steel_engine.register_fn("decimal-add", Decimal::add);
         steel_engine.register_fn("decimal->string", Decimal::to_string);
         steel_engine.register_fn("decimal-numerator", Decimal::numerator);
         steel_engine.register_fn("decimal-denominator", Decimal::denominator);
