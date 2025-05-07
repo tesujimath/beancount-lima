@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use steel::steel_vm::engine::Engine;
 use test_generator::test_resources;
 
-use super::{load_cog_path, report_test_failures, require_unit_test, set_test_mode};
+use super::{load_cog_path, report_test_failures, require_test_helpers, set_test_mode};
 use crate::{load_cog, register, set_search_path, Ledger, LIMA_PRELUDE};
 
 #[test_resources("cogs/**/*.scm")]
@@ -20,7 +20,7 @@ fn cog_tests(cog_relpath: &str) {
     set_search_path(&mut steel_engine);
     steel_engine.add_search_directory(cogs_dir.clone());
 
-    require_unit_test(&mut steel_engine).unwrap();
+    require_test_helpers(&mut steel_engine).unwrap();
     set_test_mode(&mut steel_engine).unwrap();
 
     load_cog(&mut steel_engine, LIMA_PRELUDE).unwrap();

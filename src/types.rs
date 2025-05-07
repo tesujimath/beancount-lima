@@ -278,6 +278,11 @@ impl Decimal {
     fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Decimal>("decimal?");
         steel_engine.register_fn("decimal", Decimal::new);
+        steel_engine.register_fn("decimal=?", Decimal::eq);
+        steel_engine.register_fn("decimal>?", Decimal::gt);
+        steel_engine.register_fn("decimal<?", Decimal::lt);
+        steel_engine.register_fn("decimal>=?", Decimal::ge);
+        steel_engine.register_fn("decimal<=?", Decimal::le);
         steel_engine.register_fn("decimal-zero", Decimal::zero);
         steel_engine.register_fn("decimal-add", Decimal::add);
         steel_engine.register_fn("decimal->string", Decimal::to_string);
@@ -291,6 +296,26 @@ impl Decimal {
 impl From<rust_decimal::Decimal> for Decimal {
     fn from(value: rust_decimal::Decimal) -> Self {
         Self(value)
+    }
+}
+
+impl PartialEq for Decimal {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl Eq for Decimal {}
+
+impl PartialOrd for Decimal {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.0.cmp(&other.0))
+    }
+}
+
+impl Ord for Decimal {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
     }
 }
 

@@ -6,7 +6,7 @@ use test_generator::test_resources;
 
 use crate::{
     load_cog, register, set_search_path,
-    tests::{report_test_failures, require_unit_test},
+    tests::{report_test_failures, require_test_helpers},
     Ledger, LIMA_PRELUDE,
 };
 
@@ -27,7 +27,7 @@ fn beancount_tests(beancount_relpath: &str) {
 
     load_cog(&mut steel_engine, LIMA_PRELUDE).unwrap();
 
-    require_unit_test(&mut steel_engine).unwrap();
+    require_test_helpers(&mut steel_engine).unwrap();
     load_cog(&mut steel_engine, cog_name).unwrap();
     report_test_failures(&mut steel_engine, cog_name).unwrap();
 }

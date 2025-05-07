@@ -11,11 +11,14 @@ where
     run_emitting_error(steel_engine, cog_path, &load_cog_command)
 }
 
-fn require_unit_test(steel_engine: &mut Engine) -> Result<(), Error> {
+fn require_test_helpers(steel_engine: &mut Engine) -> Result<(), Error> {
     run_emitting_error(
         steel_engine,
         "",
-        r#"(require "steel/tests/unit-test.scm" (for-syntax "steel/tests/unit-test.scm"))"#,
+        r#"
+            (require "steel/tests/unit-test.scm" (for-syntax "steel/tests/unit-test.scm"))
+            (require "lima/tests/assertions.scm" (for-syntax "lima/tests/assertions.scm"))
+        "#,
     )
 }
 
