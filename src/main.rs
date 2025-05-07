@@ -4,6 +4,8 @@ use steel_repl::run_repl;
 
 const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
 
+const LIMA_PRELUDE: &str = "lima/prelude";
+
 fn main() -> Result<(), Error> {
     let flags = xflags::parse_or_exit! {
         /// Don't load the prelude
@@ -27,7 +29,12 @@ fn main() -> Result<(), Error> {
 
     set_search_path(&mut steel_engine);
 
-    load_cogs(&mut steel_engine, !flags.no_prelude, &flags.cog)?;
+    if !flags.no_prelude {
+        load_cog(&mut steel_engine, LIMA_PRELUDE)?;
+    }
+    if let Some(cog) = &flags.cog {
+        load_cog(&mut steel_engine, cog)?;
+    }
 
     if flags.batch {
         return Ok(());
@@ -66,31 +73,30 @@ fn set_search_path(steel_engine: &mut Engine) {
     }
 }
 
-fn load_cogs(
+fn run_emitting_error<S>(
     steel_engine: &mut Engine,
-    load_prelude: bool,
-    cli_cog: &Option<String>,
-) -> Result<(), Error> {
-    if load_prelude {
-        // load ledger prelude
-        let prelude = "lima/prelude";
-        let load_prelude_command = format!("(require \"{}.scm\")", prelude);
-        if let Err(e) = steel_engine.run(load_prelude_command.clone()) {
-            e.emit_result(prelude, &load_prelude_command);
-            return Err(Error::Scheme);
-        }
-    }
-
-    // load additional CLI cog if any
-    if let Some(cog) = cli_cog {
-        let load_cog_command = format!("(require \"{}.scm\")", cog);
-        if let Err(e) = steel_engine.run(load_cog_command.clone()) {
-            e.emit_result(cog, &load_cog_command);
-            return Err(Error::Scheme);
-        }
+    error_context: &str,
+    input: S,
+) -> Result<(), Error>
+where
+    S: AsRef<str>,
+{
+    let input = input.as_ref();
+    if let Err(e) = steel_engine.run(input.to_string()) {
+        e.emit_result(error_context, input);
+        return Err(Error::Scheme);
     }
 
     Ok(())
+}
+
+fn load_cog<S>(steel_engine: &mut Engine, cog_name: S) -> Result<(), Error>
+where
+    S: AsRef<str>,
+{
+    let cog_name = cog_name.as_ref();
+    let load_cog_command = format!("(require \"{}.scm\")", cog_name);
+    run_emitting_error(steel_engine, cog_name, &load_cog_command)
 }
 
 #[derive(Debug)]
@@ -117,3 +123,5 @@ impl Display for Error {
 pub(crate) mod ledger;
 pub(crate) mod types;
 pub(crate) use types::*;
+#[cfg(test)]
+mod tests;
