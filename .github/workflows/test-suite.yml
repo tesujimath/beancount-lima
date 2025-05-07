@@ -1,4 +1,4 @@
-name: test suite
+name: test-suite
 on:
   push:
     branches:
@@ -10,15 +10,15 @@ on:
 jobs:
   run-tests:
     name: Run Tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
       - name: Run Tests
         run: |
-          cargo test
+          nix run '.#tests'
 
   check-nix-flake:
     name: Check Nix Flake

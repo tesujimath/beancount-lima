@@ -28,29 +28,33 @@
             export RUSTC="${nightly}/bin/rustc";
             exec "${nightly}/bin/cargo" "$@"
           '';
+
+          dev-packages = with pkgs; [
+            just
+
+            # build dependencies
+            cargo-modules
+            cargo-nightly
+            cargo-udeps
+            cargo-outdated
+            cargo-edit
+            gcc
+            gdb
+            rust-bin.stable.latest.default
+
+            flakePkgs.steel
+
+
+          ];
         in
         with pkgs;
         {
           devShells.default = mkShell {
             nativeBuildInputs = [
-              just
-
-              # build dependencies
-              cargo-modules
-              cargo-nightly
-              cargo-udeps
-              cargo-outdated
-              cargo-edit
-              gcc
-              gdb
-              rust-bin.stable.latest.default
-
-              flakePkgs.steel
-
               # useful for reference:
               beancount
               beanquery
-            ];
+            ] ++ dev-packages;
 
             shellHook = ''
               # LSP config
@@ -61,6 +65,18 @@
 
               PATH=$PATH:$(pwd)/target/debug
             '';
+          };
+
+          apps = {
+            tests = {
+              type = "app";
+              program = "${writeShellScript "beancount-lima-tests" ''
+                export PATH=${pkgs.lib.makeBinPath dev-packages}
+                export BEANCOUNT_LIMA_COGPATH="$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
+                just test
+              ''}";
+            };
+
           };
         }
       );
