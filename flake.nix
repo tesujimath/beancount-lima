@@ -29,32 +29,30 @@
             exec "${nightly}/bin/cargo" "$@"
           '';
 
-          dev-packages = with pkgs; [
+          ci-packages = with pkgs; [
+            bashInteractive
             just
-
-            # build dependencies
-            cargo-modules
-            cargo-nightly
-            cargo-udeps
-            cargo-outdated
-            cargo-edit
-            gcc
-            gdb
             rust-bin.stable.latest.default
-
+            gcc
             flakePkgs.steel
-
-
           ];
         in
         with pkgs;
         {
           devShells.default = mkShell {
             nativeBuildInputs = [
+              # build dependencies
+              cargo-modules
+              cargo-nightly
+              cargo-udeps
+              cargo-outdated
+              cargo-edit
+              gdb
+
               # useful for reference:
               beancount
               beanquery
-            ] ++ dev-packages;
+            ] ++ ci-packages;
 
             shellHook = ''
               # LSP config
@@ -71,7 +69,7 @@
             tests = {
               type = "app";
               program = "${writeShellScript "beancount-lima-tests" ''
-                export PATH=${pkgs.lib.makeBinPath dev-packages}
+                export PATH=${pkgs.lib.makeBinPath ci-packages}
                 export BEANCOUNT_LIMA_COGPATH="$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
                 just test
               ''}";
