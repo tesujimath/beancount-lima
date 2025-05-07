@@ -1,7 +1,7 @@
 (provide compose flatmap)
 
 (define compose (lambda (f g) (lambda (arg) (f (g arg)))))
-:; example
+;; example
 ;; (map (compose amount-number posting-amount) (account-postings current-account)
 
 (define (flatmap proc seq)

@@ -12,6 +12,16 @@ use std::{
 use super::{types::*, Error};
 
 impl Ledger {
+    /// Empty ledger, for running cog tests only
+    #[cfg(test)]
+    pub(crate) fn empty() -> Self {
+        Ledger {
+            sources: BeancountSources::from(""),
+            currencies: HashSet::default(),
+            accounts: HashMap::default(),
+        }
+    }
+
     pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Ledger, Error>
     where
         W: Write + Copy,

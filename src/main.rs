@@ -99,6 +99,16 @@ where
     run_emitting_error(steel_engine, cog_name, &load_cog_command)
 }
 
+#[cfg(test)]
+fn load_cog_path<S>(steel_engine: &mut Engine, cog_path: S) -> Result<(), Error>
+where
+    S: AsRef<str>,
+{
+    let cog_path = cog_path.as_ref();
+    let load_cog_command = format!("(require \"{}\")", cog_path);
+    run_emitting_error(steel_engine, cog_path, &load_cog_command)
+}
+
 #[derive(Debug)]
 pub(crate) enum Error {
     Io(io::Error),
