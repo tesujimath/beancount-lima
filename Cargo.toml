@@ -18,5 +18,9 @@ xflags = "0.3.2"
 rust_decimal = "1.37.1"
 hashbrown = "0.15.2"
 time = "0.3.41"
-test-case = "3.3.1"
-walkdir = "2.5.0"
+
+[dev-dependencies]
+test-generator = "0.3.1"
+
+[build-dependencies]
+build-deps = "0.1.4"
