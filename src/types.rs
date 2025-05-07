@@ -7,7 +7,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 use steel::{
-    rvals::Custom,
+    rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelErr,
 };
@@ -328,6 +328,14 @@ impl Display for Decimal {
 impl Custom for Decimal {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.0.to_string()))
+    }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<Decimal>(other) {
+            self == other
+        } else {
+            false
+        }
     }
 }
 
