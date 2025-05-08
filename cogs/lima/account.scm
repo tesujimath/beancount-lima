@@ -1,4 +1,7 @@
+(provide postings->inv-alist)
+
 (require "lima/alist.scm")
+(require "lima/types.scm")
 
 (define (add-posting p inv-alist)
   (let* ((amt (posting-amount p))

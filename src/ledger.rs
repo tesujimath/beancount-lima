@@ -338,7 +338,6 @@ struct AccountBuilder {
 impl AccountBuilder {
     fn build(self) -> Account {
         Account {
-            inventory: self.inventory.into_iter().collect(),
             postings: self.postings.into_iter().collect(),
         }
     }

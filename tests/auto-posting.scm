@@ -1,4 +1,5 @@
 (require (for-syntax "steel/tests/unit-test.scm"))
+(require "lima/alist.scm")
 
-(let ((current-nzd (hash-get (account-inventory (hash-get (ledger-accounts *ledger*) "Assets:Bank:Current")) "NZD")))
-  (check-equal? "current-nzd" current-nzd (decimal -965 2)))
+(let ((current-nzd (cdr-assoc-or-default "NZD" (decimal-zero) (account-inventory (hash-get (ledger-accounts *ledger*) "Assets:Bank:Current")))))
+  (check-equal? "current-nzd" current-nzd (decimal -2965 2)))

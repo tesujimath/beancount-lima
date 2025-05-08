@@ -6,7 +6,6 @@
   ledger-currencies
   ledger-account-names
   ledger-accounts
-  ffi-ledger->ledger
   account
   account?
   account-inventory
@@ -26,6 +25,8 @@
 
 (require "lima/tabulate.scm")
 (provide tabulate)
+
+(require "lima/ffi.scm")
 
 (provide
   *ledger*)

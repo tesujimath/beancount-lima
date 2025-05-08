@@ -45,59 +45,21 @@ impl Ledger {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Steel, Debug)]
 pub(crate) struct Account {
-    // TODO support cost in the inventory
-    pub(crate) inventory: HashMap<String, Decimal>,
     // TODO
     // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
     pub(crate) postings: Vec<Posting>,
 }
 
 impl Account {
-    fn inventory(&self) -> HashMap<String, Decimal> {
-        self.inventory.clone()
-    }
-
     fn postings(&self) -> Vec<Posting> {
         self.postings.clone()
     }
 
     fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Account>("ffi-account?");
-        steel_engine.register_fn("ffi-account->string", Account::to_string);
-        steel_engine.register_fn("ffi-account-inventory", Account::inventory);
         steel_engine.register_fn("ffi-account-postings", Account::postings);
-    }
-}
-
-impl Display for Account {
-    // display the inventory like a Clojure literal hash
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut pad = "";
-        f.write_str("{")?;
-        // sort so output is deterministic
-        let mut currencies = self.inventory.keys().collect::<Vec<_>>();
-        currencies.sort();
-        for currency in currencies.into_iter() {
-            write!(
-                f,
-                "{}\"{}\" {}",
-                pad,
-                currency,
-                self.inventory.get(currency).unwrap()
-            )?;
-            pad = ", ";
-        }
-        f.write_str("}")?;
-
-        Ok(())
-    }
-}
-
-impl Custom for Account {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.to_string()))
     }
 }
 

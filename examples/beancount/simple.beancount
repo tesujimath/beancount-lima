@@ -2,9 +2,13 @@
 
 1970-01-01 commodity NZD
 
+1970-01-01 commodity GBP
+
 2016-03-01 open Assets:Bank:Current
 
-2016-03-01 open Expenses:Groceries NZD
+2016-03-01 open Assets:Bank:UK
+
+2016-03-01 open Expenses:Groceries NZD,GBP
 
 2016-03-01 open Expenses:Entertainment:Drinks-and-snacks NZD
 
@@ -12,6 +16,14 @@
   Expenses:Groceries                             10.00 NZD
   Assets:Bank:Current
 
+2023-05-30* "Countdown"
+  Expenses:Groceries                             17.50 NZD
+  Assets:Bank:Current
+
 2023-05-31 * "EMERSON S TAPROOM DUNEDIN ;"
   Expenses:Entertainment:Drinks-and-snacks       25.00 NZD
   Assets:Bank:Current
+
+2023-06-01 * "UK groceries"
+  Expenses:Groceries                             5.00 GBP
+  Assets:Bank:UK
