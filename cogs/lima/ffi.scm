@@ -14,8 +14,7 @@
   (posting (ffi-posting-date pst) (ffi-amount->amount (ffi-posting-amount pst))))
 
 (define (ffi-account->account acc)
-  (let ((postings (map ffi-posting->posting (ffi-account-postings acc))))
-    (account (postings->inv-alist postings) postings)))
+  (postings->account (map ffi-posting->posting (ffi-account-postings acc))))
 
 (define (ffi-ledger->ledger ldg)
   (let* ((account-names (ffi-ledger-account-names ldg))

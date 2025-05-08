@@ -26,7 +26,7 @@
 (define (decimal->rational r) (/ (decimal-numerator r) (decimal-denominator r)))
 
 ;; a half-open date range, including start, not including end
-(struct period (start end))
+(struct period (start end) #:transparent)
 ; TODO:
 ; (define/contract (period start end)
 ;   (and (date? start) (date? end)))
