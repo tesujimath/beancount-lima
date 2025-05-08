@@ -1,5 +1,5 @@
 (provide postings->account
-  make-account-name-contains?
+  make-subaccount?
   account-filter-postings
   account-currencies)
 
@@ -26,8 +26,11 @@
 (define (postings->account postings)
   (account (postings->inv-alist postings) postings))
 
-;; return a predicate which checks whether an account name contains the string `s`
-(define (make-account-name-contains? s) (lambda (name) (string-contains? name s)))
+;; return a predicate which checks whether an account name is a non-strict sub-account of `acc-name`,
+;; where non-strict here means an account is a subaccount of itself.
+(define (make-subaccount? acc) (lambda (subacc)
+                                (or (string=? subacc acc)
+                                  (starts-with? subacc (string-append acc ":")))))
 
 ;; return a new account filtered by posting `predicate`
 (define (account-filter-postings predicate acc)
@@ -39,8 +42,11 @@
 
 (test-module
   "account tests"
-  (check-equal? "make-account-name-contains?" ((make-account-name-contains? "Bank") "Assets:Bank") #t)
-  (check-equal? "make-account-name-contains? not" ((make-account-name-contains? "Banko") "Assets:Bank") #f)
+  (check-equal? "make-subaccount?" ((make-subaccount? "Bank") "Assets:Bank") #f)
+  (check-equal? "make-subaccount?" ((make-subaccount? "Assets") "Assets:Bank") #t)
+  (check-equal? "make-subaccount?" ((make-subaccount? "Asset") "Assets:Bank") #f)
+  (check-equal? "make-subaccount?" ((make-subaccount? "Assets:Bank") "Assets:Bank") #t)
+  (check-equal? "make-subaccount?" ((make-subaccount? "Assets:Bank:Current") "Assets:Bank") #f)
 
   (check-equal? "account-filter-postings" (account-filter-postings (make-posting-within? (period (date 2025 1 1) (date 2025 2 1)))
                                            (postings->account (list
