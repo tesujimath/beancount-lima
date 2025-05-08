@@ -2,7 +2,7 @@
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima::BeancountSources;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::Display,
     ops::{Deref, DerefMut},
 };
@@ -16,31 +16,16 @@ use steel_derive::Steel;
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
     pub(crate) sources: BeancountSources,
-    pub(crate) currencies: HashSet<String>,
     pub(crate) accounts: HashMap<String, Account>,
 }
 
 impl Ledger {
-    fn currencies(&self) -> Vec<String> {
-        let mut currencies = self.currencies.iter().cloned().collect::<Vec<_>>();
-        currencies.sort();
-        currencies
-    }
-
-    fn account_names(&self) -> Vec<String> {
-        let mut account_names = self.accounts.keys().cloned().collect::<Vec<_>>();
-        account_names.sort();
-        account_names
-    }
-
     fn accounts(&self) -> HashMap<String, Account> {
         self.accounts.clone()
     }
 
     fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Ledger>("ffi-ledger?");
-        steel_engine.register_fn("ffi-ledger-currencies", Ledger::currencies);
-        steel_engine.register_fn("ffi-ledger-account-names", Ledger::account_names);
         steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
     }
 }

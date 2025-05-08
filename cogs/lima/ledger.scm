@@ -1,11 +1,24 @@
 (provide
+  accounts->ledger
   ledger-filter-accounts-by-name)
 
 (require "lima/types.scm")
 (require "lima/account.scm")
 (require "lima/posting.scm")
+(require "steel/sorting/merge-sort.scm")
+
+;; for tests
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
+
+;; return a ledger from a hashmap of accounts
+(define (accounts->ledger accs)
+  (let* ((account-names (merge-sort (hash-keys->list accs) #:comparator string<?))
+         (hashset-insert-all (lambda (hs items) (foldl (flip hashset-insert) hs items)))
+         (currencies (foldl (lambda (acc all-curs) (hashset-insert-all all-curs (account-currencies acc))) (hashset) (hash-values->list accs))))
+    (ledger (merge-sort (hashset->list currencies) #:comparator string<?)
+      account-names
+      accs)))
 
 ;; return a new ledger filtered by account name `predicate`
 (define (ledger-filter-accounts-by-name predicate ldg)

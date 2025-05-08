@@ -1,6 +1,7 @@
 (provide
   ffi-ledger->ledger)
 
+(require "lima/ledger.scm")
 (require "lima/account.scm")
 (require "lima/types.scm")
 
@@ -17,12 +18,8 @@
   (postings->account (map ffi-posting->posting (ffi-account-postings acc))))
 
 (define (ffi-ledger->ledger ldg)
-  (let* ((account-names (ffi-ledger-account-names ldg))
-         (ffi-accounts (ffi-ledger-accounts ldg))
-         (accounts (transduce account-names
+  (let* ((ffi-accounts (ffi-ledger-accounts ldg))
+         (accounts (transduce (hash-keys->list ffi-accounts)
                     (mapping (lambda (name) (cons name (ffi-account->account (hash-get ffi-accounts name)))))
                     (into-hashmap))))
-    (ledger
-      (ffi-ledger-currencies ldg)
-      account-names
-      accounts)))
+    (accounts->ledger accounts)))

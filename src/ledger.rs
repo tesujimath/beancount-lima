@@ -17,7 +17,6 @@ impl Ledger {
     pub(crate) fn empty() -> Self {
         Ledger {
             sources: BeancountSources::from(""),
-            currencies: HashSet::default(),
             accounts: HashMap::default(),
         }
     }
@@ -77,18 +76,8 @@ impl LedgerBuilder {
         W: Write + Copy,
     {
         if self.errors.is_empty() {
-            // determine all currencies actually used
-            let mut currencies = HashSet::<&str>::default();
-            for account in self.accounts.values() {
-                for currency in account.inventory.keys() {
-                    currencies.insert(currency.as_str());
-                }
-            }
-            let currencies = currencies.into_iter().map(|s| s.to_string()).collect();
-
             Ok(Ledger {
                 sources,
-                currencies,
                 accounts: self
                     .accounts
                     .into_iter()

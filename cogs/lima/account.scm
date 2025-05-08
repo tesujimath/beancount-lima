@@ -1,12 +1,16 @@
 (provide postings->account
   make-account-name-contains?
-  account-filter-postings)
+  account-filter-postings
+  account-currencies)
 
 (require "lima/alist.scm")
 (require "lima/types.scm")
 (require "lima/posting.scm")
+
+;; for tests
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
+(require "steel/sorting/merge-sort.scm")
 
 (define (add-posting p inv-alist)
   (let* ((amt (posting-amount p))
@@ -29,10 +33,14 @@
 (define (account-filter-postings predicate acc)
   (postings->account (filter predicate (account-postings acc))))
 
+;; return account currencies in arbitrary order
+(define (account-currencies acc)
+  (map car (account-inventory acc)))
+
 (test-module
   "account tests"
-  (check-equal? "make-account-name-contains?" #t ((make-account-name-contains? "Bank") "Assets:Bank"))
-  (check-equal? "make-account-name-contains? not" #f ((make-account-name-contains? "Banko") "Assets:Bank"))
+  (check-equal? "make-account-name-contains?" ((make-account-name-contains? "Bank") "Assets:Bank") #t)
+  (check-equal? "make-account-name-contains? not" ((make-account-name-contains? "Banko") "Assets:Bank") #f)
 
   (check-equal? "account-filter-postings" (account-filter-postings (make-posting-within? (period (date 2025 1 1) (date 2025 2 1)))
                                            (postings->account (list
@@ -40,4 +48,12 @@
                                                                (posting (date 2025 1 5) (amount (decimal 1000 2) "NZD"))
                                                                (posting (date 2025 2 19) (amount (decimal 150 2) "NZD")))))
     (postings->account (list
-                        (posting (date 2025 1 5) (amount (decimal 1000 2) "NZD"))))))
+                        (posting (date 2025 1 5) (amount (decimal 1000 2) "NZD")))))
+  (check-equal? "account-currencies" (merge-sort (account-currencies
+                                                  (postings->account (list
+                                                                      (posting (date 2024 12 24) (amount (decimal 750 2) "NZD"))
+                                                                      (posting (date 2025 1 5) (amount (decimal 1000 2) "GBP"))
+                                                                      (posting (date 2025 2 19) (amount (decimal 150 2) "NZD")))))
+                                      #:comparator
+                                      string<?)
+    '("GBP" "NZD")))
