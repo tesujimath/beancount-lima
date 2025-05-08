@@ -183,7 +183,9 @@ dependencies = [
 
 [[package]]
 name = "beancount-parser-lima"
-version = "0.8.0-alpha.1"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9da1c4e30ca2c29cf63fe67b5332c203bafdc3af1dcd9f4a18c0307b6130ce06"
 dependencies = [
  "anyhow",
  "ariadne",
