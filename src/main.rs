@@ -29,15 +29,18 @@ fn main() -> Result<(), Error> {
 
     set_search_path(&mut steel_engine);
 
-    if !flags.no_prelude {
-        load_cog(&mut steel_engine, LIMA_PRELUDE)?;
-    }
     if let Some(cog) = &flags.cog {
         load_cog(&mut steel_engine, cog)?;
     }
 
     if flags.batch {
         return Ok(());
+    }
+
+    // the prelude is only auto-loaded for the REPL,
+    // all Scheme files must load it explicitly
+    if !flags.no_prelude {
+        load_cog(&mut steel_engine, LIMA_PRELUDE)?;
     }
 
     run_repl(steel_engine).map_err(Error::Io)?;

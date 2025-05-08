@@ -1,3 +1,5 @@
+(require "lima/prelude.scm")
+
 (define (inventory-for-currencies inv currencies)
   (map (lambda (cur)
         (if (hash-contains? inv cur)

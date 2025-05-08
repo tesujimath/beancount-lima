@@ -1,6 +1,6 @@
 (provide
   accounts->ledger
-  ledger-filter-accounts-by-name)
+  ledger-filter)
 
 (require "lima/types.scm")
 (require "lima/account.scm")
@@ -40,14 +40,39 @@
                                (cons name filtered-acc)))
                      (into-hashmap)))))
     ;; TODO filter out now empty accounts
-    (ledger
-      (ledger-currencies ldg)
-      ;; TODO construct account names from what accounts we have left,
-      ; and maybe always do this rather than on Rust side
-      (ledger-account-names ldg)
-      accounts)))
+    (accounts->ledger accounts)))
 
-; (test-module
-;   "ledger tests"
-;   ;; TODO
-;    )
+;; transducer to extract the combined predicate from a predicates alist
+;; example:
+;; (define preds (list (cons 'date 1) (cons 'account-name (lambda (s) (string-contains? s "ab"))) (cons 'account-name (lambda (s) (string-contains? s "bc")))))
+;; (define preds? (transduce preds (combined-predicate 'account-name) (into-list)))
+(define (combined-predicate key preds)
+  (lambda (x)
+    (transduce preds
+      (compose
+        (filtering (lambda (pair) (eq? key (car pair))))
+        (mapping (lambda (pair) ((cdr pair) x))))
+      (into-reducer (lambda (a p) (and a p)) #t))))
+
+;; Return a new ledger filtered by `predicates`, which is an alist with the following keys:
+;; `account-name` a predicate that takes an account name
+;; `date` a predicate that takes a posting date
+;;
+;; The result is the intersection of all predicates.
+(define (ledger-filter predicates ldg)
+  (let ((account-name-predicates (map cdr (filter)))) ldg))
+
+(test-module
+  "ledger tests"
+  (let ((p1 (list
+             (cons 'account-name (make-subaccount? "Assets"))
+             (cons 'date (make-period-within? (period (date 2025 1 1) (date 2025 2 1))))
+             (cons 'account-name (make-subaccount? "Assets:Bank")))))
+    (check-equal? "combined-predicate subaccount 1" ((combined-predicate 'account-name p1) "Assets:Bank")
+      #t)
+    (check-equal? "combined-predicate subaccount 2 not" ((combined-predicate 'account-name p1) "Assets")
+      #f)
+    (check-equal? "combined-predicate date 1" ((combined-predicate 'date p1) (date 2025 1 3))
+      #t)
+    (check-equal? "combined-predicate date 2 not" ((combined-predicate 'date p1) (date 2025 2 2))
+      #f)))

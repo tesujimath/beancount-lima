@@ -1,5 +1,6 @@
 (provide tax-year)
 
+(require "lima/prelude.scm")
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 

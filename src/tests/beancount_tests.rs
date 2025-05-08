@@ -4,9 +4,7 @@ use std::path::PathBuf;
 use steel::steel_vm::engine::Engine;
 use test_generator::test_resources;
 
-use crate::{
-    load_cog, register, set_search_path, tests::report_test_failures, Ledger, LIMA_PRELUDE,
-};
+use crate::{load_cog, register, set_search_path, tests::report_test_failures, Ledger};
 
 #[test_resources("tests/*.beancount")]
 fn beancount_tests(beancount_relpath: &str) {
@@ -22,8 +20,6 @@ fn beancount_tests(beancount_relpath: &str) {
 
     set_search_path(&mut steel_engine);
     steel_engine.add_search_directory(tests_dir.clone());
-
-    load_cog(&mut steel_engine, LIMA_PRELUDE).unwrap();
 
     load_cog(&mut steel_engine, cog_name).unwrap();
     report_test_failures(&mut steel_engine, cog_name).unwrap();
