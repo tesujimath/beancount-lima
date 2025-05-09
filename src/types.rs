@@ -200,6 +200,10 @@ impl Decimal {
         rust_decimal::Decimal::ZERO.into()
     }
 
+    fn is_zero(&self) -> bool {
+        self.0 == rust_decimal::Decimal::ZERO
+    }
+
     // width of digits and/or sign to left of decimal point
     fn width_left(&self) -> u32 {
         let sign_width = if self.0.is_sign_negative() { 1u32 } else { 0 };
@@ -231,6 +235,7 @@ impl Decimal {
         steel_engine.register_fn("decimal>=?", Decimal::ge);
         steel_engine.register_fn("decimal<=?", Decimal::le);
         steel_engine.register_fn("decimal-zero", Decimal::zero);
+        steel_engine.register_fn("decimal-zero?", Decimal::is_zero);
         steel_engine.register_fn("decimal-add", Decimal::add);
         steel_engine.register_fn("decimal->string", Decimal::to_string);
         steel_engine.register_fn("decimal-numerator", Decimal::numerator);

@@ -10,12 +10,18 @@
   (let ((all-currencies (ledger-currencies ledger)))
     (cons
       (cons "" all-currencies)
-      (map
-        (lambda (account-name)
-          (let* ((account (hash-get (ledger-accounts ledger) account-name))
-                 (inv (account-inventory account)) #| ((currencies (ledger-currencies ledger)))|##| (currency-totals (map (lambda (cur))))|#)
-            (cons account-name (inventory-for-currencies inv all-currencies))))
-        (ledger-account-names ledger)))))
+      (transduce (ledger-account-names ledger)
+        (compose
+          (mapping (lambda (account-name)
+                    (let* ((account (hash-get (ledger-accounts ledger) account-name))
+                           (inv (account-inventory account)))
+                      (cons account-name inv))))
+          (filtering (lambda (pair) (not (empty? (cdr pair)))))
+          (mapping (lambda (pair)
+                    (let* ((account-name (car pair))
+                           (inv (cdr pair)))
+                      (cons account-name (inventory-for-currencies inv all-currencies))))))
+        (into-list)))))
 
 (define (display-balances ledger)
   (display (tabulate (format-balances ledger) 'left 'centre)))
