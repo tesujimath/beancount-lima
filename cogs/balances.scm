@@ -1,10 +1,9 @@
 (require "lima/prelude.scm")
+(require "lima/alist.scm")
 
 (define (inventory-for-currencies inv currencies)
   (map (lambda (cur)
-        (if (hash-contains? inv cur)
-          (hash-get inv cur)
-          ""))
+        (cdr-assoc-or-default cur "" inv))
     currencies))
 
 (define (format-balances ledger)
