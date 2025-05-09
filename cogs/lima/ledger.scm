@@ -60,7 +60,25 @@
 ;;
 ;; The result is the intersection of all predicates.
 (define (ledger-filter predicates ldg)
-  (let ((account-name-predicates (map cdr (filter)))) ldg))
+  (let* ((filtered-account-name? (combined-predicate 'account-name predicates))
+         (filtered-date? (combined-predicate 'date predicates))
+         (filtered-posting? (lambda (pst) (filtered-date? (posting-date pst))))
+
+         (filtered-account-names
+           (filter filtered-account-name?
+             (ledger-account-names ldg)))
+
+         (filtered-accounts
+           (transduce filtered-account-names
+             (mapping (lambda (name)
+                       (let* ((acc (hash-get (ledger-accounts ldg) name))
+                              (filtered-acc (postings->account (filter filtered-posting? (account-postings acc)))))
+                         (cons name filtered-acc))))
+             (into-hashmap))))
+    (ledger
+      (ledger-currencies ldg)
+      filtered-account-names
+      filtered-accounts)))
 
 (test-module
   "ledger tests"
