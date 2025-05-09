@@ -1,26 +1,21 @@
 #![cfg(test)]
 
-use std::path::PathBuf;
 use steel::steel_vm::engine::Engine;
 use test_generator::test_resources;
 
-use super::{load_cog_path, report_test_failures, set_test_mode};
-use crate::{register, set_search_path, Ledger};
+use super::{load_cog_path, report_test_failures};
+use crate::{register, CogPaths, Ledger};
 
-#[test_resources("cogs/**/*.scm")]
+#[test_resources("cogs/**/tests/*.scm")]
 fn cog_tests(cog_relpath: &str) {
-    let manifest_dir: PathBuf = std::env::var("CARGO_MANIFEST_DIR").unwrap().into();
-    let cogs_dir = manifest_dir.join("cogs");
-
     let empty_ledger = Ledger::empty();
     let mut steel_engine = Engine::new();
 
     register(&mut steel_engine, empty_ledger);
 
-    set_search_path(&mut steel_engine);
-    steel_engine.add_search_directory(cogs_dir.clone());
+    let cog_paths = CogPaths::from_env();
 
-    set_test_mode(&mut steel_engine).unwrap();
+    cog_paths.set_steel_search_path(&mut steel_engine);
 
     load_cog_path(&mut steel_engine, cog_relpath).unwrap();
     report_test_failures(&mut steel_engine, cog_relpath).unwrap();
