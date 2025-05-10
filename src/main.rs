@@ -6,6 +6,49 @@ const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
 
 const LIMA_PRELUDE: &str = "lima/prelude";
 
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    /// Don't run the REPL
+    #[clap(long)]
+    batch: bool,
+
+    /// Set test mode
+    #[clap(long)]
+    test: bool,
+
+    /// Don't load the Scheme prelude
+    #[clap(long)]
+    no_prelude: bool,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Count beans in a REPL
+    Count {
+        /// Beancount ledger
+        #[clap(value_name = "FILE")]
+        path: PathBuf,
+
+        /// Initial cog to load
+        cog: Option<String>,
+    },
+
+    Import {
+        /// File to import
+        #[clap(value_name = "FILE")]
+        path: PathBuf,
+
+        /// Initial cog to load
+        cog: Option<String>,
+    },
+}
+
 struct CogPaths(Vec<PathBuf>);
 
 impl CogPaths {
@@ -55,47 +98,41 @@ impl CogPaths {
 }
 
 fn main() -> Result<(), Error> {
-    let flags = xflags::parse_or_exit! {
-        /// Don't load the prelude
-        optional --no-prelude
-
-        /// Exit after loading and validating all files
-        optional --batch
-
-        /// Set test mode
-        optional --test
-
-        /// Beancount ledger path
-        required beancount_path: PathBuf
-
-        /// additional cog to load
-        optional cog: String
-    };
-
-    let ledger = Ledger::parse_from(&flags.beancount_path, &std::io::stderr())?;
-
     let mut steel_engine = Engine::new();
-
-    register(&mut steel_engine, ledger);
 
     let cog_paths = CogPaths::from_env();
     cog_paths.set_steel_search_path(&mut steel_engine);
 
-    if flags.test {
+    let cli = Cli::parse();
+    match &cli.command {
+        Some(Commands::Count {
+            path: beancount_path,
+            cog,
+        }) => {
+            let ledger = Ledger::parse_from(beancount_path, &std::io::stderr())?;
+            register(&mut steel_engine, ledger);
+
+            if let Some(cog) = cog {
+                cog_paths.load_cog(&mut steel_engine, cog)?;
+            }
+        }
+        Some(Commands::Import {
+            path: import_path,
+            cog,
+        }) => {}
+        None => {}
+    }
+    if cli.test {
         set_test_mode(&mut steel_engine).unwrap();
     }
 
-    if let Some(cog) = &flags.cog {
-        cog_paths.load_cog(&mut steel_engine, cog)?;
-    }
-
-    if flags.batch {
+    if cli.batch {
         return Ok(());
     }
 
     // the prelude is only auto-loaded for the REPL,
     // all Scheme files must load it explicitly
-    if !flags.no_prelude {
+    if !cli.no_prelude {
         cog_paths.load_cog(&mut steel_engine, LIMA_PRELUDE)?;
     }
 

@@ -3,6 +3,10 @@ name = "beancount-lima"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "lima"
+path = "src/main.rs"
+
 [dependencies]
 abi_stable = "0.11.3"
 beancount-parser-lima = "0.8.0"
@@ -14,10 +18,10 @@ steel-core = { git = "https://github.com/mattwparas/steel", branch = "master", f
 ] }
 steel-repl = { git = "https://github.com/mattwparas/steel.git", branch = "master" }
 steel-derive = { git = "https://github.com/mattwparas/steel", branch = "master" }
-xflags = "0.3.2"
 rust_decimal = "1.37.1"
 hashbrown = "0.15.2"
 time = "0.3.41"
+clap = { version = "4.5.37", features = ["derive"] }
 
 [dev-dependencies]
 test-generator = "0.3.1"
