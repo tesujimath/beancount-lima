@@ -1,4 +1,4 @@
-use import::Import;
+use import::Imported;
 use ledger::Ledger;
 use std::{fmt::Display, fs::read_to_string, io, path::PathBuf};
 use steel::steel_vm::engine::Engine;
@@ -123,7 +123,7 @@ fn main() -> Result<(), Error> {
             path: import_path,
             importer,
         }) => {
-            let import = Import::parse_from(import_path, &std::io::stderr())?;
+            let import = Imported::parse_from(import_path, &std::io::stderr())?;
             import.register(&mut steel_engine);
 
             cog_paths.load_cog(&mut steel_engine, importer)?;
@@ -182,7 +182,7 @@ pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
     Decimal::register_with_engine(steel_engine);
     Ledger::register_with_engine(steel_engine);
     Posting::register_with_engine(steel_engine);
-    Import::register_with_engine(steel_engine);
+    Imported::register_with_engine(steel_engine);
 }
 
 #[derive(Debug)]

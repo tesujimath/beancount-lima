@@ -6,12 +6,12 @@ use steel_derive::Steel;
 use crate::{register_types_with_engine, Error};
 
 #[derive(Clone, Debug, Steel)]
-pub(crate) struct Import {
+pub(crate) struct Imported {
     transaction_fields: Vec<String>,
     transactions: Vec<Vec<String>>,
 }
 
-impl Import {
+impl Imported {
     pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Self, Error>
     where
         W: Write + Copy,
@@ -38,7 +38,7 @@ impl Import {
             transactions.push(transaction);
         }
 
-        Ok(Import {
+        Ok(Imported {
             transaction_fields,
             transactions,
         })
@@ -53,9 +53,9 @@ impl Import {
     }
 
     pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Self>("ffi-import?");
-        steel_engine.register_fn("ffi-import-transaction-fields", Self::transaction_fields);
-        steel_engine.register_fn("ffi-import-transactions", Self::transactions);
+        steel_engine.register_type::<Self>("ffi-imported?");
+        steel_engine.register_fn("ffi-imported-transaction-fields", Self::transaction_fields);
+        steel_engine.register_fn("ffi-imported-transactions", Self::transactions);
     }
 
     // TODO Ugh sort this and above
@@ -63,7 +63,7 @@ impl Import {
         register_types_with_engine(steel_engine);
 
         steel_engine
-            .register_external_value("*ffi-import*", self)
+            .register_external_value("*ffi-imported*", self)
             .unwrap(); // can't fail
     }
 }
