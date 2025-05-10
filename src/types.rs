@@ -139,7 +139,7 @@ impl Date {
             .map_err(|e| {
                 SteelErr::new(
                     steel::rerrs::ErrorKind::ConversionError,
-                    format!("bad format: {}", e),
+                    format!("bad date format: {}", e),
                 )
             })?;
         time::Date::parse(&raw, &format_descr)
@@ -226,6 +226,12 @@ impl Decimal {
         self.0.scale()
     }
 
+    fn parse(raw: String) -> steel::rvals::Result<Self> {
+        rust_decimal::Decimal::from_str_exact(&raw)
+            .map_err(|e| SteelErr::new(steel::rerrs::ErrorKind::ConversionError, e.to_string()))
+            .map(Self)
+    }
+
     pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Decimal>("decimal?");
         steel_engine.register_fn("decimal", Decimal::new);
@@ -242,6 +248,7 @@ impl Decimal {
         steel_engine.register_fn("decimal-denominator", Decimal::denominator);
         steel_engine.register_fn("decimal-width-left", Decimal::width_left);
         steel_engine.register_fn("decimal-width-right", Decimal::width_right);
+        steel_engine.register_fn("parse-decimal", Decimal::parse);
     }
 }
 
