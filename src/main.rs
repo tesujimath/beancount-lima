@@ -1,3 +1,5 @@
+use import::Import;
+use ledger::Ledger;
 use std::{fmt::Display, fs::read_to_string, io, path::PathBuf};
 use steel::steel_vm::engine::Engine;
 use steel_repl::run_repl;
@@ -108,19 +110,26 @@ fn main() -> Result<(), Error> {
             cog,
         }) => {
             let ledger = Ledger::parse_from(beancount_path, &std::io::stderr())?;
-            register(&mut steel_engine, ledger);
+            ledger.register(&mut steel_engine);
 
             if let Some(cog) = cog {
                 cog_paths.load_cog(&mut steel_engine, cog)?;
             }
 
-            Some("lima/prelude/count")
+            Some("lima/count/prelude")
         }
 
         Some(Commands::Import {
             path: import_path,
             importer,
-        }) => Some("lima/prelude/import"),
+        }) => {
+            let import = Import::parse_from(import_path, &std::io::stderr())?;
+            import.register(&mut steel_engine);
+
+            cog_paths.load_cog(&mut steel_engine, importer)?;
+
+            Some("lima/import/prelude")
+        }
 
         None => None,
     };
@@ -145,13 +154,6 @@ fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn register(steel_engine: &mut Engine, ledger: Ledger) {
-    types::register_types_with_engine(steel_engine);
-
-    steel_engine
-        .register_external_value("*ffi-ledger*", ledger)
-        .unwrap(); // can't fail
-}
 fn set_test_mode(steel_engine: &mut Engine) -> Result<(), Error> {
     run_emitting_error(steel_engine, "", "(set-test-mode!)")
 }
@@ -173,9 +175,20 @@ where
     Ok(())
 }
 
+pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
+    Account::register_with_engine(steel_engine);
+    Amount::register_with_engine(steel_engine);
+    Date::register_with_engine(steel_engine);
+    Decimal::register_with_engine(steel_engine);
+    Ledger::register_with_engine(steel_engine);
+    Posting::register_with_engine(steel_engine);
+    Import::register_with_engine(steel_engine);
+}
+
 #[derive(Debug)]
 pub(crate) enum Error {
     Io(io::Error),
+    Csv(csv::Error),
     Parser,
     Builder,
     Scheme,
@@ -188,6 +201,7 @@ impl Display for Error {
 
         match self {
             Io(e) => e.fmt(f),
+            Csv(e) => e.fmt(f),
             Parser => f.write_str("parser error"),
             Builder => f.write_str("builder errors"),
             Scheme => f.write_str("error in Scheme"),
@@ -196,6 +210,7 @@ impl Display for Error {
     }
 }
 
+pub(crate) mod import;
 pub(crate) mod ledger;
 pub(crate) mod types;
 pub(crate) use types::*;

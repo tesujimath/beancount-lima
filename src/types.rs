@@ -1,8 +1,6 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
-use beancount_parser_lima::BeancountSources;
 use std::{
-    collections::HashMap,
     fmt::Display,
     ops::{Deref, DerefMut},
 };
@@ -12,23 +10,6 @@ use steel::{
     SteelErr,
 };
 use steel_derive::Steel;
-
-#[derive(Clone, Debug, Steel)]
-pub(crate) struct Ledger {
-    pub(crate) sources: BeancountSources,
-    pub(crate) accounts: HashMap<String, Account>,
-}
-
-impl Ledger {
-    fn accounts(&self) -> HashMap<String, Account> {
-        self.accounts.clone()
-    }
-
-    fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Ledger>("ffi-ledger?");
-        steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
-    }
-}
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Account {
@@ -42,7 +23,7 @@ impl Account {
         self.postings.clone()
     }
 
-    fn register_with_engine(steel_engine: &mut Engine) {
+    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Account>("ffi-account?");
         steel_engine.register_fn("ffi-account-postings", Account::postings);
     }
@@ -72,7 +53,7 @@ impl Posting {
         self.amount.clone()
     }
 
-    fn register_with_engine(steel_engine: &mut Engine) {
+    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Posting>("ffi-posting?");
         steel_engine.register_fn("ffi-posting->string", Posting::to_string);
         steel_engine.register_fn("ffi-posting-date", Posting::date);
@@ -108,7 +89,7 @@ impl Amount {
         self.currency.clone()
     }
 
-    fn register_with_engine(steel_engine: &mut Engine) {
+    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Amount>("ffi-amount?");
         steel_engine.register_fn("ffi-amount->string", Amount::to_string);
         steel_engine.register_fn("ffi-amount-number", Amount::number);
@@ -137,7 +118,7 @@ impl From<(rust_decimal::Decimal, String)> for Amount {
     }
 }
 
-type Date = Wrapped<time::Date>;
+pub(crate) type Date = Wrapped<time::Date>;
 
 impl Date {
     fn new(y: i32, m: i32, d: i32) -> steel::rvals::Result<Self> {
@@ -163,7 +144,7 @@ impl Date {
         time::Date::MAX.into()
     }
 
-    fn register_with_engine(steel_engine: &mut Engine) {
+    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Date>("date?");
         steel_engine.register_fn("date", Date::new);
         steel_engine.register_fn("date-bot", Date::bot);
@@ -226,7 +207,7 @@ impl Decimal {
         self.0.scale()
     }
 
-    fn register_with_engine(steel_engine: &mut Engine) {
+    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Decimal>("decimal?");
         steel_engine.register_fn("decimal", Decimal::new);
         steel_engine.register_fn("decimal=?", Decimal::eq);
@@ -370,13 +351,4 @@ where
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
-}
-
-pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
-    Account::register_with_engine(steel_engine);
-    Amount::register_with_engine(steel_engine);
-    Date::register_with_engine(steel_engine);
-    Decimal::register_with_engine(steel_engine);
-    Ledger::register_with_engine(steel_engine);
-    Posting::register_with_engine(steel_engine);
 }

@@ -4,14 +4,15 @@ use steel::steel_vm::engine::Engine;
 use test_generator::test_resources;
 
 use super::{load_cog_path, report_test_failures};
-use crate::{register, CogPaths, Ledger};
+use crate::{CogPaths, Ledger};
 
 #[test_resources("cogs/**/tests/*.scm")]
 fn cog_tests(cog_relpath: &str) {
     let empty_ledger = Ledger::empty();
     let mut steel_engine = Engine::new();
 
-    register(&mut steel_engine, empty_ledger);
+    // TODO don't do this?
+    empty_ledger.register(&mut steel_engine);
 
     let cog_paths = CogPaths::from_env();
 

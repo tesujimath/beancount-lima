@@ -8,8 +8,18 @@ use std::{
     io::Write,
     path::Path,
 };
+use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
+use steel_derive::Steel;
+
+use crate::register_types_with_engine;
 
 use super::{types::*, Error};
+
+#[derive(Clone, Debug, Steel)]
+pub(crate) struct Ledger {
+    pub(crate) sources: BeancountSources,
+    pub(crate) accounts: HashMap<String, Account>,
+}
 
 impl Ledger {
     /// Empty ledger, for running cog tests only
@@ -21,7 +31,7 @@ impl Ledger {
         }
     }
 
-    pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Ledger, Error>
+    pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Self, Error>
     where
         W: Write + Copy,
     {
@@ -58,6 +68,24 @@ impl Ledger {
 
             Ok(ledger) => Ok(ledger),
         }
+    }
+
+    fn accounts(&self) -> HashMap<String, Account> {
+        self.accounts.clone()
+    }
+
+    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
+        steel_engine.register_type::<Ledger>("ffi-ledger?");
+        steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
+    }
+
+    // TODO Ugh sort this and above
+    pub(crate) fn register(self, steel_engine: &mut Engine) {
+        register_types_with_engine(steel_engine);
+
+        steel_engine
+            .register_external_value("*ffi-ledger*", self)
+            .unwrap(); // can't fail
     }
 }
 

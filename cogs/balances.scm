@@ -1,4 +1,4 @@
-(require "lima/prelude/count.scm")
+(require "lima/count/prelude.scm")
 (require "lima/alist.scm")
 
 (define (inventory-for-currencies inv currencies)
