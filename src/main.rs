@@ -4,8 +4,6 @@ use steel_repl::run_repl;
 
 const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
 
-const LIMA_PRELUDE: &str = "lima/prelude";
-
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -44,8 +42,8 @@ enum Commands {
         #[clap(value_name = "FILE")]
         path: PathBuf,
 
-        /// Initial cog to load
-        cog: Option<String>,
+        /// Cog to load for import
+        importer: String,
     },
 }
 
@@ -104,7 +102,7 @@ fn main() -> Result<(), Error> {
     cog_paths.set_steel_search_path(&mut steel_engine);
 
     let cli = Cli::parse();
-    match &cli.command {
+    let prelude_cog = match &cli.command {
         Some(Commands::Count {
             path: beancount_path,
             cog,
@@ -115,13 +113,17 @@ fn main() -> Result<(), Error> {
             if let Some(cog) = cog {
                 cog_paths.load_cog(&mut steel_engine, cog)?;
             }
+
+            Some("lima/prelude/count")
         }
+
         Some(Commands::Import {
             path: import_path,
-            cog,
-        }) => {}
-        None => {}
-    }
+            importer,
+        }) => Some("lima/prelude/import"),
+
+        None => None,
+    };
     if cli.test {
         set_test_mode(&mut steel_engine).unwrap();
     }
@@ -130,10 +132,12 @@ fn main() -> Result<(), Error> {
         return Ok(());
     }
 
-    // the prelude is only auto-loaded for the REPL,
+    // the optional prelude is only auto-loaded for the REPL,
     // all Scheme files must load it explicitly
-    if !cli.no_prelude {
-        cog_paths.load_cog(&mut steel_engine, LIMA_PRELUDE)?;
+    if let Some(prelude_cog) = prelude_cog {
+        if !cli.no_prelude {
+            cog_paths.load_cog(&mut steel_engine, prelude_cog)?;
+        }
     }
 
     run_repl(steel_engine).map_err(Error::Io)?;
