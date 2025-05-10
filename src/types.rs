@@ -134,6 +134,24 @@ impl Date {
             ))
     }
 
+    fn parse(raw: String, strftime_format: String) -> steel::rvals::Result<Self> {
+        let format_descr = time::format_description::parse_strftime_borrowed(&strftime_format)
+            .map_err(|e| {
+                SteelErr::new(
+                    steel::rerrs::ErrorKind::ConversionError,
+                    format!("bad format: {}", e),
+                )
+            })?;
+        time::Date::parse(&raw, &format_descr)
+            .map_err(|e| {
+                SteelErr::new(
+                    steel::rerrs::ErrorKind::ConversionError,
+                    format!("bad date: {}", e),
+                )
+            })
+            .map(Self)
+    }
+
     // beginning of time
     fn bot() -> Date {
         time::Date::MIN.into()
@@ -154,6 +172,7 @@ impl Date {
         steel_engine.register_fn("date<?", Date::lt);
         steel_engine.register_fn("date>=?", Date::ge);
         steel_engine.register_fn("date<=?", Date::le);
+        steel_engine.register_fn("parse-date", Date::parse);
     }
 }
 

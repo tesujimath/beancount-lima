@@ -4,7 +4,7 @@ use steel::steel_vm::engine::Engine;
 use test_generator::test_resources;
 
 use super::{load_cog_path, report_test_failures};
-use crate::{CogPaths, Ledger};
+use crate::{set_test_mode, CogPaths, Ledger};
 
 #[test_resources("cogs/**/tests/*.scm")]
 fn cog_tests(cog_relpath: &str) {
@@ -18,6 +18,7 @@ fn cog_tests(cog_relpath: &str) {
 
     cog_paths.set_steel_search_path(&mut steel_engine);
 
+    set_test_mode(&mut steel_engine).unwrap();
     load_cog_path(&mut steel_engine, cog_relpath).unwrap();
     report_test_failures(&mut steel_engine, cog_relpath).unwrap();
 }
