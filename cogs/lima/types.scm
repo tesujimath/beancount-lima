@@ -20,10 +20,7 @@
   amount
   amount?
   amount-number
-  amount-currency
-  imported
-  imported-transaction-fields
-  imported-transactions)
+  amount-currency)
 
 ;; convert decimal to native rational
 (define (decimal->rational r) (/ (decimal-numerator r) (decimal-denominator r)))
@@ -46,5 +43,3 @@
 (struct account (inventory postings) #:transparent)
 
 (struct ledger (currencies account-names accounts) #:transparent)
-
-(struct imported (transaction-fields transactions) #:transparent)

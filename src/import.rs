@@ -7,8 +7,8 @@ use crate::{register_types_with_engine, Error};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Imported {
-    transaction_fields: Vec<String>,
-    transactions: Vec<Vec<String>>,
+    raw_transaction_fields: Vec<String>,
+    raw_transactions: Vec<Vec<String>>,
 }
 
 impl Imported {
@@ -39,23 +39,26 @@ impl Imported {
         }
 
         Ok(Imported {
-            transaction_fields,
-            transactions,
+            raw_transaction_fields: transaction_fields,
+            raw_transactions: transactions,
         })
     }
 
     fn transaction_fields(&self) -> Vec<String> {
-        self.transaction_fields.clone()
+        self.raw_transaction_fields.clone()
     }
 
     fn transactions(&self) -> Vec<Vec<String>> {
-        self.transactions.clone()
+        self.raw_transactions.clone()
     }
 
     pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Self>("ffi-imported?");
-        steel_engine.register_fn("ffi-imported-transaction-fields", Self::transaction_fields);
-        steel_engine.register_fn("ffi-imported-transactions", Self::transactions);
+        steel_engine.register_fn(
+            "ffi-imported-raw-transaction-fields",
+            Self::transaction_fields,
+        );
+        steel_engine.register_fn("ffi-imported-raw-transactions", Self::transactions);
     }
 
     // TODO Ugh sort this and above

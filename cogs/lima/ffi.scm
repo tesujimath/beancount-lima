@@ -1,6 +1,5 @@
 (provide
-  ffi-ledger->ledger
-  ffi-imported->imported)
+  ffi-ledger->ledger)
 
 (require "lima/ledger.scm")
 (require "lima/account.scm")
@@ -24,6 +23,3 @@
                     (mapping (lambda (name) (cons name (ffi-account->account (hash-get ffi-accounts name)))))
                     (into-hashmap))))
     (accounts->ledger accounts)))
-
-(define (ffi-imported->imported imp)
-  (imported (ffi-imported-transaction-fields imp) (ffi-imported-transactions imp)))
