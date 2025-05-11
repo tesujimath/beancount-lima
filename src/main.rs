@@ -97,7 +97,11 @@ impl CogPaths {
                 Err(e) => return Err(e),
             }
         }
-        Err(Error::NoSuchCog(cog_relpath.to_string()))
+        Err(Error::Cli(format!(
+            "no such cog {} in ${}",
+            cog_relpath.to_string(),
+            BEANCOUNT_LIMA_COGPATH
+        )))
     }
 }
 
@@ -209,7 +213,8 @@ pub(crate) enum Error {
     Parser,
     Builder,
     Scheme,
-    NoSuchCog(String),
+    Cli(String),
+    NotYetImplemented(&'static str),
 }
 
 impl Display for Error {
@@ -222,7 +227,8 @@ impl Display for Error {
             Parser => f.write_str("parser error"),
             Builder => f.write_str("builder errors"),
             Scheme => f.write_str("error in Scheme"),
-            NoSuchCog(name) => write!(f, "no such cog {} in ${}", name, BEANCOUNT_LIMA_COGPATH),
+            Cli(e) => f.write_str(e),
+            NotYetImplemented(feature) => write!(f, "{} not yet implemented", feature),
         }
     }
 }

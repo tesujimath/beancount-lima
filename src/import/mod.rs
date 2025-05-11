@@ -1,5 +1,4 @@
-use slugify::slugify;
-use std::{fs::File, io::Write, path::Path};
+use std::{io::Write, path::Path};
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
@@ -11,6 +10,23 @@ pub(crate) struct Imported {
     raw_transactions: Vec<Vec<String>>,
 }
 
+enum Format {
+    Csv,
+    Ofx,
+}
+
+fn get_format(path: &Path) -> Option<Format> {
+    path.extension().and_then(|ext| {
+        if ext == "csv" || ext == "CSV" {
+            Some(Format::Csv)
+        } else if ext == "ofx" || ext == "OFX" {
+            Some(Format::Ofx)
+        } else {
+            None
+        }
+    })
+}
+
 impl Imported {
     pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Self, Error>
     where
@@ -18,30 +34,11 @@ impl Imported {
     {
         // TODO look at file extension and parse accordingly
         // For now we only do CSV
-        let csv_file = File::open(path).map_err(Error::Io)?;
-        let mut rdr = csv::Reader::from_reader(csv_file);
-        let transaction_fields = rdr
-            .headers()
-            .map_err(Error::Csv)?
-            .iter()
-            .map(|field| slugify(field, "", "-", None))
-            .collect::<Vec<_>>();
-        let mut transactions = Vec::<Vec<String>>::default();
-        for trasnaction in rdr.records() {
-            // The iterator yields Result<StringRecord, Error>, so we check the
-            // error here..
-            let transaction = trasnaction
-                .map_err(Error::Csv)?
-                .iter()
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>();
-            transactions.push(transaction);
+        match get_format(path) {
+            Some(Format::Csv) => csv::import(path),
+            Some(Format::Ofx) => ofx::import(path),
+            None => Err(Error::Cli("unsupported import file extension".to_string())),
         }
-
-        Ok(Imported {
-            raw_transaction_fields: transaction_fields,
-            raw_transactions: transactions,
-        })
     }
 
     fn transaction_fields(&self) -> Vec<String> {
@@ -70,3 +67,6 @@ impl Imported {
             .unwrap(); // can't fail
     }
 }
+
+mod csv;
+mod ofx;
