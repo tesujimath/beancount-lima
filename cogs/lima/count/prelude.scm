@@ -23,7 +23,7 @@
   amount-number
   amount-currency)
 
-(require "lima/tabulate.scm")
+(require "lima/display/tabulate.scm")
 (provide tabulate)
 
 (require "lima/ffi.scm")

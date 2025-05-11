@@ -4,11 +4,9 @@ use std::path::Path;
 use steel::steel_vm::engine::Engine;
 use test_generator::test_resources;
 
-use crate::{tests::report_test_failures, CogPaths, Ledger};
+use crate::{load_cog_path, tests::report_test_failures, CogPaths, Ledger};
 
-use super::load_cog_path;
-
-#[test_resources("tests/*.beancount")]
+#[test_resources("tests/beancount/**/*.beancount")]
 fn beancount_tests(beancount_relpath: &str) {
     let cog_relpath = format!(
         "{}.scm",

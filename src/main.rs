@@ -1,6 +1,11 @@
 use import::Imported;
 use ledger::Ledger;
-use std::{fmt::Display, fs::read_to_string, io, path::PathBuf};
+use std::{
+    fmt::Display,
+    fs::read_to_string,
+    io,
+    path::{Path, PathBuf},
+};
 use steel::steel_vm::engine::Engine;
 use steel_repl::run_repl;
 
@@ -81,20 +86,32 @@ impl CogPaths {
         }
     }
 
-    fn load_cog(&self, steel_engine: &mut Engine, cog_name: &str) -> Result<(), Error> {
-        let cog_basename = format!("{}.scm", cog_name);
-        for path in &self.0 {
-            let cog_path = path.join(&cog_basename);
-            if let Ok(cog_content) = read_to_string(&cog_path) {
-                return run_emitting_error(
-                    steel_engine,
-                    cog_path.to_string_lossy().as_ref(),
-                    cog_content,
-                );
+    /// Locate the file for the cog by looking in all our paths, and load it in Steel.
+    /// First cog found wins.
+    fn load_cog(&self, steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
+        for search_dir in &self.0 {
+            let cog_path = search_dir.join(cog_relpath);
+            match load_cog_path(steel_engine, &cog_path) {
+                Ok(_) => return Ok(()),
+                Err(Error::Io(_)) => continue,
+                Err(e) => return Err(e),
             }
         }
-        Err(Error::NoSuchCog(cog_name.to_string()))
+        Err(Error::NoSuchCog(cog_relpath.to_string()))
     }
+}
+
+fn load_cog_path<P>(steel_engine: &mut Engine, cog_path: P) -> Result<(), Error>
+where
+    P: AsRef<Path>,
+{
+    let cog_path = cog_path.as_ref();
+    let cog_content = read_to_string(cog_path).map_err(Error::Io)?;
+    run_emitting_error(
+        steel_engine,
+        cog_path.to_string_lossy().as_ref(),
+        &cog_content,
+    )
 }
 
 fn main() -> Result<(), Error> {
@@ -113,10 +130,10 @@ fn main() -> Result<(), Error> {
             ledger.register(&mut steel_engine);
 
             if let Some(cog) = cog {
-                cog_paths.load_cog(&mut steel_engine, cog)?;
+                cog_paths.load_cog(&mut steel_engine, &format!("lima/count/{}.scm", cog))?;
             }
 
-            Some("lima/count/prelude")
+            Some("lima/count/prelude.scm")
         }
 
         Some(Commands::Import {
@@ -126,9 +143,9 @@ fn main() -> Result<(), Error> {
             let import = Imported::parse_from(import_path, &std::io::stderr())?;
             import.register(&mut steel_engine);
 
-            cog_paths.load_cog(&mut steel_engine, importer)?;
+            cog_paths.load_cog(&mut steel_engine, &format!("lima/import/{}.scm", importer))?;
 
-            Some("lima/import/prelude")
+            Some("lima/import/prelude.scm")
         }
 
         None => None,
