@@ -101,7 +101,7 @@ pub(crate) fn import(path: &Path) -> Result<Imported, Error> {
 
     Ok(Imported {
         header: vec!["curdef".to_string(), curdef, "acctid".to_string(), acctid],
-        transaction_fields: StmtTrn::fields(),
+        fields: StmtTrn::fields(),
         transactions: stmttrns
             .into_iter()
             .map(StmtTrn::values)

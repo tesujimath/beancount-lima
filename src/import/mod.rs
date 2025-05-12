@@ -7,7 +7,7 @@ use crate::{register_types_with_engine, Error};
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Imported {
     header: Vec<String>,
-    transaction_fields: Vec<String>,
+    fields: Vec<String>,
     transactions: Vec<Vec<String>>,
 }
 
@@ -46,8 +46,8 @@ impl Imported {
         self.header.clone()
     }
 
-    fn transaction_fields(&self) -> Vec<String> {
-        self.transaction_fields.clone()
+    fn fields(&self) -> Vec<String> {
+        self.fields.clone()
     }
 
     fn transactions(&self) -> Vec<Vec<String>> {
@@ -57,7 +57,7 @@ impl Imported {
     pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Self>("ffi-imported?");
         steel_engine.register_fn("ffi-imported-header", Self::header);
-        steel_engine.register_fn("ffi-imported-transaction-fields", Self::transaction_fields);
+        steel_engine.register_fn("ffi-imported-fields", Self::fields);
         steel_engine.register_fn("ffi-imported-transactions", Self::transactions);
     }
 

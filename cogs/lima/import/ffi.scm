@@ -2,6 +2,7 @@
   ffi-imported->imported)
 
 (require "lima/import/types.scm")
+(require "lima/alist.scm")
 
 (define (ffi-imported->imported imp)
-  (imported (ffi-imported-transaction-fields imp) (ffi-imported-transactions imp)))
+  (imported (list->alist (ffi-imported-header imp)) (ffi-imported-fields imp) (ffi-imported-transactions imp)))

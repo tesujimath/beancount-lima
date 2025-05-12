@@ -4,7 +4,7 @@
 (require "lima/import/types.scm")
 
 (define (convert imported currency base-account other-account)
-  (let* ((fields (imported-transaction-fields imported))
+  (let* ((fields (imported-fields imported))
          (date-i (list-index fields "date"))
          (description-i (list-index fields "description"))
          (amount-i (list-index fields "amount")))
