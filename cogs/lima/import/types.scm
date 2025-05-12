@@ -1,6 +1,6 @@
 (provide imported
-  imported-raw-transaction-fields
-  imported-raw-transactions
+  imported-transaction-fields
+  imported-transactions
   transaction
   transaction-date
   transaction-payee
@@ -9,6 +9,6 @@
   transaction-base-account
   transaction-other-accounts)
 
-(struct imported (raw-transaction-fields raw-transactions) #:transparent)
+(struct imported (transaction-fields transactions) #:transparent)
 
 (struct transaction (date payee narration amount base-account other-accounts) #:transparent)

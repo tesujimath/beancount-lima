@@ -99,8 +99,7 @@ impl CogPaths {
         }
         Err(Error::Cli(format!(
             "no such cog {} in ${}",
-            cog_relpath.to_string(),
-            BEANCOUNT_LIMA_COGPATH
+            cog_relpath, BEANCOUNT_LIMA_COGPATH
         )))
     }
 }
@@ -210,6 +209,7 @@ pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
 pub(crate) enum Error {
     Io(io::Error),
     Csv(csv::Error),
+    ImportFormat(String),
     Parser,
     Builder,
     Scheme,
@@ -224,12 +224,19 @@ impl Display for Error {
         match self {
             Io(e) => e.fmt(f),
             Csv(e) => e.fmt(f),
+            ImportFormat(e) => e.fmt(f),
             Parser => f.write_str("parser error"),
             Builder => f.write_str("builder errors"),
             Scheme => f.write_str("error in Scheme"),
             Cli(e) => f.write_str(e),
             NotYetImplemented(feature) => write!(f, "{} not yet implemented", feature),
         }
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        Error::Io(value)
     }
 }
 

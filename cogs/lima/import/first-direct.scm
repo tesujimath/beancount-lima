@@ -4,7 +4,7 @@
 (require "lima/import/types.scm")
 
 (define (convert imported currency base-account other-account)
-  (let* ((fields (imported-raw-transaction-fields imported))
+  (let* ((fields (imported-transaction-fields imported))
          (date-i (list-index fields "date"))
          (description-i (list-index fields "description"))
          (amount-i (list-index fields "amount")))
@@ -13,6 +13,6 @@
                 (description (list-ref txn description-i))
                 (amt (parse-decimal (list-ref txn amount-i))))
             (transaction date description "" (amount amt currency) base-account (list other-account))))
-      (imported-raw-transactions imported))))
+      (imported-transactions imported))))
 
 (define converted (reverse (convert *imported* "GBP" "Assets:Bank" "Expenses:Unknown")))

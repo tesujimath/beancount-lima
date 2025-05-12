@@ -26,7 +26,8 @@ pub(crate) fn import(path: &Path) -> Result<Imported, Error> {
     }
 
     Ok(Imported {
-        raw_transaction_fields: transaction_fields,
-        raw_transactions: transactions,
+        header: Vec::default(),
+        transaction_fields,
+        transactions,
     })
 }
