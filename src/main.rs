@@ -1,3 +1,4 @@
+use config::get_config_string;
 use import::Imported;
 use ledger::Ledger;
 use std::{
@@ -6,7 +7,7 @@ use std::{
     io,
     path::{Path, PathBuf},
 };
-use steel::steel_vm::engine::Engine;
+use steel::{steel_vm::engine::Engine, SteelVal};
 use steel_repl::run_repl;
 
 const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
@@ -110,7 +111,7 @@ where
 {
     let cog_path = cog_path.as_ref();
     let cog_content = read_to_string(cog_path).map_err(Error::Io)?;
-    run_emitting_error(
+    run_emitting_error_discarding_result(
         steel_engine,
         cog_path.to_string_lossy().as_ref(),
         &cog_content,
@@ -122,6 +123,8 @@ fn main() -> Result<(), Error> {
 
     let cog_paths = CogPaths::from_env();
     cog_paths.set_steel_search_path(&mut steel_engine);
+    cog_paths.load_cog(&mut steel_engine, "lima/base-config.scm")?;
+    cog_paths.load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();
     let prelude_cog = match &cli.command {
@@ -143,6 +146,9 @@ fn main() -> Result<(), Error> {
             path: import_path,
             importer,
         }) => {
+            let txnid_key =
+                get_config_string(&mut steel_engine, &["import", "tnxid-key"], "txnid")?;
+            println!("txnid-key = {}", txnid_key);
             let import = Imported::parse_from(import_path, &std::io::stderr())?;
             import.register(&mut steel_engine);
 
@@ -175,10 +181,28 @@ fn main() -> Result<(), Error> {
 }
 
 fn set_test_mode(steel_engine: &mut Engine) -> Result<(), Error> {
-    run_emitting_error(steel_engine, "", "(set-test-mode!)")
+    run_emitting_error_discarding_result(steel_engine, "", "(set-test-mode!)")
 }
 
 fn run_emitting_error<S>(
+    steel_engine: &mut Engine,
+    error_context: &str,
+    input: S,
+) -> Result<Vec<SteelVal>, Error>
+where
+    S: AsRef<str>,
+{
+    let input = input.as_ref();
+    match steel_engine.run(input.to_string()) {
+        Ok(result) => Ok(result),
+        Err(e) => {
+            e.emit_result(error_context, input);
+            Err(Error::Scheme)
+        }
+    }
+}
+
+fn run_emitting_error_discarding_result<S>(
     steel_engine: &mut Engine,
     error_context: &str,
     input: S,
@@ -186,13 +210,7 @@ fn run_emitting_error<S>(
 where
     S: AsRef<str>,
 {
-    let input = input.as_ref();
-    if let Err(e) = steel_engine.run(input.to_string()) {
-        e.emit_result(error_context, input);
-        return Err(Error::Scheme);
-    }
-
-    Ok(())
+    run_emitting_error(steel_engine, error_context, input).map(|_result| ())
 }
 
 pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
@@ -240,6 +258,7 @@ impl From<io::Error> for Error {
     }
 }
 
+pub(crate) mod config;
 pub(crate) mod import;
 pub(crate) mod ledger;
 pub(crate) mod types;

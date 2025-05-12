@@ -1,9 +1,9 @@
 use steel::steel_vm::engine::Engine;
 
-use crate::{run_emitting_error, Error};
+use crate::{run_emitting_error_discarding_result, Error};
 
 fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
-    run_emitting_error(
+    run_emitting_error_discarding_result(
         steel_engine,
         "",
         format!(
