@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use std::{fs::read_to_string, path::Path};
 
 use super::Imported;
 use crate::Error;
@@ -99,7 +98,14 @@ pub(crate) fn parse(ofx_content: &str) -> Result<Imported, Error> {
     } = doc;
 
     Ok(Imported {
-        header: vec!["curdef".to_string(), curdef, "acctid".to_string(), acctid],
+        header: vec![
+            "format".to_string(),
+            "ofx1".to_string(),
+            "curdef".to_string(),
+            curdef,
+            "acctid".to_string(),
+            acctid,
+        ],
         fields: StmtTrn::fields(),
         transactions: stmttrns
             .into_iter()

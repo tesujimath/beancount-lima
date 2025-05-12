@@ -26,7 +26,7 @@ pub(crate) fn import(path: &Path) -> Result<Imported, Error> {
     }
 
     Ok(Imported {
-        header: Vec::default(),
+        header: vec!["format".to_string(), "csv".to_string()],
         fields,
         transactions,
     })
