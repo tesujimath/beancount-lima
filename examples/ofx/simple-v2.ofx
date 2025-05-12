@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="ASCII"?>
+<OFX>
+  <SIGNONMSGSRSV1>
+    <SONRS>
+      <STATUS>
+        <CODE>0</CODE>
+        <SEVERITY>INFO</SEVERITY>
+      </STATUS>
+      <DTSERVER>20250512143000</DTSERVER>
+    </SONRS>
+  </SIGNONMSGSRSV1>
+  <BANKMSGSRSV1>
+    <STMTTRNRS>
+      <TRNUID>12345</TRNUID>
+      <STATUS>
+        <CODE>0</CODE>
+        <SEVERITY>INFO</SEVERITY>
+      </STATUS>
+      <STMTRS>
+        <CURDEF>USD</CURDEF>
+        <BANKACCTFROM>
+          <BANKID>12345</BANKID>
+          <ACCTID>67890</ACCTID>
+          <ACCTTYPE>CHECKING</ACCTTYPE>
+        </BANKACCTFROM>
+        <BANKACCTTO>
+          <BANKID>98765</BANKID>
+          <ACCTID>45678</ACCTID>
+          <ACCTTYPE>CHECKING</ACCTTYPE>
+        </BANKACCTTO>
+        <PAYEE>John Doe</PAYEE>
+        <TXNID>98765</TXNID>
+        <AMOUNT>100.00</AMOUNT>
+        <PAYMENT>
+          <CHECKNUM>001</CHECKNUM>
+        </PAYMENT>
+      </STMTRS>
+    </STMTTRNRS>
+  </BANKMSGSRSV1>
+</OFX>

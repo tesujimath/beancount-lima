@@ -25,4 +25,4 @@
             (transaction date name memo (amount amt cur) base-account (list other-account))))
       (imported-transactions imp))))
 
-(define converted (reverse (convert *imported* "Assets:Bank" "Expenses:Unknown")))
+(define converted (convert *imported* "Assets:Bank" "Expenses:Unknown"))

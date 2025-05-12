@@ -68,8 +68,7 @@ impl StmtTrn {
     }
 }
 
-pub(crate) fn import(path: &Path) -> Result<Imported, Error> {
-    let ofx_content = read_to_string(path).map_err(Into::<Error>::into)?;
+pub(crate) fn parse(ofx_content: &str) -> Result<Imported, Error> {
     let sgml = sgmlish::Parser::builder()
         .lowercase_names()
         .expand_entities(|entity| match entity {
@@ -79,7 +78,7 @@ pub(crate) fn import(path: &Path) -> Result<Imported, Error> {
             "nbsp" => Some(" "),
             _ => None,
         })
-        .parse(&ofx_content)
+        .parse(ofx_content)
         .map_err(Into::<Error>::into)?;
     let sgml = sgmlish::transforms::normalize_end_tags(sgml).map_err(Into::<Error>::into)?;
     let doc = sgmlish::from_fragment::<Document>(sgml).map_err(Into::<Error>::into)?;
