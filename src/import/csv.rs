@@ -1,10 +1,10 @@
 use slugify::slugify;
 use std::{fs::File, path::Path};
 
-use super::Imported;
+use super::{ImportContext, Imported};
 use crate::Error;
 
-pub(crate) fn import(path: &Path) -> Result<Imported, Error> {
+pub(crate) fn import(path: &Path, context: ImportContext) -> Result<Imported, Error> {
     let csv_file = File::open(path).map_err(Error::Io)?;
     let mut rdr = csv::Reader::from_reader(csv_file);
     let fields = rdr
@@ -26,6 +26,7 @@ pub(crate) fn import(path: &Path) -> Result<Imported, Error> {
     }
 
     Ok(Imported {
+        context,
         header: vec!["format".to_string(), "csv".to_string()],
         fields,
         transactions,

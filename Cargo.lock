@@ -237,9 +237,7 @@ dependencies = [
 
 [[package]]
 name = "beancount-parser-lima"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9da1c4e30ca2c29cf63fe67b5332c203bafdc3af1dcd9f4a18c0307b6130ce06"
+version = "0.9.0-alpha.1"
 dependencies = [
  "anyhow",
  "ariadne",
@@ -251,7 +249,6 @@ dependencies = [
  "protobuf-codegen",
  "rust_decimal",
  "rust_decimal_macros",
- "smallvec 2.0.0-alpha.11",
  "strum",
  "strum_macros",
  "time",
@@ -1025,7 +1022,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88485149c4fcec01ebce4e4b8284a3c75b3d8a4749169f5481144e6433e9bcd2"
 dependencies = [
- "smallvec 1.15.0",
+ "smallvec",
 ]
 
 [[package]]
@@ -1254,7 +1251,7 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77a5d83df9f36fe23f0c3648c6bbb8b0298bb5f1939c8f2704431371f4b84d43"
 dependencies = [
- "smallvec 1.15.0",
+ "smallvec",
 ]
 
 [[package]]
@@ -1362,7 +1359,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "redox_syscall",
- "smallvec 1.15.0",
+ "smallvec",
  "windows-targets",
 ]
 
@@ -1539,7 +1536,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d47bcfc3e13850589cf9338a02b6dfb5aebb3748a0f93a392e8df91d6193b6b"
 dependencies = [
  "indexmap 1.9.3",
- "smallvec 1.15.0",
+ "smallvec",
 ]
 
 [[package]]
@@ -2005,12 +2002,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8917285742e9f3e1683f0a9c4e6b57960b7314d0b08d30d1ecd426713ee2eee9"
 
 [[package]]
-name = "smallvec"
-version = "2.0.0-alpha.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87b96efa4bd6bdd2ff0c6615cc36fc4970cbae63cfd46ddff5cee35a1b4df570"
-
-[[package]]
 name = "stacker"
 version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2068,7 +2059,7 @@ dependencies = [
  "rand 0.9.0",
  "serde",
  "serde_json",
- "smallvec 1.15.0",
+ "smallvec",
  "stacker",
  "steel-derive",
  "steel-gen",
@@ -2112,7 +2103,7 @@ dependencies = [
  "once_cell",
  "pretty",
  "serde",
- "smallvec 1.15.0",
+ "smallvec",
 ]
 
 [[package]]

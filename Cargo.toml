@@ -9,7 +9,8 @@ path = "src/main.rs"
 
 [dependencies]
 abi_stable = "0.11.3"
-beancount-parser-lima = "0.8.0"
+# beancount-parser-lima = "0.8.0"
+beancount-parser-lima = { version = "0.9.0-alpha.1", path = "../beancount-parser-lima/beancount-parser-lima" }
 # steel-core = { version = "0.5.0", features = ["dylibs"] }
 steel-core = { git = "https://github.com/mattwparas/steel", branch = "master", features = [
   # need dylibs and sync for FFIModule

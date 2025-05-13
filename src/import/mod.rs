@@ -1,3 +1,4 @@
+use context::ImportContext;
 use std::{io::Write, path::Path};
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
@@ -6,9 +7,10 @@ use crate::{register_types_with_engine, Error};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Imported {
-    header: Vec<String>,
-    fields: Vec<String>,
-    transactions: Vec<Vec<String>>,
+    pub(crate) context: ImportContext,
+    pub(crate) header: Vec<String>,
+    pub(crate) fields: Vec<String>,
+    pub(crate) transactions: Vec<Vec<String>>,
 }
 
 enum Format {
@@ -29,15 +31,17 @@ fn get_format(path: &Path) -> Option<Format> {
 }
 
 impl Imported {
-    pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Self, Error>
+    pub(crate) fn parse_from<W>(
+        path: &Path,
+        context: ImportContext,
+        error_w: W,
+    ) -> Result<Self, Error>
     where
         W: Write + Copy,
     {
-        // TODO look at file extension and parse accordingly
-        // For now we only do CSV
         match get_format(path) {
-            Some(Format::Csv) => csv::import(path),
-            Some(Format::Ofx) => ofx::import(path),
+            Some(Format::Csv) => csv::import(path, context),
+            Some(Format::Ofx) => ofx::import(path, context),
             None => Err(Error::Cli("unsupported import file extension".to_string())),
         }
     }
@@ -71,5 +75,6 @@ impl Imported {
     }
 }
 
+pub(crate) mod context;
 mod csv;
 mod ofx;

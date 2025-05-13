@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use super::Imported;
-use crate::Error;
+use crate::{import::ImportContext, Error};
 
 #[derive(Deserialize, Debug)]
 struct Document {
@@ -67,7 +67,7 @@ impl StmtTrn {
     }
 }
 
-pub(crate) fn parse(ofx_content: &str) -> Result<Imported, Error> {
+pub(crate) fn parse(ofx_content: &str, context: ImportContext) -> Result<Imported, Error> {
     let sgml = sgmlish::Parser::builder()
         .lowercase_names()
         .expand_entities(|entity| match entity {
@@ -98,6 +98,7 @@ pub(crate) fn parse(ofx_content: &str) -> Result<Imported, Error> {
     } = doc;
 
     Ok(Imported {
+        context,
         header: vec![
             "format".to_string(),
             "ofx1".to_string(),

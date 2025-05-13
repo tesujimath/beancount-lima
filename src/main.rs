@@ -1,5 +1,5 @@
 use config::get_config_string;
-use import::Imported;
+use import::{context::ImportContext, Imported};
 use ledger::Ledger;
 use std::{
     fmt::Display,
@@ -38,20 +38,25 @@ enum Commands {
     /// Count beans in a REPL
     Count {
         /// Beancount ledger
-        #[clap(value_name = "FILE")]
-        path: PathBuf,
+        ledger: PathBuf,
 
-        /// Initial cog to load
-        cog: Option<String>,
+        /// Cog to load for count
+        #[arg(long, value_name = "COG")]
+        using: Option<String>,
     },
 
+    /// Import from external CSV or OFX file
     Import {
         /// File to import
-        #[clap(value_name = "FILE")]
-        path: PathBuf,
+        import_file: PathBuf,
+
+        /// Base ledger for import
+        #[arg(long)]
+        ledger: Option<PathBuf>,
 
         /// Cog to load for import
-        importer: String,
+        #[arg(long, value_name = "COG")]
+        using: Option<String>,
     },
 }
 
@@ -120,6 +125,7 @@ where
 
 fn main() -> Result<(), Error> {
     let mut steel_engine = Engine::new();
+    let error_w = &std::io::stderr();
 
     let cog_paths = CogPaths::from_env();
     cog_paths.set_steel_search_path(&mut steel_engine);
@@ -128,14 +134,11 @@ fn main() -> Result<(), Error> {
 
     let cli = Cli::parse();
     let prelude_cog = match &cli.command {
-        Some(Commands::Count {
-            path: beancount_path,
-            cog,
-        }) => {
-            let ledger = Ledger::parse_from(beancount_path, &std::io::stderr())?;
+        Some(Commands::Count { ledger, using }) => {
+            let ledger = Ledger::parse_from(ledger, error_w)?;
             ledger.register(&mut steel_engine);
 
-            if let Some(cog) = cog {
+            if let Some(cog) = using {
                 cog_paths.load_cog(&mut steel_engine, &format!("lima/count/{}.scm", cog))?;
             }
 
@@ -143,16 +146,28 @@ fn main() -> Result<(), Error> {
         }
 
         Some(Commands::Import {
-            path: import_path,
-            importer,
+            import_file,
+            ledger,
+            using,
         }) => {
             let txnid_key =
                 get_config_string(&mut steel_engine, &["import", "tnxid-key"], "txnid")?;
             println!("txnid-key = {}", txnid_key);
-            let import = Imported::parse_from(import_path, &std::io::stderr())?;
+            let import_context = if let Some(ledger) = ledger {
+                ImportContext::parse_from(ledger, txnid_key, error_w)?
+            } else {
+                ImportContext::default()
+            };
+            let import = Imported::parse_from(import_file, import_context, error_w)?;
             import.register(&mut steel_engine);
 
-            cog_paths.load_cog(&mut steel_engine, &format!("lima/import/{}.scm", importer))?;
+            cog_paths.load_cog(
+                &mut steel_engine,
+                &format!(
+                    "lima/import/{}.scm",
+                    using.as_ref().map_or("default", |s| s.as_str())
+                ),
+            )?;
 
             Some("lima/import/prelude.scm")
         }
