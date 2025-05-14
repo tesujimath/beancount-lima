@@ -1,4 +1,4 @@
-(provide format-transaction display-transactions)
+(provide format-transaction format-balance display-transactions display-balance)
 
 (require "srfi/srfi-28/format.scm")
 (require "lima/types.scm")
@@ -8,6 +8,12 @@
 
 (define (quoted space value)
   (format "~a\"~a\"" space value))
+
+(define (format-amount amt space)
+  (format "~a~a~a"
+    (amount-number amt)
+    space
+    (amount-currency amt)))
 
 (define (format-transaction txn accounts)
   (let ((space " ") (pad "  ") (indent "  "))
@@ -23,14 +29,23 @@
       indent
       (car accounts)
       pad
-      (let ((amt (cdr-assoc 'amount txn)))
-        (format "~a~a~a"
-          (amount-number amt)
-          space
-          (amount-currency amt)))
+      (format-amount (cdr-assoc 'amount txn) space)
       (foldl (lambda (acc-name s) (format "~a~a~a\n" s indent acc-name)) "" (cdr accounts)))))
+
+(define (format-balance bln account)
+  (let ((space " ") (pad "  "))
+    (format "~a~abalance~a~a~a~a\n\n"
+      (cdr-assoc 'date bln)
+      space
+      space
+      account
+      pad
+      (format-amount (cdr-assoc 'amount bln) space))))
 
 (define (display-transactions txns)
   (for-each (lambda (txn)
              (display (format-transaction txn)))
     txns))
+
+(define (display-balance bln account)
+  (display (format-balance bln account)))
