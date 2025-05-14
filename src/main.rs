@@ -123,7 +123,6 @@ fn main() -> Result<(), Error> {
         }) => {
             let txnid_key =
                 get_config_string(&mut steel_engine, &["import", "tnxid-key"], "txnid")?;
-            println!("txnid-key = {}", txnid_key);
             let import_context = if let Some(ledger) = ledger {
                 ImportContext::parse_from(ledger, txnid_key, error_w)?
             } else {

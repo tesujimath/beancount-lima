@@ -19,7 +19,6 @@ pub(crate) fn get_config_string(
         ),
     )
     .map(|result| {
-        println!("config value returned {:?}", result);
         result
             .first()
             .and_then(|s| {
