@@ -1,5 +1,5 @@
 use context::ImportContext;
-use std::{io::Write, path::Path};
+use std::{collections::HashMap, io::Write, path::Path};
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
@@ -7,10 +7,10 @@ use crate::{register_types_with_engine, Error};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Imported {
-    pub(crate) context: ImportContext,
     pub(crate) header: Vec<String>,
     pub(crate) fields: Vec<String>,
     pub(crate) transactions: Vec<Vec<String>>,
+    pub(crate) context: ImportContext,
 }
 
 enum Format {
@@ -58,11 +58,26 @@ impl Imported {
         self.transactions.clone()
     }
 
+    fn txnids(&self) -> Vec<String> {
+        self.context.txnids()
+    }
+
+    fn payees(&self) -> HashMap<String, HashMap<String, isize>> {
+        self.context.payees()
+    }
+
+    fn narrations(&self) -> HashMap<String, HashMap<String, isize>> {
+        self.context.narrations()
+    }
+
     pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Self>("ffi-imported?");
         steel_engine.register_fn("ffi-imported-header", Self::header);
         steel_engine.register_fn("ffi-imported-fields", Self::fields);
         steel_engine.register_fn("ffi-imported-transactions", Self::transactions);
+        steel_engine.register_fn("ffi-imported-txnids", Self::txnids);
+        steel_engine.register_fn("ffi-imported-payees", Self::payees);
+        steel_engine.register_fn("ffi-imported-narrations", Self::narrations);
     }
 
     // TODO Ugh sort this and above

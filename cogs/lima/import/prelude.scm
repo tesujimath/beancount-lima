@@ -2,18 +2,18 @@
   *imported*)
 
 (require "lima/import/types.scm")
-(provide
-  transaction
-  transaction-date
-  transaction-payee
-  transaction-narration
-  transaction-amount
-  transaction-base-account
-  transaction-other-accounts)
+(provide imported
+  imported-header
+  imported-fields
+  imported-transactions
+  imported-txnids
+  imported-payees
+  imported-narrations)
 
 (require "lima/import/display.scm")
 (provide
-  display-transaction)
+  format-transaction
+  display-transactions)
 
 (require "lima/import/ffi.scm")
 ;; The FFI imported is called `*ffi-imported*`.

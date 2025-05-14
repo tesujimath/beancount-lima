@@ -1,12 +1,7 @@
 use config::get_config_string;
 use import::{context::ImportContext, Imported};
 use ledger::Ledger;
-use std::{
-    fmt::Display,
-    fs::read_to_string,
-    io,
-    path::{Path, PathBuf},
-};
+use std::{fmt::Display, io, path::PathBuf};
 use steel::{steel_vm::engine::Engine, SteelVal};
 use steel_repl::run_repl;
 
@@ -91,36 +86,12 @@ impl CogPaths {
             steel_engine.add_search_directory(path.clone());
         }
     }
-
-    /// Locate the file for the cog by looking in all our paths, and load it in Steel.
-    /// First cog found wins.
-    fn load_cog(&self, steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
-        for search_dir in &self.0 {
-            let cog_path = search_dir.join(cog_relpath);
-            match load_cog_path(steel_engine, &cog_path) {
-                Ok(_) => return Ok(()),
-                Err(Error::Io(_)) => continue,
-                Err(e) => return Err(e),
-            }
-        }
-        Err(Error::Cli(format!(
-            "no such cog {} in ${}",
-            cog_relpath, BEANCOUNT_LIMA_COGPATH
-        )))
-    }
 }
 
-fn load_cog_path<P>(steel_engine: &mut Engine, cog_path: P) -> Result<(), Error>
-where
-    P: AsRef<Path>,
-{
-    let cog_path = cog_path.as_ref();
-    let cog_content = read_to_string(cog_path).map_err(Error::Io)?;
-    run_emitting_error_discarding_result(
-        steel_engine,
-        cog_path.to_string_lossy().as_ref(),
-        &cog_content,
-    )
+/// Load the cog using Steel's search path
+fn load_cog(steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
+    let run_command = format!(r#"(require "{}")"#, cog_relpath);
+    run_emitting_error_discarding_result(steel_engine, cog_relpath, &run_command)
 }
 
 fn main() -> Result<(), Error> {
@@ -129,8 +100,8 @@ fn main() -> Result<(), Error> {
 
     let cog_paths = CogPaths::from_env();
     cog_paths.set_steel_search_path(&mut steel_engine);
-    cog_paths.load_cog(&mut steel_engine, "lima/base-config.scm")?;
-    cog_paths.load_cog(&mut steel_engine, "lima/config.scm")?;
+    load_cog(&mut steel_engine, "lima/base-config.scm")?;
+    load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();
     let prelude_cog = match &cli.command {
@@ -139,7 +110,7 @@ fn main() -> Result<(), Error> {
             ledger.register(&mut steel_engine);
 
             if let Some(cog) = using {
-                cog_paths.load_cog(&mut steel_engine, &format!("lima/count/{}.scm", cog))?;
+                load_cog(&mut steel_engine, &format!("lima/count/{}.scm", cog))?;
             }
 
             Some("lima/count/prelude.scm")
@@ -161,7 +132,7 @@ fn main() -> Result<(), Error> {
             let import = Imported::parse_from(import_file, import_context, error_w)?;
             import.register(&mut steel_engine);
 
-            cog_paths.load_cog(
+            load_cog(
                 &mut steel_engine,
                 &format!(
                     "lima/import/{}.scm",
@@ -186,7 +157,7 @@ fn main() -> Result<(), Error> {
     // all Scheme files must load it explicitly
     if let Some(prelude_cog) = prelude_cog {
         if !cli.no_prelude {
-            cog_paths.load_cog(&mut steel_engine, prelude_cog)?;
+            load_cog(&mut steel_engine, prelude_cog)?;
         }
     }
 
@@ -211,7 +182,25 @@ where
     match steel_engine.run(input.to_string()) {
         Ok(result) => Ok(result),
         Err(e) => {
-            e.emit_result(error_context, input);
+            match e
+                .span()
+                .and_then(|span| span.source_id)
+                .and_then(|source_id| {
+                    match (
+                        steel_engine.get_path_for_source_id(&source_id),
+                        steel_engine.get_source(&source_id),
+                    ) {
+                        (Some(path), Some(content)) => Some((path, content)),
+                        _ => None,
+                    }
+                }) {
+                Some((path, content)) => {
+                    e.emit_result(path.to_string_lossy().as_ref(), content.as_ref());
+                }
+                None => {
+                    e.emit_result(error_context, input);
+                }
+            }
             Err(Error::Scheme)
         }
     }

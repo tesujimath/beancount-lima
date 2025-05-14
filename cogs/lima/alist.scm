@@ -1,4 +1,4 @@
-(provide del-assoc cdr-assoc-or-default list->alist)
+(provide del-assoc cdr-assoc cdr-assoc-or-default list->alist)
 
 (define (del-assoc key alist)
   (filter (lambda (kv) (not (equal? (car kv) key))) alist))
@@ -6,6 +6,10 @@
 (define (cdr-assoc-or-default key default alist)
   (let ((kv (assoc key alist)))
     (if kv (cdr kv) default)))
+
+(define (cdr-assoc key alist)
+  (let ((kv (assoc key alist)))
+    (if kv (cdr kv) (error! "key not found in alist" key))))
 
 (define (list->alist xs)
   (letrec ((list->alist-acc (lambda (xs pairs)

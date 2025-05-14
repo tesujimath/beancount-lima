@@ -13,17 +13,17 @@ use crate::Error;
 // context for import, i.e. ledger
 #[derive(Clone, Default, Debug, Steel)]
 pub(crate) struct ImportContext {
-    txnids: HashSet<String>,
-    payee_account: HashMap<String, HashMap<String, isize>>,
-    narration_account: HashMap<String, HashMap<String, isize>>,
+    pub(crate) txnids: HashSet<String>,
+    pub(crate) payees: HashMap<String, HashMap<String, isize>>,
+    pub(crate) narrations: HashMap<String, HashMap<String, isize>>,
 }
 
 #[derive(Default, Debug)]
 struct ImportContextBuilder<'a> {
     txnid_key: String,
     txnids: HashSet<String>,
-    payee_account: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
-    narration_account: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
+    payees: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
+    narrations: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
     errors: Vec<parser::Error>,
 }
 
@@ -64,6 +64,18 @@ impl ImportContext {
             }
         }
     }
+
+    pub(crate) fn txnids(&self) -> Vec<String> {
+        self.txnids.iter().cloned().collect::<Vec<_>>()
+    }
+
+    pub(crate) fn payees(&self) -> HashMap<String, HashMap<String, isize>> {
+        self.payees.clone()
+    }
+
+    pub(crate) fn narrations(&self) -> HashMap<String, HashMap<String, isize>> {
+        self.narrations.clone()
+    }
 }
 
 impl<'a> ImportContextBuilder<'a> {
@@ -71,8 +83,8 @@ impl<'a> ImportContextBuilder<'a> {
         Self {
             txnid_key,
             txnids: HashSet::default(),
-            payee_account: hashbrown::HashMap::default(),
-            narration_account: hashbrown::HashMap::default(),
+            payees: hashbrown::HashMap::default(),
+            narrations: hashbrown::HashMap::default(),
             errors: Vec::default(),
         }
     }
@@ -84,8 +96,8 @@ impl<'a> ImportContextBuilder<'a> {
         if self.errors.is_empty() {
             Ok(ImportContext {
                 txnids: self.txnids,
-                payee_account: self
-                    .payee_account
+                payees: self
+                    .payees
                     .into_iter()
                     .map(|(name, accounts)| {
                         (
@@ -97,8 +109,8 @@ impl<'a> ImportContextBuilder<'a> {
                         )
                     })
                     .collect(),
-                narration_account: self
-                    .narration_account
+                narrations: self
+                    .narrations
                     .into_iter()
                     .map(|(name, accounts)| {
                         (
@@ -157,7 +169,7 @@ impl<'a> ImportContextBuilder<'a> {
                     .collect::<Vec<&str>>();
 
                 if let Some(payee) = payee {
-                    match self.payee_account.entry(payee.item()) {
+                    match self.payees.entry(payee.item()) {
                         Occupied(mut payee_accounts) => {
                             let payee_accounts = payee_accounts.get_mut();
                             for account in accounts.iter() {

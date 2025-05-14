@@ -2,14 +2,8 @@
   imported-header
   imported-fields
   imported-transactions
-  transaction
-  transaction-date
-  transaction-payee
-  transaction-narration
-  transaction-amount
-  transaction-base-account
-  transaction-other-accounts)
+  imported-txnids
+  imported-payees
+  imported-narrations)
 
-(struct imported (header fields transactions) #:transparent)
-
-(struct transaction (date payee narration amount base-account other-accounts) #:transparent)
+(struct imported (header fields transactions txnids payees narrations) #:transparent)

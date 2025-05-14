@@ -3,8 +3,8 @@
 use steel::steel_vm::engine::Engine;
 use test_generator::test_resources;
 
-use super::report_test_failures;
-use crate::{load_cog_path, set_test_mode, CogPaths, Ledger};
+use super::{load_cog_path, report_test_failures};
+use crate::{set_test_mode, CogPaths, Ledger};
 
 #[test_resources("tests/cogs/**/*.scm")]
 fn cog_tests(cog_relpath: &str) {
