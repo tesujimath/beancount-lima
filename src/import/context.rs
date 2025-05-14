@@ -170,10 +170,10 @@ impl<'a> ImportContextBuilder<'a> {
 
                 if let Some(payee) = payee {
                     match self.payees.entry(payee.item()) {
-                        Occupied(mut payee_accounts) => {
-                            let payee_accounts = payee_accounts.get_mut();
+                        Occupied(mut payees) => {
+                            let payees = payees.get_mut();
                             for account in accounts.iter() {
-                                match payee_accounts.entry(*account) {
+                                match payees.entry(*account) {
                                     Occupied(mut payee_account) => {
                                         let payee_account = payee_account.get_mut();
                                         *payee_account += 1;
@@ -184,8 +184,35 @@ impl<'a> ImportContextBuilder<'a> {
                                 }
                             }
                         }
-                        Vacant(payee_accounts) => {
-                            payee_accounts.insert(
+                        Vacant(payees) => {
+                            payees.insert(
+                                accounts
+                                    .iter()
+                                    .map(|account| (*account, 1))
+                                    .collect::<hashbrown::HashMap<_, _>>(),
+                            );
+                        }
+                    }
+                }
+
+                if let Some(narration) = narration {
+                    match self.narrations.entry(narration.item()) {
+                        Occupied(mut narrations) => {
+                            let narrations = narrations.get_mut();
+                            for account in accounts.iter() {
+                                match narrations.entry(*account) {
+                                    Occupied(mut narration_account) => {
+                                        let narration_account = narration_account.get_mut();
+                                        *narration_account += 1;
+                                    }
+                                    Vacant(narration_account) => {
+                                        narration_account.insert(1);
+                                    }
+                                }
+                            }
+                        }
+                        Vacant(narrations) => {
+                            narrations.insert(
                                 accounts
                                     .iter()
                                     .map(|account| (*account, 1))
