@@ -1,4 +1,6 @@
-(provide del-assoc cdr-assoc cdr-assoc-or-default list->alist)
+(provide del-assoc cdr-assoc cdr-assoc-or-default list->alist alist-symbol-keys?)
+
+(require (only-in "lima/list.scm" all))
 
 (define (del-assoc key alist)
   (filter (lambda (kv) (not (equal? (car kv) key))) alist))
@@ -17,3 +19,9 @@
                                [(empty? (cdr xs)) (error! "odd length list")]
                                [else (list->alist-acc (cddr xs) (cons (cons (car xs) (cadr xs)) pairs))]))))
     (list->alist-acc xs '())))
+
+;; do we have an alist with all keys being symbols?
+(define (alist-symbol-keys? alist)
+  (and (list? alist)
+    (all (lambda (item) (and (pair? item) (symbol? (car item))))
+      alist)))

@@ -1,4 +1,4 @@
-(provide flatmap list-index)
+(provide flatmap list-index all any)
 
 (define (flatmap proc seq)
   (letrec ((accumulate
@@ -21,3 +21,9 @@
                  [(equal? (car lst) x) n]
                  [else (list-index-acc (cdr lst) x (+ n 1))]))))
     (list-index-acc lst x 0)))
+
+(define (all predicate lst)
+  (foldl (lambda (item ok) (and ok (predicate item))) #t lst))
+
+(define (any predicate lst)
+  (foldl (lambda (item ok) (or ok (predicate item))) #f lst))
