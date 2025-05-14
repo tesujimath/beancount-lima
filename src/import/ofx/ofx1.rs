@@ -23,6 +23,7 @@ struct StmtRs {
     curdef: String,
     bankacctfrom: BankAcctFrom,
     banktranlist: BankTranList,
+    ledgerbal: LedgerBal,
 }
 
 #[derive(Deserialize, Debug)]
@@ -44,6 +45,12 @@ struct StmtTrn {
     fitid: String,
     name: String,
     memo: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct LedgerBal {
+    balamt: String,
+    dtasof: String,
 }
 
 impl StmtTrn {
@@ -92,6 +99,7 @@ pub(crate) fn parse(ofx_content: &str, context: ImportContext) -> Result<Importe
                                 curdef,
                                 bankacctfrom: BankAcctFrom { acctid },
                                 banktranlist: BankTranList { stmttrns },
+                                ledgerbal: LedgerBal { balamt, dtasof },
                             },
                     },
             },
@@ -106,6 +114,10 @@ pub(crate) fn parse(ofx_content: &str, context: ImportContext) -> Result<Importe
             curdef,
             "acctid".to_string(),
             acctid,
+            "balamt".to_string(),
+            balamt,
+            "dtasof".to_string(),
+            dtasof,
         ],
         fields: StmtTrn::fields(),
         transactions: stmttrns

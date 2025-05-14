@@ -1,4 +1,5 @@
 (require "srfi/srfi-28/format.scm")
+(require "lima/config.scm")
 (require "lima/types.scm")
 (require "lima/list.scm")
 (require "lima/alist.scm")
@@ -6,9 +7,11 @@
 (require "lima/import/types.scm")
 (require "lima/import/display.scm")
 
+(define default-currency (config-value-or-default '(import default-currency) "CAD" *config*))
+
 ;; extract imported OFX1 transactions into an intermediate representation
 (define (extract hdr fields txns)
-  (let* ((cur (cdr-assoc-or-default "curdef" "USD" hdr))
+  (let* ((cur (cdr-assoc-or-default "curdef" default-currency hdr))
          (dtposted-i (list-index fields "dtposted"))
          (trnamt-i (list-index fields "trnamt"))
          (fitid-i (list-index fields "fitid"))
@@ -29,6 +32,24 @@
               (cons 'txnid txnid))))
       txns)))
 
-; (define converted (convert *imported* "Assets:Bank" "Expenses:Unknown"))
-(for-each (lambda (txn) (display (format-transaction txn '("Assets:Bank:Current" "Expenses:Unknown"))))
-  (extract (imported-header *imported*) (imported-fields *imported*) (imported-transactions *imported*)))
+;; extract balance from header if we can find the fields we need, otherwise return empty
+(define (extract-balance hdr)
+  (let* ((cur (cdr-assoc-or-default "curdef" default-currency hdr))
+         (balamt (cdr-assoc-or-default "balamt" '() hdr))
+         (dtasof (cdr-assoc-or-default "dtasof" '() hdr)))
+    (if (or (empty? balamt) (empty? dtasof))
+      '()
+      (let ((date (parse-date dtasof "%Y%m%d"))
+            (amt (parse-decimal balamt)))
+        (list (cons 'date date)
+          (cons 'amount (amount amt cur)))))))
+
+(let* ((accounts '("Assets:Bank:Current" "Expenses:Unknown"))
+       (hdr (imported-header *imported*))
+       (fields (imported-fields *imported*))
+       (txns (imported-transactions *imported*))
+       (bln (extract-balance hdr)))
+  (for-each (lambda (txn) (display (format-transaction txn accounts)))
+    (extract hdr fields txns))
+  (unless (empty? bln)
+    (display-balance bln (car accounts))))

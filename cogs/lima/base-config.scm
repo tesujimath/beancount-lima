@@ -2,7 +2,7 @@
 
 (define *base-config*
   '((import . ((txnid-key . "txnid")
-               (other-import-config . "woohoo")))
+               (default-currency . "USD")))
     (count . ((something-else . "booyah!")))))
 
 (define (config-value-or-default key-path default cfg)
