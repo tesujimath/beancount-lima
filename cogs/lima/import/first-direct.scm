@@ -20,7 +20,8 @@
   (let* ((date-i (list-index fields "date"))
          (balance-i (list-index fields "balance"))
          (txn0 (car txns))
-         (date (parse-date (list-ref txn0 date-i) "%d/%m/%Y"))
+         ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
+         (date (date-after (parse-date (list-ref txn0 date-i) "%d/%m/%Y") 1))
          (amt (parse-decimal (list-ref txn0 balance-i))))
     (list (cons 'date date)
       (cons 'amount (amount amt cur)))))

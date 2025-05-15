@@ -162,6 +162,27 @@ impl Date {
         time::Date::MAX.into()
     }
 
+    // positive or negative offset in days
+    fn after(&self, d: isize) -> steel::rvals::Result<Self> {
+        if d >= 0 {
+            self.0.checked_add(time::Duration::days(d as i64))
+        } else {
+            self.0.checked_sub(time::Duration::days(-d as i64))
+        }
+        .map_or(
+            Err(SteelErr::new(
+                steel::rerrs::ErrorKind::ConversionError,
+                "date overflow".to_string(),
+            )),
+            |date| Ok(date.into()),
+        )
+    }
+
+    // positive or negative offset in days
+    fn before(&self, d: isize) -> steel::rvals::Result<Self> {
+        self.after(-d)
+    }
+
     pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Date>("date?");
         steel_engine.register_fn("date", Date::new);
@@ -173,6 +194,8 @@ impl Date {
         steel_engine.register_fn("date>=?", Date::ge);
         steel_engine.register_fn("date<=?", Date::le);
         steel_engine.register_fn("parse-date", Date::parse);
+        steel_engine.register_fn("date-after", Date::after);
+        steel_engine.register_fn("date-before", Date::before);
     }
 }
 

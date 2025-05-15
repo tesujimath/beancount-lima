@@ -39,7 +39,8 @@
          (dtasof (cdr-assoc-or-default "dtasof" '() hdr)))
     (if (or (empty? balamt) (empty? dtasof))
       '()
-      (let ((date (parse-date dtasof "%Y%m%d"))
+      ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
+      (let ((date (date-after (parse-date dtasof "%Y%m%d") 1))
             (amt (parse-decimal balamt)))
         (list (cons 'date date)
           (cons 'amount (amount amt cur)))))))
