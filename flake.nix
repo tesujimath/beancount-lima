@@ -6,7 +6,9 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     steel = {
-      url = "github:mattwparas/steel/master";
+      # TODO switch back to mainline Steel once into-string PR merged
+      # url = "github:mattwparas/steel/master";
+      url = "github:tesujimath/steel/into-string";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

@@ -35,8 +35,8 @@
 ;; extract balance from header if we can find the fields we need, otherwise return empty
 (define (extract-balance hdr)
   (let* ((cur (cdr-assoc-or-default "curdef" default-currency hdr))
-         (balamt (cdr-assoc-or-default "balamt" '() hdr))
-         (dtasof (cdr-assoc-or-default "dtasof" '() hdr)))
+         (balamt (cdr-assoc-or-empty "balamt" hdr))
+         (dtasof (cdr-assoc-or-empty "dtasof" hdr)))
     (if (or (empty? balamt) (empty? dtasof))
       '()
       ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day

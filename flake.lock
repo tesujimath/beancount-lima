@@ -123,16 +123,16 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1744408216,
-        "narHash": "sha256-Pt8P/vuT+kdRZQ1hXQ3DejC4ytGZ/r4LX5mnBlspKVk=",
-        "owner": "mattwparas",
+        "lastModified": 1747349626,
+        "narHash": "sha256-DPc3HfmsHMr7QSb/8x/Z9cTOG3rYdjvhB8PRNF0ZXOY=",
+        "owner": "tesujimath",
         "repo": "steel",
-        "rev": "9273f13677a8b967429ed46f46f6969fdee6bde1",
+        "rev": "6e0ad5f8a96b246166047afa75a15c5058173b5d",
         "type": "github"
       },
       "original": {
-        "owner": "mattwparas",
-        "ref": "master",
+        "owner": "tesujimath",
+        "ref": "into-string",
         "repo": "steel",
         "type": "github"
       }

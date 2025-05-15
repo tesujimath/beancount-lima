@@ -1,4 +1,4 @@
-(provide tabulate)
+(provide tabulate spaces)
 
 ;; a column may contain strings or decimals or both
 ;; string-width is the max string length,
@@ -45,8 +45,12 @@
 (define (rowspec-from-rows rows)
   (foldl rowspec-add-row '() rows))
 
-(define (display-spaces n)
-  (if (> n 0) (begin (display " ") (display-spaces (- n 1)))))
+(define (repeat-string n s)
+  (transduce (map (lambda (i) s) (range n)) (into-string)))
+
+(define (spaces n) (repeat-string n " "))
+
+(define (display-spaces n) (display (spaces n)))
 
 (define (display-cell just cs cell)
   (cond

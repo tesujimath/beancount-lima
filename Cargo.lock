@@ -1571,12 +1571,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 
 [[package]]
-name = "radix_fmt"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce082a9940a7ace2ad4a8b7d0b1eac6aa378895f18be598230c5f2284ac05426"
-
-[[package]]
 name = "radix_trie"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2024,7 +2018,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "steel-core"
 version = "0.6.0"
-source = "git+https://github.com/mattwparas/steel?branch=master#890d3595d8e01ed39915ed4292ab441c1be7dbca"
+source = "git+https://github.com/tesujimath/steel?branch=into-string#6e0ad5f8a96b246166047afa75a15c5058173b5d"
 dependencies = [
  "abi_stable",
  "arc-swap",
@@ -2056,7 +2050,6 @@ dependencies = [
  "parking_lot",
  "polling",
  "quickscope",
- "radix_fmt",
  "rand 0.9.0",
  "serde",
  "serde_json",
@@ -2074,7 +2067,7 @@ dependencies = [
 [[package]]
 name = "steel-derive"
 version = "0.5.0"
-source = "git+https://github.com/mattwparas/steel?branch=master#890d3595d8e01ed39915ed4292ab441c1be7dbca"
+source = "git+https://github.com/tesujimath/steel?branch=into-string#6e0ad5f8a96b246166047afa75a15c5058173b5d"
 dependencies = [
  "proc-macro2 1.0.94",
  "quote 1.0.40",
@@ -2084,7 +2077,7 @@ dependencies = [
 [[package]]
 name = "steel-gen"
 version = "0.2.0"
-source = "git+https://github.com/mattwparas/steel?branch=master#890d3595d8e01ed39915ed4292ab441c1be7dbca"
+source = "git+https://github.com/tesujimath/steel?branch=into-string#6e0ad5f8a96b246166047afa75a15c5058173b5d"
 dependencies = [
  "codegen",
  "serde",
@@ -2093,7 +2086,7 @@ dependencies = [
 [[package]]
 name = "steel-parser"
 version = "0.6.0"
-source = "git+https://github.com/mattwparas/steel?branch=master#890d3595d8e01ed39915ed4292ab441c1be7dbca"
+source = "git+https://github.com/tesujimath/steel?branch=into-string#6e0ad5f8a96b246166047afa75a15c5058173b5d"
 dependencies = [
  "compact_str",
  "fxhash",
@@ -2110,7 +2103,7 @@ dependencies = [
 [[package]]
 name = "steel-repl"
 version = "0.6.0"
-source = "git+https://github.com/mattwparas/steel?branch=master#890d3595d8e01ed39915ed4292ab441c1be7dbca"
+source = "git+https://github.com/tesujimath/steel?branch=into-string#6e0ad5f8a96b246166047afa75a15c5058173b5d"
 dependencies = [
  "colored",
  "crossbeam-utils",

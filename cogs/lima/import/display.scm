@@ -5,6 +5,7 @@
 (require "lima/string.scm")
 (require "lima/alist.scm")
 (require "lima/import/types.scm")
+(require "lima/import/account-inference.scm")
 
 (define (quoted space value)
   (format "~a\"~a\"" space value))
@@ -19,15 +20,7 @@
   (let ((space " ")
         (pad "  ")
         (indent "  ")
-        (format-secondary-account
-          (lambda (acc)
-            (if (list? acc)
-              (let* ((acc-name (car acc))
-                     (n (cadr acc))
-                     (suffix (if (> n 1) "s" ""))
-                     (category (caddr acc)))
-                (format "~a  ; inferred from ~a ~a~a" acc-name n category suffix))
-              acc))))
+        (acc-width 60))
     (format "~a~a~a~a\n~a~a~a~a\n~a\n"
       (cdr-assoc 'date txn)
       space
@@ -42,8 +35,8 @@
       (cdr-assoc 'primary-account txn)
       pad
       (format-amount (cdr-assoc 'amount txn) space)
-      (foldl (lambda (acc s) (format "~a~a~a\n" s indent (format-secondary-account acc))) ""
-        (cdr-assoc-or-default 'secondary-accounts '() txn)))))
+      (foldl (lambda (acc s) (format "~a~a~a\n" s indent (format-secondary-account acc acc-width))) ""
+        (cdr-assoc-or-empty 'secondary-accounts txn)))))
 
 (define (format-balance bln account)
   (let ((space " ") (pad "  "))
