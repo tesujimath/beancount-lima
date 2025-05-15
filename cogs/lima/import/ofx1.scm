@@ -1,5 +1,5 @@
 (require "srfi/srfi-28/format.scm")
-(require "steel/logging/log.scm")
+(require "steel/sorting/merge-sort.scm")
 (require "lima/config.scm")
 (require "lima/types.scm")
 (require "lima/list.scm")
@@ -12,7 +12,6 @@
 
 ;; extract imported OFX1 transactions into an intermediate representation
 (define (make-extract hdr fields acctid primary-account)
-  (log/info! "make-extract" primary-account)
   (let* ((cur (cdr-assoc-or-default "curdef" default-currency hdr))
          (dtposted-i (list-index fields "dtposted"))
          (trnamt-i (list-index fields "trnamt"))
@@ -48,6 +47,7 @@
 
 ;; TODO move to a more general place
 ;; infer expenses account from payees and narrations we found in the ledger
+;; the secondary accounts are a list of either strings, or lists of string count category
 (define (make-infer-secondary-accounts-from-payees-and-narrations payees narrations)
   (lambda (txn)
     (let* ((amount (amount-number (cdr-assoc 'amount txn)))
@@ -56,16 +56,16 @@
                [(decimal>? amount (decimal-zero)) '("Income:Unknown")]
                [(decimal<? amount (decimal-zero))
                  (let* ((found-payee (hash-try-get payees (cdr-assoc 'payee txn)))
-                        (found-narration (hash-try-get narrations (cdr-assoc 'narration txn))))
+                        (found-narration (hash-try-get narrations (cdr-assoc 'narration txn)))
+                        (order-accounts (lambda (account-lookup category)
+                                         (let* ((account-names (hash-keys->list account-lookup))
+                                                (annotated-accounts (map (lambda (account-name)
+                                                                          (list account-name (hash-get account-lookup account-name) category))
+                                                                     account-names)))
+                                           (merge-sort annotated-accounts #:comparator (lambda (row0 row1) (> (cadr row0) (cadr row1))))))))
                    (cond
-                     [found-payee
-                       (begin
-                         (log/info! "found payee" found-payee)
-                         (hash-keys->list found-payee))]
-                     [found-narration
-                       (begin
-                         (log/info! "found narration" found-narration)
-                         (hash-keys->list found-narration))]
+                     [found-payee (order-accounts found-payee "payee")]
+                     [found-narration (order-accounts found-narration "narration")]
                      [else '("Expenses:Unknown")]))]
                [else '()])))
       (cons (cons 'secondary-accounts secondary-accounts) txn))))
