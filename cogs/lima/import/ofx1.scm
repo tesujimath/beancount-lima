@@ -1,5 +1,4 @@
 (require "srfi/srfi-28/format.scm")
-(require "steel/sorting/merge-sort.scm")
 (require "lima/config.scm")
 (require "lima/types.scm")
 (require "lima/list.scm")
@@ -7,6 +6,7 @@
 (require "lima/import/prelude.scm")
 (require "lima/import/types.scm")
 (require "lima/import/display.scm")
+(require "lima/import/account-inference.scm")
 
 (define default-currency (config-value-or-default '(import default-currency) "CAD" *config*))
 
@@ -45,31 +45,6 @@
         (list (cons 'date date)
           (cons 'amount (amount amt cur)))))))
 
-;; TODO move to a more general place
-;; infer expenses account from payees and narrations we found in the ledger
-;; the secondary accounts are a list of either strings, or lists of string count category
-(define (make-infer-secondary-accounts-from-payees-and-narrations payees narrations)
-  (lambda (txn)
-    (let* ((amount (amount-number (cdr-assoc 'amount txn)))
-           (secondary-accounts
-             (cond
-               [(decimal>? amount (decimal-zero)) '("Income:Unknown")]
-               [(decimal<? amount (decimal-zero))
-                 (let* ((found-payee (hash-try-get payees (cdr-assoc 'payee txn)))
-                        (found-narration (hash-try-get narrations (cdr-assoc 'narration txn)))
-                        (order-accounts (lambda (account-lookup category)
-                                         (let* ((account-names (hash-keys->list account-lookup))
-                                                (annotated-accounts (map (lambda (account-name)
-                                                                          (list account-name (hash-get account-lookup account-name) category))
-                                                                     account-names)))
-                                           (merge-sort annotated-accounts #:comparator (lambda (row0 row1) (> (cadr row0) (cadr row1))))))))
-                   (cond
-                     [found-payee (order-accounts found-payee "payee")]
-                     [found-narration (order-accounts found-narration "narration")]
-                     [else '("Expenses:Unknown")]))]
-               [else '()])))
-      (cons (cons 'secondary-accounts secondary-accounts) txn))))
-
 (let* ((accounts-by-id (config-value-or-default '(import accounts) '() *config*))
        (hdr (imported-header *imported*))
        (acctid (cdr-assoc-or-default "acctid" "unknown-acctid" hdr))
@@ -78,10 +53,11 @@
        (txns (imported-transactions *imported*))
        (payees (imported-payees *imported*))
        (narrations (imported-narrations *imported*))
-       (bln (extract-balance hdr)))
+       (bln (extract-balance hdr))
+       (txn-directive (config-value-or-default '(import txn-directive) "txn" *config*)))
   (transduce txns
     (mapping (make-extract hdr fields acctid primary-account))
     (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
-    (into-for-each (lambda (txn) (display (format-transaction txn)))))
+    (into-for-each (lambda (txn) (display (format-transaction txn txn-directive)))))
   (unless (empty? bln)
-    (display-balance bln primary-account)))
+    (display (format-balance bln primary-account))))

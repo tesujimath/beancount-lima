@@ -2,7 +2,8 @@
 (require "lima/alist.scm")
 
 (define *base-config*
-  '((import . ((txnid-key . "txnid")
+  '((import . ((txn-directive . "txn")
+               (txnid-key . "txnid")
                (default-currency . "USD")))
     (count . ((something-else . "booyah!")))))
 

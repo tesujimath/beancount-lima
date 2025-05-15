@@ -1,4 +1,4 @@
-(provide format-transaction format-balance display-transactions display-balance)
+(provide format-transaction format-balance)
 
 (require "srfi/srfi-28/format.scm")
 (require "lima/types.scm")
@@ -15,8 +15,10 @@
     space
     (amount-currency amt)))
 
-(define (format-transaction txn)
-  (let ((space " ") (pad "  ") (indent "  ")
+(define (format-transaction txn txn-directive)
+  (let ((space " ")
+        (pad "  ")
+        (indent "  ")
         (format-secondary-account
           (lambda (acc)
             (if (list? acc)
@@ -26,9 +28,10 @@
                      (category (caddr acc)))
                 (format "~a  ; inferred from ~a ~a~a" acc-name n category suffix))
               acc))))
-    (format "~a~atxn~a\n~a~a~a~a\n~a\n"
+    (format "~a~a~a~a\n~a~a~a~a\n~a\n"
       (cdr-assoc 'date txn)
       space
+      txn-directive
       (let ((payee (cdr-assoc-or-default 'payee "" txn))
             (narration (cdr-assoc-or-default 'narration "" txn)))
         (cond
@@ -40,7 +43,7 @@
       pad
       (format-amount (cdr-assoc 'amount txn) space)
       (foldl (lambda (acc s) (format "~a~a~a\n" s indent (format-secondary-account acc))) ""
-        (cdr-assoc 'secondary-accounts txn)))))
+        (cdr-assoc-or-default 'secondary-accounts '() txn)))))
 
 (define (format-balance bln account)
   (let ((space " ") (pad "  "))
@@ -51,11 +54,3 @@
       account
       pad
       (format-amount (cdr-assoc 'amount bln) space))))
-
-(define (display-transactions txns)
-  (for-each (lambda (txn)
-             (display (format-transaction txn)))
-    txns))
-
-(define (display-balance bln account)
-  (display (format-balance bln account)))

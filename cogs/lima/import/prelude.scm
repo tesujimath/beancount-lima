@@ -12,9 +12,7 @@
 
 (require "lima/import/display.scm")
 (provide format-transaction
-  format-balance
-  display-transactions
-  display-balance)
+  format-balance)
 
 (require "lima/import/ffi.scm")
 ;; The FFI imported is called `*ffi-imported*`.
