@@ -61,6 +61,10 @@ impl CogPaths {
     fn from_env() -> Self {
         let mut paths = Vec::default();
 
+        if let Some(cog_dir) = user_cog_dir() {
+            paths.push(cog_dir);
+        }
+
         if let Ok(path) = std::env::var(BEANCOUNT_LIMA_COGPATH) {
             for path in path.split(":") {
                 if path.is_empty() {
@@ -86,6 +90,21 @@ impl CogPaths {
             steel_engine.add_search_directory(path.clone());
         }
     }
+}
+
+// return user cog dir if it exists
+fn user_cog_dir() -> Option<PathBuf> {
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("beancount-lima");
+    xdg_dirs
+        .get_data_home()
+        .map(|path| path.join("cogs"))
+        .and_then(|cog_dir| {
+            if cog_dir.is_dir() {
+                Some(cog_dir)
+            } else {
+                None
+            }
+        })
 }
 
 /// Load the cog using Steel's search path
