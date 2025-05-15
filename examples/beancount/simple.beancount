@@ -10,7 +10,15 @@
 
 2016-03-01 open Expenses:Groceries NZD,GBP
 
+2016-03-01 open Expenses:Donations NZD
+
 2016-03-01 open Expenses:Entertainment:Drinks-and-snacks NZD
+
+2016-03-01 open Income:Tips NZD
+
+2023-04-10 * "WIKIMEDIA 877-600-9454" "WIKIMEDIA 877-600-9454 ;"
+  Assets:Bank:Current                           -10.00 NZD
+  Expenses:Donations
 
 2023-05-29 * "New World Gardens North East Va" "Very hungry"
   Expenses:Groceries                             10.00 NZD

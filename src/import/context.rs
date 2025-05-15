@@ -157,15 +157,23 @@ impl<'a> ImportContextBuilder<'a> {
             }
         }
 
-        // update payee and narration map to account name
+        // update payee and narration map to account name only for expenses,
+        // since we only try to infer account names for expense accounts
         use hashbrown::hash_map::Entry::*;
         match (transaction.payee(), transaction.narration()) {
             (None, None) => (),
             (payee, narration) => {
-                // get all accounts for postings
+                // get accounts of type expenses for postings
                 let accounts = transaction
                     .postings()
-                    .map(|p| p.account().item().as_ref())
+                    .filter_map(|p| {
+                        let account = p.account().item();
+                        if account.account_type() == parser::AccountType::Expenses {
+                            Some(p.account().item().as_ref())
+                        } else {
+                            None
+                        }
+                    })
                     .collect::<Vec<&str>>();
 
                 if let Some(payee) = payee {

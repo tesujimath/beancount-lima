@@ -15,7 +15,7 @@
     space
     (amount-currency amt)))
 
-(define (format-transaction txn accounts)
+(define (format-transaction txn)
   (let ((space " ") (pad "  ") (indent "  "))
     (format "~a~atxn~a\n~a~a~a~a\n~a\n"
       (cdr-assoc 'date txn)
@@ -27,10 +27,11 @@
           [(string-empty? payee) (quoted space narration)]
           [else (format "~a~a" (quoted space payee) (quoted space narration))]))
       indent
-      (car accounts)
+      (cdr-assoc 'primary-account txn)
       pad
       (format-amount (cdr-assoc 'amount txn) space)
-      (foldl (lambda (acc-name s) (format "~a~a~a\n" s indent acc-name)) "" (cdr accounts)))))
+      (foldl (lambda (acc-name s) (format "~a~a~a\n" s indent acc-name)) ""
+        (cdr-assoc 'secondary-accounts txn)))))
 
 (define (format-balance bln account)
   (let ((space " ") (pad "  "))
