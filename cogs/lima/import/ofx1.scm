@@ -9,6 +9,7 @@
 (require "lima/import/types.scm")
 (require "lima/import/display.scm")
 (require "lima/import/account-inference.scm")
+(require "lima/import/dedupe.scm")
 
 (define default-currency (config-value-or-default '(import default-currency) "CAD" *config*))
 
@@ -42,19 +43,22 @@
           (cons 'amount (amount amt cur)))))))
 
 (let* ((accounts-by-id (config-value-or-default '(import accounts) '() *config*))
+       (txnid-key (config-value-or-default '(import txnid-key) "txnid" *config*))
        (hdr (imported-header *imported*))
        (cur (cdr-assoc-or-default "curdef" default-currency hdr))
-       (acctid (cdr-assoc-or-default "acctid" "unknown-acctid" hdr))
+       (acctid (cdr-assoc-or-default 'acctid "unknown-acctid" hdr))
        (primary-account (cdr-assoc-or-default acctid "Assets:Unknown" accounts-by-id))
        (field-names (imported-fields *imported*))
        (txns (imported-transactions *imported*))
        (payees (imported-payees *imported*))
        (narrations (imported-narrations *imported*))
+       (existing-txnids (imported-txnids *imported*))
        (bln (extract-balance hdr))
        (txn-directive (config-value-or-default '(import txn-directive) "txn" *config*)))
   (transduce txns
     (mapping (make-extract field-names acctid primary-account cur))
+    (filtering (make-dedupe-transactions existing-txnids))
     (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
-    (into-for-each (lambda (txn) (display (format-transaction txn txn-directive)))))
+    (into-for-each (lambda (txn) (display (format-transaction txn txn-directive #:txnid-key txnid-key)))))
   (unless (empty? bln)
     (display (format-balance bln primary-account))))

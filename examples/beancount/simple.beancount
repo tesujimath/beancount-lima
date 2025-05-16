@@ -32,6 +32,11 @@
   Expenses:Entertainment:Drinks-and-snacks       25.00 NZD
   Assets:Bank:Current
 
+2025-03-31 txn "INTEREST EARNED" "INTEREST EARNED ;"
+  txnid: "99-1234-0123456-01.31Mar2025.1"
+  Assets:Bank:Current  4.72 USD
+  Income:Unknown
+
 2023-06-01 * "UK groceries"
   Expenses:Groceries                             5.00 GBP
   Assets:Bank:UK

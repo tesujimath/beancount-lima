@@ -9,6 +9,6 @@
   (imported (ffi-alist->alist (ffi-imported-header imp))
     (ffi-imported-fields imp)
     (ffi-imported-transactions imp)
-    (ffi-imported-txnids imp)
+    (list->hashset (ffi-imported-txnids imp))
     (ffi-imported-payees imp)
     (ffi-imported-narrations imp)))
