@@ -108,16 +108,11 @@ pub(crate) fn parse(ofx_content: &str, context: ImportContext) -> Result<Importe
     Ok(Imported {
         context,
         header: vec![
-            "format".to_string(),
-            "ofx1".to_string(),
-            "curdef".to_string(),
-            curdef,
-            "acctid".to_string(),
-            acctid,
-            "balamt".to_string(),
-            balamt,
-            "dtasof".to_string(),
-            dtasof,
+            ("format", "ofx1").into(),
+            ("curdef", curdef).into(),
+            ("acctid", acctid).into(),
+            ("balamt", balamt).into(),
+            ("dtasof", dtasof).into(),
         ],
         fields: StmtTrn::fields(),
         transactions: stmttrns

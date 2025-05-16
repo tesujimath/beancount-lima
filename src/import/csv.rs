@@ -27,7 +27,7 @@ pub(crate) fn import(path: &Path, context: ImportContext) -> Result<Imported, Er
 
     Ok(Imported {
         context,
-        header: vec!["format".to_string(), "csv".to_string()],
+        header: vec![("format", "csv").into()],
         fields,
         transactions,
     })

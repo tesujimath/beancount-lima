@@ -243,6 +243,7 @@ pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
     Ledger::register_with_engine(steel_engine);
     Posting::register_with_engine(steel_engine);
     Imported::register_with_engine(steel_engine);
+    AlistItem::register_with_engine(steel_engine);
 }
 
 #[derive(Debug)]

@@ -3,11 +3,11 @@ use std::{collections::HashMap, io::Write, path::Path};
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
-use crate::{register_types_with_engine, Error};
+use crate::{register_types_with_engine, AlistItem, Error};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Imported {
-    pub(crate) header: Vec<String>,
+    pub(crate) header: Vec<AlistItem>,
     pub(crate) fields: Vec<String>,
     pub(crate) transactions: Vec<Vec<String>>,
     pub(crate) context: ImportContext,
@@ -46,7 +46,7 @@ impl Imported {
         }
     }
 
-    fn header(&self) -> Vec<String> {
+    fn header(&self) -> Vec<AlistItem> {
         self.header.clone()
     }
 

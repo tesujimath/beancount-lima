@@ -1,4 +1,5 @@
 (provide
+  ffi-alist->alist
   ffi-ledger->ledger)
 
 (require "lima/ledger.scm")
@@ -7,6 +8,11 @@
 
 ;; Steel does not allow construction of arbitrary native Steel values from Rust,
 ;; so we convert from FFI values to native values here.
+
+(define (ffi-alist->alist alst)
+  (map (lambda(item) (cons (string->symbol (ffi-alistitem-key item))
+                      (ffi-alistitem-value item)))
+    alst))
 
 (define (ffi-amount->amount amt)
   (amount (ffi-amount-number amt) (ffi-amount-currency amt)))

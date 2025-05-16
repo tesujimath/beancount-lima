@@ -7,7 +7,7 @@ use std::{
 use steel::{
     rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelErr,
+    SteelErr, SteelVal,
 };
 use steel_derive::Steel;
 
@@ -399,5 +399,46 @@ where
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct AlistItem {
+    key: String,
+    value: SteelVal,
+}
+
+impl Display for AlistItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} . {})", &self.key, &self.value)
+    }
+}
+
+impl AlistItem {
+    fn key(&self) -> String {
+        self.key.clone()
+    }
+
+    fn value(&self) -> SteelVal {
+        self.value.clone()
+    }
+
+    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
+        steel_engine.register_type::<AlistItem>("ffi-alistitem?");
+        steel_engine.register_fn("ffi-alistitem-key", AlistItem::key);
+        steel_engine.register_fn("ffi-alistitem-value", AlistItem::value);
+    }
+}
+
+impl<K, V> From<(K, V)> for AlistItem
+where
+    K: AsRef<str>,
+    V: AsRef<str>,
+{
+    fn from(value: (K, V)) -> Self {
+        AlistItem {
+            key: value.0.as_ref().to_string(),
+            value: SteelVal::StringV(value.1.as_ref().to_string().into()),
+        }
     }
 }

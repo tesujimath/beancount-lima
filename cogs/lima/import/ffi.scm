@@ -3,9 +3,10 @@
 
 (require "lima/import/types.scm")
 (require "lima/alist.scm")
+(require "lima/ffi.scm")
 
 (define (ffi-imported->imported imp)
-  (imported (list->alist (ffi-imported-header imp))
+  (imported (ffi-alist->alist (ffi-imported-header imp))
     (ffi-imported-fields imp)
     (ffi-imported-transactions imp)
     (ffi-imported-txnids imp)
