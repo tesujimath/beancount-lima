@@ -31,9 +31,9 @@
 
 ;; extract balance from header if we can find the fields we need, otherwise return empty
 (define (extract-balance hdr)
-  (let* ((cur (cdr-assoc-or-default "curdef" default-currency hdr))
-         (balamt (cdr-assoc-or-empty "balamt" hdr))
-         (dtasof (cdr-assoc-or-empty "dtasof" hdr)))
+  (let* ((cur (cdr-assoc-or-default 'curdef default-currency hdr))
+         (balamt (cdr-assoc-or-empty 'balamt hdr))
+         (dtasof (cdr-assoc-or-empty 'dtasof hdr)))
     (if (or (empty? balamt) (empty? dtasof))
       '()
       ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
@@ -45,7 +45,7 @@
 (let* ((accounts-by-id (config-value-or-default '(import accounts) '() *config*))
        (txnid-key (config-value-or-default '(import txnid-key) "txnid" *config*))
        (hdr (imported-header *imported*))
-       (cur (cdr-assoc-or-default "curdef" default-currency hdr))
+       (cur (cdr-assoc-or-default 'curdef default-currency hdr))
        (acctid (cdr-assoc-or-default 'acctid "unknown-acctid" hdr))
        (primary-account (cdr-assoc-or-default acctid "Assets:Unknown" accounts-by-id))
        (field-names (imported-fields *imported*))
