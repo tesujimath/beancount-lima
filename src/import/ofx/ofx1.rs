@@ -5,7 +5,8 @@ use crate::{import::ImportContext, Error};
 
 #[derive(Deserialize, Debug)]
 struct Document {
-    bankmsgsrsv1: BankMsgsRsV1,
+    bankmsgsrsv1: Option<BankMsgsRsV1>,
+    creditcardmsgsrsv1: Option<CreditCardMsgsRsV1>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -14,8 +15,18 @@ struct BankMsgsRsV1 {
 }
 
 #[derive(Deserialize, Debug)]
+struct CreditCardMsgsRsV1 {
+    ccstmttrnrs: CcStmtTrnRs,
+}
+
+#[derive(Deserialize, Debug)]
 struct StmtTrnRs {
     stmtrs: StmtRs,
+}
+
+#[derive(Deserialize, Debug)]
+struct CcStmtTrnRs {
+    ccstmtrs: CcStmtRs,
 }
 
 #[derive(Deserialize, Debug)]
@@ -27,7 +38,20 @@ struct StmtRs {
 }
 
 #[derive(Deserialize, Debug)]
+struct CcStmtRs {
+    curdef: String,
+    ccacctfrom: CcAcctFrom,
+    banktranlist: BankTranList,
+    ledgerbal: LedgerBal,
+}
+
+#[derive(Deserialize, Debug)]
 struct BankAcctFrom {
+    acctid: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct CcAcctFrom {
     acctid: String,
 }
 
@@ -89,23 +113,44 @@ pub(crate) fn parse(ofx_content: &str, context: ImportContext) -> Result<Importe
     let sgml = sgmlish::transforms::normalize_end_tags(sgml).map_err(Into::<Error>::into)?;
     let doc = sgmlish::from_fragment::<Document>(sgml).map_err(Into::<Error>::into)?;
 
-    let Document {
-        bankmsgsrsv1:
-            BankMsgsRsV1 {
-                stmttrnrs:
-                    StmtTrnRs {
-                        stmtrs:
-                            StmtRs {
-                                curdef,
-                                bankacctfrom: BankAcctFrom { acctid },
-                                banktranlist: BankTranList { stmttrns },
-                                ledgerbal: LedgerBal { balamt, dtasof },
-                            },
-                    },
-            },
-    } = doc;
+    match doc {
+        Document {
+            bankmsgsrsv1:
+                Some(BankMsgsRsV1 {
+                    stmttrnrs:
+                        StmtTrnRs {
+                            stmtrs:
+                                StmtRs {
+                                    curdef,
+                                    bankacctfrom: BankAcctFrom { acctid },
+                                    banktranlist: BankTranList { stmttrns },
+                                    ledgerbal: LedgerBal { balamt, dtasof },
+                                },
+                        },
+                }),
+            creditcardmsgsrsv1: None,
+        } => Ok((curdef, acctid, balamt, dtasof, stmttrns)),
 
-    Ok(Imported {
+        Document {
+            bankmsgsrsv1: None,
+            creditcardmsgsrsv1:
+                Some(CreditCardMsgsRsV1 {
+                    ccstmttrnrs:
+                        CcStmtTrnRs {
+                            ccstmtrs:
+                                CcStmtRs {
+                                    curdef,
+                                    ccacctfrom: CcAcctFrom { acctid },
+                                    banktranlist: BankTranList { stmttrns },
+                                    ledgerbal: LedgerBal { balamt, dtasof },
+                                },
+                        },
+                }),
+        } => Ok((curdef, acctid, balamt, dtasof, stmttrns)),
+
+        _ => Err(Error::ImportFormat("unsupported OFX1 document".to_string())),
+    }
+    .map(|(curdef, acctid, balamt, dtasof, stmttrns)| Imported {
         context,
         header: vec![
             ("format", "ofx1").into(),
