@@ -1,9 +1,12 @@
-(provide imported
-  imported-header
-  imported-fields
-  imported-transactions
-  imported-txnids
-  imported-payees
-  imported-narrations)
+(provide import-group
+  import-group-sources
+  import-group-txnids
+  import-group-payees
+  import-group-narrations
+  import-source
+  import-source-header
+  import-source-fields
+  import-source-transactions)
 
-(struct imported (header fields transactions txnids payees narrations) #:transparent)
+(struct import-group (sources txnids payees narrations) #:transparent)
+(struct import-source (header fields transactions) #:transparent)

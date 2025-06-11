@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
-use super::Imported;
-use crate::{import::ImportContext, Error};
+use crate::{import::Source, Error};
 
 #[derive(Deserialize, Debug)]
 struct Document {
@@ -98,7 +97,7 @@ impl StmtTrn {
     }
 }
 
-pub(crate) fn parse(ofx_content: &str, context: ImportContext) -> Result<Imported, Error> {
+pub(crate) fn parse(ofx_content: &str) -> Result<Source, Error> {
     let sgml = sgmlish::Parser::builder()
         .lowercase_names()
         .expand_entities(|entity| match entity {
@@ -150,8 +149,7 @@ pub(crate) fn parse(ofx_content: &str, context: ImportContext) -> Result<Importe
 
         _ => Err(Error::ImportFormat("unsupported OFX1 document".to_string())),
     }
-    .map(|(curdef, acctid, balamt, dtasof, stmttrns)| Imported {
-        context,
+    .map(|(curdef, acctid, balamt, dtasof, stmttrns)| Source {
         header: vec![
             ("format", "ofx1").into(),
             ("curdef", curdef).into(),

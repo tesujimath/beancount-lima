@@ -1,4 +1,4 @@
-(provide del-assoc cdr-assoc cdr-assoc-or-default cdr-assoc-or-empty alist-symbol-keys?)
+(provide del-assoc cdr-assoc cdr-assoc-or-default cdr-assoc-or-empty alist-symbol-keys? alist-insert-or-replace)
 
 (require (only-in "lima/list.scm" all))
 
@@ -21,3 +21,7 @@
   (and (list? alist)
     (all (lambda (item) (and (pair? item) (symbol? (car item))))
       alist)))
+
+;; insert or replace an item in an alist
+(define (alist-insert-or-replace key value alist)
+  (cons (cons key value) (del-assoc key alist)))

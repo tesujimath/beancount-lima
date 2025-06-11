@@ -12,7 +12,7 @@ use crate::Error;
 
 // context for import, i.e. ledger
 #[derive(Clone, Default, Debug, Steel)]
-pub(crate) struct ImportContext {
+pub(crate) struct Context {
     pub(crate) txnids: HashSet<String>,
     pub(crate) payees: HashMap<String, HashMap<String, isize>>,
     pub(crate) narrations: HashMap<String, HashMap<String, isize>>,
@@ -27,7 +27,7 @@ struct ImportContextBuilder<'a> {
     errors: Vec<parser::Error>,
 }
 
-impl ImportContext {
+impl Context {
     pub(crate) fn parse_from<W>(path: &Path, txnid_key: String, error_w: W) -> Result<Self, Error>
     where
         W: Write + Copy,
@@ -89,12 +89,12 @@ impl<'a> ImportContextBuilder<'a> {
         }
     }
 
-    fn build<W>(self, sources: &BeancountSources, error_w: W) -> Result<ImportContext, Error>
+    fn build<W>(self, sources: &BeancountSources, error_w: W) -> Result<Context, Error>
     where
         W: Write + Copy,
     {
         if self.errors.is_empty() {
-            Ok(ImportContext {
+            Ok(Context {
                 txnids: self.txnids,
                 payees: self
                     .payees

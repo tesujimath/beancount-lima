@@ -1,7 +1,11 @@
 use config::get_config_string;
-use import::{context::ImportContext, Imported};
+use import::{Context, Group, Source};
 use ledger::Ledger;
-use std::{fmt::Display, io, path::PathBuf};
+use std::{
+    fmt::Display,
+    io::{self, Write},
+    path::PathBuf,
+};
 use steel::{steel_vm::engine::Engine, SteelVal};
 use steel_repl::run_repl;
 
@@ -42,8 +46,8 @@ enum Commands {
 
     /// Import from external CSV or OFX file
     Import {
-        /// File to import
-        import_file: PathBuf,
+        /// Files to import
+        import_files: Vec<PathBuf>,
 
         /// Base ledger for import
         #[arg(long)]
@@ -136,18 +140,18 @@ fn main() -> Result<(), Error> {
         }
 
         Some(Commands::Import {
-            import_file,
+            import_files,
             ledger,
             using,
         }) => {
             let txnid_key =
                 get_config_string(&mut steel_engine, &["import", "tnxid-key"], "txnid")?;
-            let import_context = if let Some(ledger) = ledger {
-                ImportContext::parse_from(ledger, txnid_key, error_w)?
+            let context = if let Some(ledger) = ledger {
+                Context::parse_from(ledger, txnid_key, error_w)?
             } else {
-                ImportContext::default()
+                Context::default()
             };
-            let import = Imported::parse_from(import_file, import_context, error_w)?;
+            let import = Group::parse_from(import_files.as_slice(), context, error_w)?;
             import.register(&mut steel_engine);
 
             load_cog(
@@ -219,6 +223,10 @@ where
                     e.emit_result(error_context, input);
                 }
             }
+            steel_engine.raise_error(e);
+            // if let Some(msg) = steel_engine.raise_error_to_string(e) {
+            //     eprintln!("{}", msg);
+            // }
             Err(Error::Scheme)
         }
     }
@@ -242,7 +250,8 @@ pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
     Decimal::register_with_engine(steel_engine);
     Ledger::register_with_engine(steel_engine);
     Posting::register_with_engine(steel_engine);
-    Imported::register_with_engine(steel_engine);
+    Group::register_with_engine(steel_engine);
+    Source::register_with_engine(steel_engine);
     AlistItem::register_with_engine(steel_engine);
 }
 

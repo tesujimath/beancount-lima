@@ -29,3 +29,18 @@
   (check-equal? "alist-symbol-keys? empty"
     (alist-symbol-keys? '())
     #t))
+
+(test-module
+  "alist-insert-or-replace tests"
+  (check-equal? "alist-insert-or-replace first"
+    (alist-insert-or-replace 'a 11 '((a . 1) (b . 2) (c . 3)))
+    '((a . 11) (b . 2) (c . 3)))
+  (check-equal? "alist-insert-or-replace second"
+    (alist-insert-or-replace 'b 102 '((a . 1) (b . 2) (c . 3)))
+    '((b . 102) (a . 1) (c . 3)))
+  (check-equal? "alist-insert-or-replace not present"
+    (alist-insert-or-replace 'd 25 '((a . 1) (b . 2) (c . 3)))
+    '((d . 25) (a . 1) (b . 2) (c . 3)))
+  (check-equal? "alist-insert-or-replace multiple present"
+    (alist-insert-or-replace 'b 27 '((a . 1) (b . 2) (c . 3) (b . 4)))
+    '((b . 27) (a . 1) (c . 3))))

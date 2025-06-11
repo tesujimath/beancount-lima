@@ -11,12 +11,10 @@
   (let* ((amt (posting-amount p))
          (cur (amount-currency amt))
          (inv-cur-prev-total (cdr-assoc-or-default cur (decimal-zero) inv-alist))
-         (inv-cur-new-total (decimal-add inv-cur-prev-total (amount-number amt)))
-         (inv-without-cur (del-assoc cur inv-alist)))
+         (inv-cur-new-total (decimal-add inv-cur-prev-total (amount-number amt))))
     (if (decimal-zero? inv-cur-new-total)
-      inv-without-cur
-      (cons (cons cur inv-cur-new-total)
-        inv-without-cur))))
+      (del-assoc cur inv-alist)
+      (alist-insert-or-replace cur inv-cur-new-total inv-alist))))
 
 (define (postings->inv-alist postings)
   (let ((inv-alist (foldl add-posting '() postings)))
