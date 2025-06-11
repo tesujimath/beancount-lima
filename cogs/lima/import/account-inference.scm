@@ -11,26 +11,26 @@
 (define (make-infer-secondary-accounts-from-payees-and-narrations payees narrations)
   (lambda (txn)
     (let* ((amount (amount-number (cdr-assoc 'amount txn)))
+           (primary-account (cdr-assoc 'primary-account txn))
            (secondary-accounts
-             (cond
-               [(decimal>? amount (decimal-zero)) (list (list (cons 'name "Income:Unknown")))]
-               [(decimal<? amount (decimal-zero))
-                 (let* ((found-payee (hash-try-get payees (cdr-assoc-or-empty 'payee txn)))
-                        (found-narration (hash-try-get narrations (cdr-assoc-or-empty 'narration txn)))
-                        (order-accounts (lambda (account-lookup category)
-                                         (let* ((account-names (hash-keys->list account-lookup))
-                                                (annotated-accounts (map (lambda (account-name)
-                                                                          (list (cons 'name account-name) (cons 'infer-count (hash-get account-lookup account-name)) (cons 'infer-category category)))
-                                                                     account-names)))
-                                           (merge-sort annotated-accounts
-                                             #:comparator
-                                             (lambda (acc0 acc1) (> (cdr-assoc 'infer-count acc0)
-                                                                  (cdr-assoc 'infer-count acc1))))))))
-                   (cond
-                     [found-payee (order-accounts found-payee "payee")]
-                     [found-narration (order-accounts found-narration "narration")]
-                     [else (list (list (cons 'name "Expenses:Unknown")))]))]
-               [else '()])))
+             (let* ((found-payee (hash-try-get payees (cdr-assoc-or-empty 'payee txn)))
+                    (found-narration (hash-try-get narrations (cdr-assoc-or-empty 'narration txn)))
+                    (order-accounts (lambda (account-lookup category)
+                                     (let* ((all-account-names (hash-keys->list account-lookup))
+                                            (candidate-account-names (filter (lambda (account-name) (not (equal? account-name primary-account))) all-account-names))
+                                            (annotated-accounts (map (lambda (account-name)
+                                                                      (list (cons 'name account-name) (cons 'infer-count (hash-get account-lookup account-name)) (cons 'infer-category category)))
+                                                                 candidate-account-names)))
+                                       (merge-sort annotated-accounts
+                                         #:comparator
+                                         (lambda (acc0 acc1) (> (cdr-assoc 'infer-count acc0)
+                                                              (cdr-assoc 'infer-count acc1))))))))
+               (cond
+                 [found-payee (order-accounts found-payee "payee")]
+                 [found-narration (order-accounts found-narration "narration")]
+                 [(decimal>? amount (decimal-zero)) (list (list (cons 'name "Income:Unknown")))]
+                 [(decimal<? amount (decimal-zero)) (list (list (cons 'name "Expenses:Unknown")))]
+                 [else '()]))))
       (cons (cons 'secondary-accounts secondary-accounts) txn))))
 
 ;; format the account name inferred above with a comment about where it came from

@@ -166,14 +166,7 @@ impl<'a> ImportContextBuilder<'a> {
                 // get accounts of type expenses for postings
                 let accounts = transaction
                     .postings()
-                    .filter_map(|p| {
-                        let account = p.account().item();
-                        if account.account_type() == parser::AccountType::Expenses {
-                            Some(p.account().item().as_ref())
-                        } else {
-                            None
-                        }
-                    })
+                    .map(|p| p.account().item().as_ref())
                     .collect::<Vec<&str>>();
 
                 if let Some(payee) = payee {
