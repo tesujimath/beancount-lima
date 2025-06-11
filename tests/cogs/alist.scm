@@ -44,3 +44,18 @@
   (check-equal? "alist-insert-or-replace multiple present"
     (alist-insert-or-replace 'b 27 '((a . 1) (b . 2) (c . 3) (b . 4)))
     '((b . 27) (a . 1) (c . 3))))
+
+(test-module
+  "alist-merge tests"
+  (check-equal? "alist-merge simple"
+    (alist-merge '((a . 1) (b . 2) (c . 3)) '((d . 4) (e . 5)))
+    '((e . 5) (d . 4) (a . 1) (b . 2) (c . 3)))
+  (check-equal? "alist-merge override"
+    (alist-merge '((a . 1) (b . 2) (c . 3)) '((d . 4) (a . 5)))
+    '((a . 5) (d . 4) (b . 2) (c . 3)))
+  (check-equal? "alist-merge empty0"
+    (alist-merge '() '((d . 4) (e . 5)))
+    '((e . 5) (d . 4)))
+  (check-equal? "alist-merge empty1"
+    (alist-merge '((a . 1) (b . 2) (c . 3)) '())
+    '((a . 1) (b . 2) (c . 3))))
