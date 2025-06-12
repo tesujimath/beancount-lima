@@ -98,7 +98,7 @@ impl Group {
 }
 
 impl Source {
-    pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Self, Error>
+    pub(crate) fn parse_from<W>(path: &Path, _error_w: W) -> Result<Self, Error>
     where
         W: Write + Copy,
     {

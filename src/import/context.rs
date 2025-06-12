@@ -20,7 +20,7 @@ pub(crate) struct Context {
 
 #[derive(Default, Debug)]
 struct ImportContextBuilder<'a> {
-    txnid_key: String,
+    txnid_keys: Vec<String>,
     txnids: HashSet<String>,
     payees: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
     narrations: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
@@ -28,7 +28,11 @@ struct ImportContextBuilder<'a> {
 }
 
 impl Context {
-    pub(crate) fn parse_from<W>(path: &Path, txnid_key: String, error_w: W) -> Result<Self, Error>
+    pub(crate) fn parse_from<W>(
+        path: &Path,
+        txnid_keys: Vec<String>,
+        error_w: W,
+    ) -> Result<Self, Error>
     where
         W: Write + Copy,
     {
@@ -43,7 +47,7 @@ impl Context {
                 warnings,
             }) => {
                 sources.write(error_w, warnings).map_err(Error::Io)?;
-                let mut builder = ImportContextBuilder::new(txnid_key);
+                let mut builder = ImportContextBuilder::new(txnid_keys);
 
                 for directive in &directives {
                     builder.directive(directive);
@@ -79,9 +83,9 @@ impl Context {
 }
 
 impl<'a> ImportContextBuilder<'a> {
-    fn new(txnid_key: String) -> Self {
+    fn new(txnid_keys: Vec<String>) -> Self {
         Self {
-            txnid_key,
+            txnid_keys,
             txnids: HashSet::default(),
             payees: hashbrown::HashMap::default(),
             narrations: hashbrown::HashMap::default(),
@@ -146,13 +150,15 @@ impl<'a> ImportContextBuilder<'a> {
         'b: 'a,
     {
         // record transaction ID if it exists in the metadata
-        if let Some(txnid) = directive
-            .metadata()
-            .key_value(parser::Key::try_from(self.txnid_key.as_str()).unwrap())
-        {
-            if let parser::MetaValue::Simple(parser::SimpleValue::String(s)) = txnid.item() {
-                if !self.txnids.contains(*s) {
-                    self.txnids.insert(s.to_string());
+        for txnid_key in self.txnid_keys.iter() {
+            if let Some(txnid) = directive
+                .metadata()
+                .key_value(parser::Key::try_from(txnid_key.as_str()).unwrap())
+            {
+                if let parser::MetaValue::Simple(parser::SimpleValue::String(s)) = txnid.item() {
+                    if !self.txnids.contains(*s) {
+                        self.txnids.insert(s.to_string());
+                    }
                 }
             }
         }

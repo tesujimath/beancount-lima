@@ -3,7 +3,7 @@ use import::{Context, Group, Source};
 use ledger::Ledger;
 use std::{
     fmt::Display,
-    io::{self, Write},
+    io::{self},
     path::PathBuf,
 };
 use steel::{steel_vm::engine::Engine, SteelVal};
@@ -145,9 +145,11 @@ fn main() -> Result<(), Error> {
             using,
         }) => {
             let txnid_key =
-                get_config_string(&mut steel_engine, &["import", "tnxid-key"], "txnid")?;
+                get_config_string(&mut steel_engine, &["import", "txnid-key"], "txnid")?;
+            let txnid2_key =
+                get_config_string(&mut steel_engine, &["import", "txnid2-key"], "txnid2")?;
             let context = if let Some(ledger) = ledger {
-                Context::parse_from(ledger, txnid_key, error_w)?
+                Context::parse_from(ledger, vec![txnid_key, txnid2_key], error_w)?
             } else {
                 Context::default()
             };

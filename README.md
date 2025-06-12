@@ -12,17 +12,23 @@ A number of useful queries are provided out-of-the-box.
 ## Example
 
 ```
-aya> beancount-lima --batch ./examples/beancount/full.beancount balances
-                                            CAD       NZD
-Assets:AccountsReceivable:Taxes
-Assets:Bank:Current                                 -125.00
-Assets:Bank:Unspecified
-Assets:CA:RBC-Investing:Taxable-CAD:Cash  -1395.43
-Assets:US:TD:Checking
-Expenses:Car:Fuel                                    125.00
-Expenses:Entertainment:Drinks-and-snacks              25.00
-Expenses:Groceries                                    39.65
+aya> lima count --using balances examples/beancount/simple.beancount
+                                           GBP    NZD
+Assets:Bank:Current                              -80.78
+Assets:Bank:UK                            -5.00
+Expenses:Donations                                10.00
+Expenses:Entertainment:Drinks-and-snacks          48.00
+Expenses:Groceries                         5.00   27.50
+Income:Unknown                                    -4.72
 ```
+
+## Import
+
+[Import](doc/import.md) is particularly convenient and addresses pain points I encountered with import using classic Beancount tools.
+
+## Contributions
+
+While issues are welcome, and I am particularly interested in more example files for import, given the current pace of development I am unlikely to be able to accept PRs for now.
 
 ## License
 

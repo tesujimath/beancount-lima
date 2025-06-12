@@ -4,7 +4,9 @@
 (define *base-config*
   '((import . ((txn-directive . "txn")
                (txnid-key . "txnid")
-               (default-currency . "USD")))
+               (txnid2-key . "txnid2")
+               (default-currency . "USD")
+               (pairing-window-days . 3)))
     (count . ((something-else . "booyah!")))))
 
 (define (config-value-or-default key-path default cfg)
