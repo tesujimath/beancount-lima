@@ -32,3 +32,9 @@
   (check-equal? "any empty"
     (any even? '())
     #f))
+
+(test-module
+  "partition tests"
+  (check-equal? "partition"
+    (partition even? '(1 2 3 4 5))
+    '((2 4) . (1 3 5))))

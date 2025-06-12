@@ -1,4 +1,4 @@
-(provide flatmap list-index all any)
+(provide flatmap list-index all any partition)
 
 (define (flatmap proc seq)
   (letrec ((accumulate
@@ -27,3 +27,14 @@
 
 (define (any predicate lst)
   (foldl (lambda (item ok) (or ok (predicate item))) #f lst))
+
+;; partition a list by predicate returning a pair
+;; whose car is the list of elements for which the predicate is true
+(define (partition predicate lst)
+  (let ((partitioned
+          (foldl (lambda (item acc) (if (predicate item)
+                                     (cons (cons item (car acc)) (cdr acc))
+                                     (cons (car acc) (cons item (cdr acc)))))
+            '(() . ())
+            lst)))
+    (cons (reverse (car partitioned)) (reverse (cdr partitioned)))))
