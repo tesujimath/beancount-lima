@@ -1,5 +1,6 @@
 (provide import)
 
+(require "steel/sorting/merge-sort.scm")
 (require "lima/alist.scm")
 (require "lima/base-config.scm")
 (require "lima/import/types.scm")
@@ -9,6 +10,19 @@
 
 ;; default extractors:
 (require (only-in "lima/import/ofx1.scm" [make-extract ofx1-make-extract]))
+
+;; insert a transaction into the hash-by-date
+(define (insert-by-date h txn)
+  (let* ((j (date-julian (cdr-assoc 'date txn)))
+         (existing-txns-for-date (or (hash-try-get h j) '())))
+    (hash-insert h j (cons txn existing-txns-for-date))))
+
+(define (all-by-date h)
+  (transduce (merge-sort (hash-keys->list h))
+    (mapping (lambda (j) (hash-get h j)))
+    (flattening)
+    ;; TODO can we do better than into-list here?
+    (into-list)))
 
 ;; import a group, using the supplied config, which is an alist with the following optional keys:
 ; accounts - alist of account-id to account-name
@@ -31,20 +45,24 @@
       ; group
       (payees (import-group-payees group))
       (narrations (import-group-narrations group))
-      (existing-txnids (import-group-txnids group)) #| (bln (extract-balance default-currency hdr))) ; TODO balance|#)
-    (transduce (import-group-sources group)
-      (mapping (lambda (source)
-                (let* ((hdr (import-source-header source))
-                       (format (cdr-assoc 'format hdr))
-                       (extractor (cdr-assoc format (alist-merge default-extractors extractors)))
-                       (txns (import-source-transactions source)))
-                  (transduce txns
-                    (mapping (extractor default-currency accounts-by-id source))
-                    (filtering (make-dedupe-transactions existing-txnids))
-                    (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
-                    (into-list)))))
-      (flattening)
+      (existing-txnids (import-group-txnids group))
+      (txns-by-date (transduce (import-group-sources group)
+                     (mapping (lambda (source)
+                               (let* ((hdr (import-source-header source))
+                                      (format (cdr-assoc 'format hdr))
+                                      (extractor (cdr-assoc format (alist-merge default-extractors extractors)))
+                                      (txns (import-source-transactions source)))
+                                 (transduce txns
+                                   (mapping (extractor default-currency accounts-by-id source))
+                                   (filtering (make-dedupe-transactions existing-txnids))
+                                   (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
+                                   (into-list)))))
+                     (flattening)
+                     (into-reducer insert-by-date (hash)))))
+    (transduce (all-by-date txns-by-date)
       (into-for-each (lambda (txn) (display (format-transaction txn txn-directive #:txnid-key txnid-key)))))))
+
+;; (bln (extract-balance default-currency hdr))) ; TODO balance
 
 ;; TODO balance
 ; (unless (empty? bln)

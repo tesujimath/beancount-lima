@@ -183,6 +183,11 @@ impl Date {
         self.after(-d)
     }
 
+    // Julian day
+    fn julian(&self) -> i32 {
+        self.0.to_julian_day()
+    }
+
     pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Date>("date?");
         steel_engine.register_fn("date", Date::new);
@@ -196,6 +201,7 @@ impl Date {
         steel_engine.register_fn("parse-date", Date::parse);
         steel_engine.register_fn("date-after", Date::after);
         steel_engine.register_fn("date-before", Date::before);
+        steel_engine.register_fn("date-julian", Date::julian);
     }
 }
 
