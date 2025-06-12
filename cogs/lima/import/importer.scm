@@ -6,16 +6,19 @@
 (require "lima/import/types.scm")
 (require "lima/import/dedupe.scm")
 (require "lima/import/account-inference.scm")
+(require "lima/import/pairing.scm")
 (require "lima/import/display.scm")
 
 ;; default extractors:
 (require (only-in "lima/import/ofx1.scm" [make-extract ofx1-make-extract]))
 
-;; insert a transaction into the hash-by-date
+;; insert a transaction into the hash-by-date, trying to pair where we can
+;; TODO check other dates up to pairing-window-days
 (define (insert-by-date h txn)
   (let* ((j (date-julian (cdr-assoc 'date txn)))
          (existing-txns-for-date (or (hash-try-get h j) '())))
-    (hash-insert h j (cons txn existing-txns-for-date))))
+    (hash-insert h j (or (try-pair txn existing-txns-for-date)
+                      (cons txn existing-txns-for-date)))))
 
 (define (all-by-date h)
   (transduce (merge-sort (hash-keys->list h))

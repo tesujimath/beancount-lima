@@ -16,12 +16,12 @@
     space
     (amount-currency amt)))
 
-(define (format-transaction txn txn-directive #:txnid-key [txnid-key "txnid"])
+(define (format-transaction txn txn-directive #:txnid-key [txnid-key "txnid"] #:txnid2-key [txnid2-key "txnid2"])
   (let ((space " ")
         (pad "  ")
         (indent "  ")
         (acc-width 60))
-    (format "~a~a~a~a\n~a~a~a~a~a\n~a\n"
+    (format "~a~a~a~a\n~a~a~a~a~a~a\n~a\n"
       (cdr-assoc 'date txn)
       space
       txn-directive
@@ -34,6 +34,9 @@
       (let ((txnid (cdr-assoc-or-empty 'txnid txn)))
         (if (empty? txnid) ""
           (format "~a~a: \"~a\"\n" indent txnid-key txnid)))
+      (let ((txnid2 (cdr-assoc-or-empty 'txnid2 txn)))
+        (if (empty? txnid2) ""
+          (format "~a~a: \"~a\"\n" indent txnid2-key txnid2)))
       indent
       (cdr-assoc 'primary-account txn)
       pad
