@@ -209,7 +209,7 @@ impl Date {
 pub(crate) struct Decimal(rust_decimal::Decimal);
 
 impl Decimal {
-    pub(crate) fn add(&mut self, other: Decimal) -> Decimal {
+    pub(crate) fn add(&self, other: Decimal) -> Decimal {
         (self.0 + other.0).into()
     }
 
