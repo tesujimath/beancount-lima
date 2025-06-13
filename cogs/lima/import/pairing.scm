@@ -11,19 +11,21 @@
 
 ;; do the transactions comprise a pair, that is, values sum to zero and the accounts match counter-symmetrically
 ;; note: dates are ignored here, a date threshold should be applied before calling this
+;; note that if either transaction has already been paired (has txnid2), it is no longer available
 (define (is-pair? txn0 txn1)
-  (let ((a0 (cdr-assoc 'amount txn0))
-        (a1 (cdr-assoc 'amount txn1))
-        (p0 (cdr-assoc 'primary-account txn0))
-        (p1 (cdr-assoc 'primary-account txn1))
-        (s0 (cdr-assoc 'secondary-accounts txn0))
-        (s1 (cdr-assoc 'secondary-accounts txn1))
-        (equal-p-s? (lambda (p s)
-                     (and (eq? (length s) 1)
-                       (equal? p (cdr-assoc 'name (car s)))))))
-    (and (amount-zero-sum? a0 a1)
-      (equal-p-s? p0 s1)
-      (equal-p-s? p1 s0))))
+  (if (or (alist-contains? 'txnid2 txn0) (alist-contains? 'txnid2 txn1)) #f
+    (let ((a0 (cdr-assoc 'amount txn0))
+          (a1 (cdr-assoc 'amount txn1))
+          (p0 (cdr-assoc 'primary-account txn0))
+          (p1 (cdr-assoc 'primary-account txn1))
+          (s0 (cdr-assoc 'secondary-accounts txn0))
+          (s1 (cdr-assoc 'secondary-accounts txn1))
+          (equal-p-s? (lambda (p s)
+                       (and (eq? (length s) 1)
+                         (equal? p (cdr-assoc 'name (car s)))))))
+      (and (amount-zero-sum? a0 a1)
+        (equal-p-s? p0 s1)
+        (equal-p-s? p1 s0)))))
 
 ;; pair two transactions by returning the first with txnid2 from the second's txnid (if any)
 (define (pair txn0 txn2)

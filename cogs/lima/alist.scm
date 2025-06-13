@@ -4,6 +4,7 @@
   cdr-assoc-or-default
   cdr-assoc-or-empty
   try-cdr-assoc
+  alist-contains?
   alist-symbol-keys?
   alist-insert-or-replace
   alist-insert
@@ -28,6 +29,9 @@
 (define (cdr-assoc key alist)
   (let ((kv (assoc key alist)))
     (if kv (cdr kv) (error! "key" key "not found in alist" alist))))
+
+(define (alist-contains? key alist)
+  (and (assoc key alist) #t))
 
 ;; do we have an alist with all keys being symbols?
 (define (alist-symbol-keys? alist)
