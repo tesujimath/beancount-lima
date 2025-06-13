@@ -21,7 +21,7 @@
         (pad "  ")
         (indent "  ")
         (acc-width 60))
-    (format "~a~a~a~a\n~a~a~a~a~a~a\n~a\n"
+    (format "~a~a~a~a\n~a~a~a~a~a~a~a\n~a\n"
       (cdr-assoc 'date txn)
       space
       txn-directive
@@ -31,6 +31,9 @@
           [(and (string-empty? payee) (string-empty? narration)) ""]
           [(string-empty? payee) (quoted space narration)]
           [else (format "~a~a" (quoted space payee) (quoted space narration))]))
+      (let ((comment (cdr-assoc-or-empty 'comment txn)))
+        (if (empty? comment) ""
+          (format "~a; ~a\n" indent comment)))
       (let ((txnid (cdr-assoc-or-empty 'txnid txn)))
         (if (empty? txnid) ""
           (format "~a~a: \"~a\"\n" indent txnid-key txnid)))

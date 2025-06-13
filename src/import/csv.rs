@@ -26,7 +26,10 @@ pub(crate) fn import(path: &Path) -> Result<Source, Error> {
     }
 
     Ok(Source {
-        header: vec![("format", "csv").into()],
+        header: vec![
+            ("format", "csv").into(),
+            ("path", path.to_string_lossy()).into(),
+        ],
         fields,
         transactions,
     })

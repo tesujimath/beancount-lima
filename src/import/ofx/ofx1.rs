@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde::Deserialize;
 
 use crate::{import::Source, Error};
@@ -97,7 +99,7 @@ impl StmtTrn {
     }
 }
 
-pub(crate) fn parse(ofx_content: &str) -> Result<Source, Error> {
+pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source, Error> {
     let sgml = sgmlish::Parser::builder()
         .lowercase_names()
         .expand_entities(|entity| match entity {
@@ -156,6 +158,7 @@ pub(crate) fn parse(ofx_content: &str) -> Result<Source, Error> {
             ("acctid", acctid).into(),
             ("balamt", balamt).into(),
             ("dtasof", dtasof).into(),
+            ("path", path.to_string_lossy()).into(),
         ],
         fields: StmtTrn::fields(),
         transactions: stmttrns

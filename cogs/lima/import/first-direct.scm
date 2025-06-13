@@ -1,4 +1,5 @@
 (require "lima/types.scm")
+(require "lima/list.scm")
 (require "lima/alist.scm")
 (require "lima/stdlib.scm")
 (require "lima/import/prelude.scm")
@@ -17,10 +18,16 @@
       (cons 'amount (amount (get-balance txn0) cur)))))
 
 ;; extract imported First Direct flavour CSV transactions into an intermediate representation
+;; where the account is inferred from the path by picking the first in `accounts-by-id`
+;; which is contained in the import path
 (define (make-extract default-currency accounts-by-id source)
   (let* ((hdr (import-source-header source))
-         ;; TODO primary account should be inferrable from filename
-         (primary-account "Assets:Unknown")
+         (path (cdr-assoc 'path hdr))
+         (primary-account (find-and-map-or-default
+                           (lambda (account-lookup) (string-contains? path (car account-lookup)))
+                           accounts-by-id
+                           cdr
+                           "Assets:Unknown"))
          (field-names (import-source-fields source))
          (get-date (make-field-getter field-names "date" (lambda (x) (parse-date x "%d/%m/%Y"))))
          (get-amount (make-field-getter field-names "amount" parse-decimal))

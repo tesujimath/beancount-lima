@@ -10,7 +10,7 @@ pub(crate) fn import(path: &Path) -> Result<Source, Error> {
         if first_line.trim() == "OFXHEADER:100" {
             let blank_line = Regex::new("\r\n\\s*\r\n").unwrap();
             if let Some(m) = blank_line.find(&ofx_content) {
-                ofx1::parse(&ofx_content[m.end()..])
+                ofx1::parse(path, &ofx_content[m.end()..])
             } else {
                 Err(Error::ImportFormat(
                     "failed to find end of OFX1 header".to_string(),

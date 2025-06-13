@@ -1,5 +1,6 @@
 (provide is-pair? try-pair)
 
+(require "srfi/srfi-28/format.scm")
 (require "lima/types.scm")
 (require "lima/alist.scm")
 (require "lima/list.scm")
@@ -32,7 +33,10 @@
   (let ((txnid2 (try-cdr-assoc 'txnid txn2)))
     (if txnid2
       (alist-insert 'txnid2 txnid2 txn0)
-      txn0)))
+      (let ((comment (format "paired with \"~a\" \"~a\""
+                      (cdr-assoc-or-default 'payee "" txn2)
+                      (cdr-assoc-or-default 'narration "" txn2))))
+        (alist-insert 'comment comment txn0)))))
 
 ;; try pairing a transaction into a list of txns, returning new list on success, or #f on fail
 (define (try-pair txn2 txns)

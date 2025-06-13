@@ -1,4 +1,4 @@
-(provide flatmap list-index all any partition)
+(provide flatmap list-index all any find find-and-map-or-default partition)
 
 (define (flatmap proc seq)
   (letrec ((accumulate
@@ -27,6 +27,18 @@
 
 (define (any predicate lst)
   (foldl (lambda (item ok) (or ok (predicate item))) #f lst))
+
+(define (find predicate lst)
+  (cond
+    [(empty? lst) #f]
+    [(predicate (car lst)) (car lst)]
+    [else (find predicate (cdr lst))]))
+
+(define (find-and-map-or-default predicate lst f default)
+  (let ((found (find predicate lst)))
+    (if found
+      (f found)
+      default)))
 
 ;; partition a list by predicate returning a pair
 ;; whose car is the list of elements for which the predicate is true
