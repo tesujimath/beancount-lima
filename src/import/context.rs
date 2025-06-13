@@ -163,15 +163,15 @@ impl<'a> ImportContextBuilder<'a> {
             }
         }
 
-        // update payee and narration map to account name only for expenses,
-        // since we only try to infer account names for expense accounts
+        // update payee and narration map to account name only for second and subsequent postings,
+        // as the first posting is assumed to be the primary account
         use hashbrown::hash_map::Entry::*;
         match (transaction.payee(), transaction.narration()) {
             (None, None) => (),
             (payee, narration) => {
-                // get accounts of type expenses for postings
                 let accounts = transaction
                     .postings()
+                    .skip(1) // skip first posting, assumed to be for primary account
                     .map(|p| p.account().item().as_ref())
                     .collect::<Vec<&str>>();
 
