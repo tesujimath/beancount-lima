@@ -148,8 +148,21 @@ fn main() -> Result<(), Error> {
                 get_config_string(&mut steel_engine, &["import", "txnid-key"], "txnid")?;
             let txnid2_key =
                 get_config_string(&mut steel_engine, &["import", "txnid2-key"], "txnid2")?;
+            let payee2_key =
+                get_config_string(&mut steel_engine, &["import", "payee2-key"], "payee2")?;
+            let narration2_key = get_config_string(
+                &mut steel_engine,
+                &["import", "narration2-key"],
+                "narration2",
+            )?;
             let context = if let Some(ledger) = ledger {
-                Context::parse_from(ledger, vec![txnid_key, txnid2_key], error_w)?
+                Context::parse_from(
+                    ledger,
+                    vec![txnid_key, txnid2_key],
+                    payee2_key,
+                    narration2_key,
+                    error_w,
+                )?
             } else {
                 Context::default()
             };

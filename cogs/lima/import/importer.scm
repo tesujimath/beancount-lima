@@ -39,6 +39,8 @@
     ( ; config
       (accounts-by-id (config-value-or-default '(accounts) '() config))
       (txnid-key (config-value-or-default '(txnid-key) "txnid" config))
+      (payee2-key (config-value-or-default '(payee2-key) "payee2" config))
+      (narration2-key (config-value-or-default '(narration2-key) "narration2" config))
       (txn-directive (config-value-or-default '(txn-directive) "txn" config))
       (default-currency (config-value-or-default '(default-currency) "CAD" config))
 
@@ -63,7 +65,15 @@
                      (flattening)
                      (into-reducer insert-by-date (hash)))))
     (transduce (all-by-date txns-by-date)
-      (into-for-each (lambda (txn) (display (format-transaction txn txn-directive #:txnid-key txnid-key)))))))
+      (into-for-each (lambda (txn) (display (format-transaction
+                                             txn
+                                             txn-directive
+                                             #:txnid-key
+                                             txnid-key
+                                             #:payee2-key
+                                             payee2-key
+                                             #:narration2-key
+                                             narration2-key)))))))
 
 ;; (bln (extract-balance default-currency hdr))) ; TODO balance
 

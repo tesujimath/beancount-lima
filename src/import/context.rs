@@ -21,6 +21,8 @@ pub(crate) struct Context {
 #[derive(Default, Debug)]
 struct ImportContextBuilder<'a> {
     txnid_keys: Vec<String>,
+    payee2_key: String,
+    narration2_key: String,
     txnids: HashSet<String>,
     payees: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
     narrations: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
@@ -31,6 +33,8 @@ impl Context {
     pub(crate) fn parse_from<W>(
         path: &Path,
         txnid_keys: Vec<String>,
+        payee2_key: String,
+        narration2_key: String,
         error_w: W,
     ) -> Result<Self, Error>
     where
@@ -47,7 +51,7 @@ impl Context {
                 warnings,
             }) => {
                 sources.write(error_w, warnings).map_err(Error::Io)?;
-                let mut builder = ImportContextBuilder::new(txnid_keys);
+                let mut builder = ImportContextBuilder::new(txnid_keys, payee2_key, narration2_key);
 
                 for directive in &directives {
                     builder.directive(directive);
@@ -83,9 +87,11 @@ impl Context {
 }
 
 impl<'a> ImportContextBuilder<'a> {
-    fn new(txnid_keys: Vec<String>) -> Self {
+    fn new(txnid_keys: Vec<String>, payee2_key: String, narration2_key: String) -> Self {
         Self {
             txnid_keys,
+            payee2_key,
+            narration2_key,
             txnids: HashSet::default(),
             payees: hashbrown::HashMap::default(),
             narrations: hashbrown::HashMap::default(),
@@ -155,17 +161,57 @@ impl<'a> ImportContextBuilder<'a> {
                 .metadata()
                 .key_value(parser::Key::try_from(txnid_key.as_str()).unwrap())
             {
-                if let parser::MetaValue::Simple(parser::SimpleValue::String(s)) = txnid.item() {
-                    if !self.txnids.contains(*s) {
-                        self.txnids.insert(s.to_string());
+                if let parser::MetaValue::Simple(parser::SimpleValue::String(txnid)) = txnid.item()
+                {
+                    if !self.txnids.contains(*txnid) {
+                        self.txnids.insert(txnid.to_string());
                     }
+                }
+            }
+        }
+
+        // count primary account if we have payee2 or narration2 metadata
+        let primary_account = transaction
+            .postings()
+            .next()
+            .map(|p| p.account().item().as_ref());
+
+        if let Some(payee2) = directive
+            .metadata()
+            .key_value(parser::Key::try_from(self.payee2_key.as_str()).unwrap())
+        {
+            if let parser::MetaValue::Simple(parser::SimpleValue::String(payee2)) = *payee2.item() {
+                {
+                    // ugh, borrow checker can't cope, so leak the string
+                    count_accounts(
+                        &mut self.payees,
+                        payee2.to_string().leak(),
+                        primary_account.iter().copied(),
+                    );
+                }
+            }
+        }
+
+        if let Some(narration2) = directive
+            .metadata()
+            .key_value(parser::Key::try_from(self.narration2_key.as_str()).unwrap())
+        {
+            if let parser::MetaValue::Simple(parser::SimpleValue::String(narration2)) =
+                *narration2.item()
+            {
+                {
+                    // ugh, borrow checker can't cope, so leak the string
+                    count_accounts(
+                        &mut self.narrations,
+                        narration2.to_string().leak(),
+                        primary_account.iter().copied(),
+                    );
                 }
             }
         }
 
         // update payee and narration map to account name only for second and subsequent postings,
         // as the first posting is assumed to be the primary account
-        use hashbrown::hash_map::Entry::*;
         match (transaction.payee(), transaction.narration()) {
             (None, None) => (),
             (payee, narration) => {
@@ -176,59 +222,51 @@ impl<'a> ImportContextBuilder<'a> {
                     .collect::<Vec<&str>>();
 
                 if let Some(payee) = payee {
-                    match self.payees.entry(payee.item()) {
-                        Occupied(mut payees) => {
-                            let payees = payees.get_mut();
-                            for account in accounts.iter() {
-                                match payees.entry(*account) {
-                                    Occupied(mut payee_account) => {
-                                        let payee_account = payee_account.get_mut();
-                                        *payee_account += 1;
-                                    }
-                                    Vacant(payee_account) => {
-                                        payee_account.insert(1);
-                                    }
-                                }
-                            }
-                        }
-                        Vacant(payees) => {
-                            payees.insert(
-                                accounts
-                                    .iter()
-                                    .map(|account| (*account, 1))
-                                    .collect::<hashbrown::HashMap<_, _>>(),
-                            );
-                        }
-                    }
+                    count_accounts(&mut self.payees, payee.item(), accounts.iter().copied());
                 }
 
                 if let Some(narration) = narration {
-                    match self.narrations.entry(narration.item()) {
-                        Occupied(mut narrations) => {
-                            let narrations = narrations.get_mut();
-                            for account in accounts.iter() {
-                                match narrations.entry(*account) {
-                                    Occupied(mut narration_account) => {
-                                        let narration_account = narration_account.get_mut();
-                                        *narration_account += 1;
-                                    }
-                                    Vacant(narration_account) => {
-                                        narration_account.insert(1);
-                                    }
-                                }
-                            }
-                        }
-                        Vacant(narrations) => {
-                            narrations.insert(
-                                accounts
-                                    .iter()
-                                    .map(|account| (*account, 1))
-                                    .collect::<hashbrown::HashMap<_, _>>(),
-                            );
-                        }
+                    count_accounts(
+                        &mut self.narrations,
+                        narration.item(),
+                        accounts.iter().copied(),
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Accumulate the counts for the inferred accounts
+fn count_accounts<'a, I>(
+    buckets: &mut hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
+    key: &'a str,
+    accounts: I,
+) where
+    I: Iterator<Item = &'a str>,
+{
+    use hashbrown::hash_map::Entry::*;
+    match buckets.entry(key) {
+        Occupied(mut payees) => {
+            let payees = payees.get_mut();
+            for account in accounts {
+                match payees.entry(account) {
+                    Occupied(mut payee_account) => {
+                        let payee_account = payee_account.get_mut();
+                        *payee_account += 1;
+                    }
+                    Vacant(payee_account) => {
+                        payee_account.insert(1);
                     }
                 }
             }
+        }
+        Vacant(payees) => {
+            payees.insert(
+                accounts
+                    .map(|account| (account, 1))
+                    .collect::<hashbrown::HashMap<_, _>>(),
+            );
         }
     }
 }

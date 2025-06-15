@@ -18,23 +18,17 @@
 
 2020-01-01 txn "TRANSFER TO S J GUEST - 21" "TRANSFER TO S J GUEST - 21 ;"
   txnid: "99-1234-0123456-07.01Jan2020.5"
+  txnid2: "99-1234-0123456-21.01Jan2020.1"
+  payee2: "TRANSFER FROM S J GUEST - 07"
   Assets:Bank:Current     -8000.00 NZD
   Assets:Bank:Savings
 
 2020-01-01 txn "TRANSFER FROM S J GUEST - 21" "TRANSFER FROM S J GUEST - 21 ;"
   txnid: "99-1234-0123456-07.01Jan2020.2"
+  txnid2: "99-1234-0123456-21.01Jan2020.1"
+  payee2: "TRANSFER TO S J GUEST - 07"
   Assets:Bank:Current      1000.00 NZD
   Assets:Bank:Savings
-
-2020-01-01 txn "TRANSFER TO S J GUEST - 07" "TRANSFER TO S J GUEST - 07 ;"
-  txnid: "99-1234-0123456-21.01Jan2020.1"
-  Assets:Bank:Savings     -1000.00 NZD
-  Assets:Bank:Current
-
-2020-01-01 txn "TRANSFER FROM S J GUEST - 07" "TRANSFER FROM S J GUEST - 07 ;"
-  txnid: "99-1234-0123456-21.01Jan2020.1"
-  Assets:Bank:Savings      8000.00 NZD
-  Assets:Bank:Current
 
 2020-01-01 txn "BURGERFUEL NORTH" "BURGERFUEL NORTH ;"
   txnid: "99-1234-0123456-07.01Jan2020.1"
@@ -59,7 +53,7 @@
 2020-01-01 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
   txnid: "99-1234-0123456-21.01Jan2020.2"
   Assets:Bank:Savings       -60.39 NZD
-  Expenses:Tax            
+  Expenses:Tax                                 
 
 2020-01-01 txn "TRANSFER TO SAVINGS"
   Assets:Bank:Uk:Current   -100.00 NZD
