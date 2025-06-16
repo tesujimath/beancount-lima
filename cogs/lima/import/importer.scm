@@ -10,7 +10,9 @@
 (require "lima/import/display.scm")
 
 ;; default extractors:
-(require (only-in "lima/import/ofx1.scm" [make-extract ofx1-make-extract]))
+(require (only-in "lima/import/ofx1.scm"
+          [make-extract-txn ofx1-make-extract-txn]
+          [extract-balance ofx1-extract-balance]))
 
 ;; insert a transaction into the hash-by-date, trying to pair where we can
 ;; TODO check other dates up to pairing-window-days
@@ -43,7 +45,8 @@
       (txn-directive (config-value-or-default '(txn-directive) "txn" config))
 
       ; defaults
-      (default-extractors `(("ofx1" . ,ofx1-make-extract)))
+      (default-extractors `(("ofx1" . ((txn . ,ofx1-make-extract-txn)
+                                       (bal . ,ofx1-extract-balance)))))
 
       ; group
       (payees (import-group-payees group))
@@ -56,22 +59,26 @@
                                       (extractor (cdr-assoc format (alist-merge default-extractors extractors)))
                                       (txns (import-source-transactions source)))
                                  (transduce txns
-                                   (mapping (extractor accounts-by-id source))
+                                   (mapping ((cdr-assoc 'txn extractor) accounts-by-id source))
                                    (filtering (make-dedupe-transactions existing-txnids))
                                    (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
+                                   (extending ((cdr-assoc 'bal extractor) accounts-by-id source))
                                    (into-list)))))
                      (flattening)
                      (into-reducer insert-by-date (hash)))))
     (transduce (all-by-date txns-by-date)
-      (into-for-each (lambda (txn) (display (format-transaction
-                                             txn
-                                             txn-directive
-                                             #:txnid-key
-                                             txnid-key
-                                             #:payee2-key
-                                             payee2-key
-                                             #:narration2-key
-                                             narration2-key)))))))
+      (into-for-each (lambda (directive) (display
+                                          (if (alist-contains? 'primary-account directive)
+                                            (format-transaction
+                                              directive
+                                              txn-directive
+                                              #:txnid-key
+                                              txnid-key
+                                              #:payee2-key
+                                              payee2-key
+                                              #:narration2-key
+                                              narration2-key)
+                                            (format-balance directive))))))))
 
 ;; (bln (extract-balance hdr))) ; TODO balance
 

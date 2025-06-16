@@ -63,12 +63,12 @@
       (foldl (lambda (acc s) (format "~a~a~a\n" s indent (format-secondary-account acc acc-width))) ""
         (cdr-assoc-or-empty 'secondary-accounts txn)))))
 
-(define (format-balance bln account)
+(define (format-balance bln)
   (let ((space " ") (pad "  "))
     (format "~a~abalance~a~a~a~a\n\n"
       (cdr-assoc 'date bln)
       space
       space
-      account
+      (cdr-assoc 'account bln)
       pad
       (format-amount (cdr-assoc 'amount bln) space))))

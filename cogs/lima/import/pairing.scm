@@ -17,8 +17,8 @@
   (if (or (alist-contains? 'txnid2 txn0) (alist-contains? 'txnid2 txn1)) #f
     (let ((a0 (cdr-assoc 'amount txn0))
           (a1 (cdr-assoc 'amount txn1))
-          (p0 (cdr-assoc 'primary-account txn0))
-          (p1 (cdr-assoc 'primary-account txn1))
+          (p0 (try-cdr-assoc 'primary-account txn0))
+          (p1 (try-cdr-assoc 'primary-account txn1))
           (s0 (cdr-assoc-or-empty 'secondary-accounts txn0))
           (s1 (cdr-assoc-or-empty 'secondary-accounts txn1))
           (equal-p-s? (lambda (p s)
