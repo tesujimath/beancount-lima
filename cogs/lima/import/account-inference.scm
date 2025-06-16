@@ -19,12 +19,21 @@
                                      (let* ((all-account-names (hash-keys->list account-lookup))
                                             (candidate-account-names (filter (lambda (account-name) (not (equal? account-name primary-account))) all-account-names))
                                             (annotated-accounts (map (lambda (account-name)
-                                                                      (list (cons 'name account-name) (cons 'infer-count (hash-get account-lookup account-name)) (cons 'infer-category category)))
+                                                                      `((name . ,account-name)
+                                                                        (infer-count . ,(hash-get account-lookup account-name))
+                                                                        (infer-category . ,category)))
                                                                  candidate-account-names)))
                                        (merge-sort annotated-accounts
                                          #:comparator
-                                         (lambda (acc0 acc1) (> (cdr-assoc 'infer-count acc0)
-                                                              (cdr-assoc 'infer-count acc1))))))))
+                                         ;; by infer-count descending, then by name ascending
+                                         (lambda (acc0 acc1) (cond [(> (cdr-assoc 'infer-count acc0)
+                                                                      (cdr-assoc 'infer-count acc1))
+                                                                    #t]
+                                                              [(< (cdr-assoc 'infer-count acc0)
+                                                                  (cdr-assoc 'infer-count acc1))
+                                                                #f]
+                                                              [else (string<? (cdr-assoc 'name acc0)
+                                                                     (cdr-assoc 'name acc1))])))))))
                (cond
                  [found-payee (order-accounts found-payee "payee")]
                  [found-narration (order-accounts found-narration "narration")]
