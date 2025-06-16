@@ -12,6 +12,7 @@
   (if (empty? key-path) cfg
     (let ((subcfg (assoc (car key-path) cfg)))
       (if subcfg (config-value-or-default (cdr key-path) default (cdr subcfg)) default))))
+
 ;; example
 ;; (config-value-or-default '(import txnid-key) "default-key" *base-config*)
 

@@ -10,10 +10,10 @@
 (define (add-posting p inv-alist)
   (let* ((amt (posting-amount p))
          (cur (amount-currency amt))
-         (inv-cur-prev-total (cdr-assoc-or-default cur (decimal-zero) inv-alist))
+         (inv-cur-prev-total (alist-get-or-default cur (decimal-zero) inv-alist))
          (inv-cur-new-total (decimal-add inv-cur-prev-total (amount-number amt))))
     (if (decimal-zero? inv-cur-new-total)
-      (del-assoc cur inv-alist)
+      (alist-remove cur inv-alist)
       (alist-insert-or-replace cur inv-cur-new-total inv-alist))))
 
 (define (postings->inv-alist postings)

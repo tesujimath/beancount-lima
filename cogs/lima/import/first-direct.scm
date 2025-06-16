@@ -12,7 +12,7 @@
 (define (extract-balance cur)
   (lambda (accounts-by-id source)
     (let* ((hdr (import-source-header source))
-           (path (cdr-assoc 'path hdr))
+           (path (alist-get 'path hdr))
            (account (find-and-map-or-default
                      (lambda (account-lookup) (string-contains? path (car account-lookup)))
                      accounts-by-id
@@ -34,7 +34,7 @@
 (define (make-extract cur)
   (lambda (accounts-by-id source)
     (let* ((hdr (import-source-header source))
-           (path (cdr-assoc 'path hdr))
+           (path (alist-get 'path hdr))
            (primary-account (find-and-map-or-default
                              (lambda (account-lookup) (string-contains? path (car account-lookup)))
                              accounts-by-id

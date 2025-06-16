@@ -1,9 +1,9 @@
 (provide
-  del-assoc
-  cdr-assoc
-  cdr-assoc-or-default
-  cdr-assoc-or-empty
-  try-cdr-assoc
+  alist-remove
+  alist-get
+  alist-get-or-default
+  alist-get-or-empty
+  alist-try-get
   alist-contains?
   alist-symbol-keys?
   alist-insert-or-replace
@@ -12,21 +12,21 @@
 
 (require (only-in "lima/list.scm" all))
 
-(define (del-assoc key alist)
+(define (alist-remove key alist)
   (filter (lambda (kv) (not (equal? (car kv) key))) alist))
 
-(define (cdr-assoc-or-default key default alist)
+(define (alist-get-or-default key default alist)
   (let ((kv (assoc key alist)))
     (if kv (cdr kv) default)))
 
-(define (cdr-assoc-or-empty key alist)
-  (cdr-assoc-or-default key '() alist))
+(define (alist-get-or-empty key alist)
+  (alist-get-or-default key '() alist))
 
 ;; return #f if not found
-(define (try-cdr-assoc key alist)
-  (cdr-assoc-or-default key #f alist))
+(define (alist-try-get key alist)
+  (alist-get-or-default key #f alist))
 
-(define (cdr-assoc key alist)
+(define (alist-get key alist)
   (let ((kv (assoc key alist)))
     (if kv (cdr kv) (error! "key" key "not found in alist" alist))))
 
@@ -41,7 +41,7 @@
 
 ;; insert or replace an item in an alist
 (define (alist-insert-or-replace key value alist)
-  (cons (cons key value) (del-assoc key alist)))
+  (cons (cons key value) (alist-remove key alist)))
 
 ;; insert an item in an alist
 (define (alist-insert key value alist)

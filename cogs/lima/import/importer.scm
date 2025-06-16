@@ -17,7 +17,7 @@
 ;; insert a transaction into the hash-by-date, trying to pair where we can
 ;; TODO check other dates up to pairing-window-days
 (define (insert-by-date h txn)
-  (let* ((j (date-julian (cdr-assoc 'date txn)))
+  (let* ((j (date-julian (alist-get 'date txn)))
          (existing-txns-for-date (or (hash-try-get h j) '())))
     (hash-insert h j (or (try-pair txn existing-txns-for-date)
                       (cons txn existing-txns-for-date)))))
@@ -55,14 +55,14 @@
       (txns-by-date (transduce (import-group-sources group)
                      (mapping (lambda (source)
                                (let* ((hdr (import-source-header source))
-                                      (format (cdr-assoc 'format hdr))
-                                      (extractor (cdr-assoc format (alist-merge default-extractors extractors)))
+                                      (format (alist-get 'format hdr))
+                                      (extractor (alist-get format (alist-merge default-extractors extractors)))
                                       (txns (import-source-transactions source)))
                                  (transduce txns
-                                   (mapping ((cdr-assoc 'txn extractor) accounts-by-id source))
+                                   (mapping ((alist-get 'txn extractor) accounts-by-id source))
                                    (filtering (make-dedupe-transactions existing-txnids))
                                    (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
-                                   (extending ((cdr-assoc 'bal extractor) accounts-by-id source))
+                                   (extending ((alist-get 'bal extractor) accounts-by-id source))
                                    (into-list)))))
                      (flattening)
                      (into-reducer insert-by-date (hash)))))

@@ -10,11 +10,11 @@
 ;; the secondary accounts are a list of either strings, or lists of string count category
 (define (make-infer-secondary-accounts-from-payees-and-narrations payees narrations)
   (lambda (txn)
-    (let* ((amount (amount-number (cdr-assoc 'amount txn)))
-           (primary-account (cdr-assoc 'primary-account txn))
+    (let* ((amount (amount-number (alist-get 'amount txn)))
+           (primary-account (alist-get 'primary-account txn))
            (secondary-accounts
-             (let* ((found-payee (hash-try-get payees (cdr-assoc-or-empty 'payee txn)))
-                    (found-narration (hash-try-get narrations (cdr-assoc-or-empty 'narration txn)))
+             (let* ((found-payee (hash-try-get payees (alist-get-or-empty 'payee txn)))
+                    (found-narration (hash-try-get narrations (alist-get-or-empty 'narration txn)))
                     (order-accounts (lambda (account-lookup category)
                                      (let* ((all-account-names (hash-keys->list account-lookup))
                                             (candidate-account-names (filter (lambda (account-name) (not (equal? account-name primary-account))) all-account-names))
@@ -26,14 +26,14 @@
                                        (merge-sort annotated-accounts
                                          #:comparator
                                          ;; by infer-count descending, then by name ascending
-                                         (lambda (acc0 acc1) (cond [(> (cdr-assoc 'infer-count acc0)
-                                                                      (cdr-assoc 'infer-count acc1))
+                                         (lambda (acc0 acc1) (cond [(> (alist-get 'infer-count acc0)
+                                                                      (alist-get 'infer-count acc1))
                                                                     #t]
-                                                              [(< (cdr-assoc 'infer-count acc0)
-                                                                  (cdr-assoc 'infer-count acc1))
+                                                              [(< (alist-get 'infer-count acc0)
+                                                                  (alist-get 'infer-count acc1))
                                                                 #f]
-                                                              [else (string<? (cdr-assoc 'name acc0)
-                                                                     (cdr-assoc 'name acc1))])))))))
+                                                              [else (string<? (alist-get 'name acc0)
+                                                                     (alist-get 'name acc1))])))))))
                (cond
                  [found-payee (order-accounts found-payee "payee")]
                  [found-narration (order-accounts found-narration "narration")]
@@ -44,10 +44,10 @@
 
 ;; format the account name inferred above with a comment about where it came from
 (define (format-secondary-account acc width)
-  (let* ((name (cdr-assoc 'name acc))
+  (let* ((name (alist-get 'name acc))
          (pad (spaces (max (- width (string-length name)) 0)))
-         (count (cdr-assoc-or-empty 'infer-count acc))
-         (category (cdr-assoc-or-empty 'infer-category acc)))
+         (count (alist-get-or-empty 'infer-count acc))
+         (category (alist-get-or-empty 'infer-category acc)))
     (if (or (empty? count) (empty? category))
       name
       (let ((suffix (if (> count 1) "s" "")))

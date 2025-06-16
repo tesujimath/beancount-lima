@@ -3,7 +3,7 @@
 
 (define (inventory-for-currencies inv currencies)
   (map (lambda (cur)
-        (cdr-assoc-or-default cur "" inv))
+        (alist-get-or-default cur "" inv))
     currencies))
 
 (define (format-balances ledger)
