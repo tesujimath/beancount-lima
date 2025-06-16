@@ -5,7 +5,6 @@
   '((import . ((txn-directive . "txn")
                (txnid-key . "txnid")
                (txnid2-key . "txnid2")
-               (default-currency . "USD")
                (pairing-window-days . 3)))
     (count . ((something-else . "booyah!")))))
 

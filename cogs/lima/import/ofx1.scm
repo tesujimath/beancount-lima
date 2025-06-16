@@ -10,8 +10,9 @@
 (require "lima/import/types.scm")
 
 ;; extract balance from header if we can find the fields we need, otherwise return empty
-(define (extract-balance default-currency hdr)
-  (let* ((cur (cdr-assoc-or-default 'curdef default-currency hdr))
+(define (extract-balance source)
+  (let* ((hdr (import-source-header source))
+         (cur (cdr-assoc 'curdef hdr))
          (balamt (cdr-assoc-or-empty 'balamt hdr))
          (dtasof (cdr-assoc-or-empty 'dtasof hdr)))
     (if (or (empty? balamt) (empty? dtasof))
@@ -23,9 +24,9 @@
           (cons 'amount (amount amt cur)))))))
 
 ;; extract imported OFX1 transactions into an intermediate representation
-(define (make-extract default-currency accounts-by-id source)
+(define (make-extract accounts-by-id source)
   (let* ((hdr (import-source-header source))
-         (cur (cdr-assoc-or-default 'curdef default-currency hdr))
+         (cur (cdr-assoc 'curdef hdr))
          (acctid (cdr-assoc-or-default 'acctid "unknown-acctid" hdr))
          (primary-account (cdr-assoc-or-default acctid "Assets:Unknown" accounts-by-id))
          (field-names (import-source-fields source))

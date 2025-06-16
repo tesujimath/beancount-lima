@@ -31,7 +31,6 @@
 ; accounts - alist of account-id to account-name
 ; txnid-key - metadata key used for transaction IDs
 ; txn-directive - the directive written out for a transaction
-; default-currency - the currency used when none is specified in the import
 ;
 ; extractors is an alist by format of extractor for that format
 (define (import config extractors group)
@@ -42,7 +41,6 @@
       (payee2-key (config-value-or-default '(payee2-key) "payee2" config))
       (narration2-key (config-value-or-default '(narration2-key) "narration2" config))
       (txn-directive (config-value-or-default '(txn-directive) "txn" config))
-      (default-currency (config-value-or-default '(default-currency) "CAD" config))
 
       ; defaults
       (default-extractors `(("ofx1" . ,ofx1-make-extract)))
@@ -58,7 +56,7 @@
                                       (extractor (cdr-assoc format (alist-merge default-extractors extractors)))
                                       (txns (import-source-transactions source)))
                                  (transduce txns
-                                   (mapping (extractor default-currency accounts-by-id source))
+                                   (mapping (extractor accounts-by-id source))
                                    (filtering (make-dedupe-transactions existing-txnids))
                                    (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
                                    (into-list)))))
@@ -75,7 +73,7 @@
                                              #:narration2-key
                                              narration2-key)))))))
 
-;; (bln (extract-balance default-currency hdr))) ; TODO balance
+;; (bln (extract-balance hdr))) ; TODO balance
 
 ;; TODO balance
 ; (unless (empty? bln)

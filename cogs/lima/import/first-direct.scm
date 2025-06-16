@@ -20,7 +20,7 @@
 ;; extract imported First Direct flavour CSV transactions into an intermediate representation
 ;; where the account is inferred from the path by picking the first in `accounts-by-id`
 ;; which is contained in the import path
-(define (make-extract default-currency accounts-by-id source)
+(define (make-extract accounts-by-id source)
   (let* ((hdr (import-source-header source))
          (path (cdr-assoc 'path hdr))
          (primary-account (find-and-map-or-default
@@ -32,15 +32,15 @@
          (get-date (make-field-getter field-names "date" (lambda (x) (parse-date x "%d/%m/%Y"))))
          (get-amount (make-field-getter field-names "amount" parse-decimal))
          (get-description (make-field-getter field-names "description" identity)))
-    (lambda (txn)
-      (list (cons 'date (get-date txn))
-        (cons 'amount (amount (get-amount txn) default-currency))
-        (cons 'primary-account primary-account)
-        (cons 'narration (get-description txn))))))
+    (lambda (cur)
+      (lambda (txn)
+        (list (cons 'date (get-date txn))
+          (cons 'amount (amount (get-amount txn) cur))
+          (cons 'primary-account primary-account)
+          (cons 'narration (get-description txn)))))))
 
-;; make this usable from CLI
-(let* ((import-config (config-value-or-default '(import) '() *config*)))
-  ;; First Direct is a UK bank, so set default currency accordingly
-  (import (alist-merge import-config '((default-currency . "GBP")))
-    `(("csv" . ,make-extract))
+;; First Direct is a UK bank, so set currency accordingly
+(let ((cur "GBP"))
+  (import (config-value-or-default '(import) '() *config*)
+    `(("csv" . ,(make-extract cur)))
     *import-group*))
