@@ -17,6 +17,8 @@
   posting?
   posting-date
   posting-amount
+  posting-flag
+  make-posting-flagged-with?
   amount
   amount?
   amount-number
@@ -38,7 +40,11 @@
 
 (struct amount (number currency) #:transparent)
 
-(struct posting (date amount) #:transparent)
+(struct posting (date amount flag) #:transparent)
+
+;; return a predicate which selects postings with given flag
+(define (make-posting-flagged-with? flag)
+  (lambda (pst) (equal? (posting-flag pst) flag)))
 
 (struct account (inventory postings) #:transparent)
 

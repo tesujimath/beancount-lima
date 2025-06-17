@@ -18,7 +18,7 @@
   (amount (ffi-amount-number amt) (ffi-amount-currency amt)))
 
 (define (ffi-posting->posting pst)
-  (posting (ffi-posting-date pst) (ffi-amount->amount (ffi-posting-amount pst))))
+  (posting (ffi-posting-date pst) (ffi-amount->amount (ffi-posting-amount pst)) (ffi-posting-flag pst)))
 
 (define (ffi-account->account acc)
   (postings->account (map ffi-posting->posting (ffi-account-postings acc))))

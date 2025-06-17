@@ -33,16 +33,16 @@ impl Account {
 pub(crate) struct Posting {
     pub(crate) date: Date,
     pub(crate) amount: Amount,
+    pub(crate) flag: Option<String>,
     // TODO:
-    // pub(crate) flag: Option<String>,
     // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
     // pub(crate) price_annotation: Option<Spanned<PriceSpec<'a>>>,
     // pub(crate) metadata: Metadata<'a>,
 }
 
 impl Posting {
-    pub(crate) fn new(date: Date, amount: Amount) -> Self {
-        Posting { date, amount }
+    pub(crate) fn new(date: Date, amount: Amount, flag: Option<String>) -> Self {
+        Posting { date, amount, flag }
     }
 
     fn date(&self) -> Date {
@@ -53,11 +53,16 @@ impl Posting {
         self.amount.clone()
     }
 
+    fn flag(&self) -> Option<String> {
+        self.flag.clone()
+    }
+
     pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
         steel_engine.register_type::<Posting>("ffi-posting?");
         steel_engine.register_fn("ffi-posting->string", Posting::to_string);
         steel_engine.register_fn("ffi-posting-date", Posting::date);
         steel_engine.register_fn("ffi-posting-amount", Posting::amount);
+        steel_engine.register_fn("ffi-posting-flag", Posting::flag);
     }
 }
 
@@ -184,7 +189,7 @@ impl Date {
     }
 
     // Julian day
-    fn julian(&self) -> i32 {
+    pub(crate) fn julian(&self) -> i32 {
         self.0.to_julian_day()
     }
 
@@ -229,7 +234,7 @@ impl Decimal {
         rust_decimal::Decimal::ZERO.into()
     }
 
-    fn is_zero(&self) -> bool {
+    pub(crate) fn is_zero(&self) -> bool {
         self.0 == rust_decimal::Decimal::ZERO
     }
 
@@ -284,6 +289,12 @@ impl Decimal {
 impl From<rust_decimal::Decimal> for Decimal {
     fn from(value: rust_decimal::Decimal) -> Self {
         Self(value)
+    }
+}
+
+impl From<Decimal> for rust_decimal::Decimal {
+    fn from(value: Decimal) -> Self {
+        value.0
     }
 }
 

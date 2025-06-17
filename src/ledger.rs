@@ -38,7 +38,7 @@ impl Ledger {
         let sources = BeancountSources::try_from(path).map_err(Error::Io)?;
         let parser = BeancountParser::new(&sources);
 
-        let builder = match parser.parse() {
+        let mut builder = match parser.parse() {
             Ok(ParseSuccess {
                 directives,
                 options: _,
@@ -62,6 +62,8 @@ impl Ledger {
         }?;
 
         drop(parser);
+
+        builder.validate();
 
         match builder.build(sources, error_w) {
             Err(errors) => Err(Error::Builder),
@@ -99,6 +101,16 @@ struct LedgerBuilder {
 }
 
 impl LedgerBuilder {
+    // generate any errors before building
+    fn validate(&mut self) {
+        // check for unused pad directives
+        for account in self.accounts.values() {
+            if let Some(pad) = &account.pad {
+                self.errors.push(pad.error("unused"))
+            }
+        }
+    }
+
     fn build<W>(self, sources: BeancountSources, error_w: W) -> Result<Ledger, Error>
     where
         W: Write + Copy,
@@ -169,16 +181,26 @@ impl LedgerBuilder {
             .postings()
             .filter(|posting| posting.amount().is_some() && posting.currency().is_some())
         {
-            self.post(*directive.date().item(), posting, None);
+            let amount = posting.amount().unwrap().item().value();
+            let currency = posting.currency().unwrap().item();
+            self.post(
+                (*directive.date().item()).into(),
+                &posting.account().to_string(),
+                (amount, currency.to_string()).into(),
+                posting.flag().map(|flag| flag.item().to_string()),
+                posting,
+            );
         }
 
         // auto-post if required
         if let Some(unspecified) = unspecified.pop() {
             for (currency, number) in residual {
                 self.post(
-                    *directive.date().item(),
+                    (*directive.date().item()).into(),
+                    &unspecified.account().to_string(),
+                    (-number, currency.to_string()).into(),
+                    unspecified.flag().map(|flag| flag.item().to_string()),
                     unspecified,
-                    Some((-number, currency.to_string()).into()),
                 );
             }
         }
@@ -189,84 +211,135 @@ impl LedgerBuilder {
         }
     }
 
-    fn post(
+    fn post<E>(
         &mut self,
-        date: time::Date,
-        posting: &Spanned<parser::Posting>,
-        amount: Option<Amount>,
-    ) {
-        if self
-            .open_accounts
-            .contains_key(&posting.account().item().to_string())
-        {
-            let account = self
-                .accounts
-                .get_mut(&posting.account().item().to_string())
-                .unwrap();
+        date: Date,
+        account_name: &str,
+        amount: Amount,
+        flag: Option<String>,
+        source: &Spanned<E>,
+    ) where
+        E: parser::ElementType,
+    {
+        if self.open_accounts.contains_key(account_name) {
+            let account = self.accounts.get_mut(account_name).unwrap();
 
-            // if amount is specified explicitly we use it, otherwise we extract it from the post
-            let amount = amount.or_else(|| {
-                let amount = posting.amount().map(|amount| amount.item().value());
+            use hashbrown::hash_map::Entry::*;
 
-                let currency = posting.currency().map(|currency| currency.item());
+            if account.is_currency_valid(&amount.currency) {
+                match account.inventory.entry(amount.currency.clone()) {
+                    Occupied(mut position) => {
+                        let value = position.get_mut();
+                        *value = value.add(amount.number);
 
-                match (amount, currency) {
-                    (Some(amount), Some(currency)) => Some((amount, currency.to_string()).into()),
-                    (None, Some(_)) => {
-                        self.errors.push(posting.error("missing amount"));
-                        None
-                    }
-                    (Some(_), None) => {
-                        self.errors.push(posting.error("missing currency"));
-                        None
-                    }
-                    (None, None) => {
-                        self.errors
-                            .push(posting.error("missing amount and currency"));
-                        None
-                    }
-                }
-            });
+                        tracing::debug!(
+                            "post {} {} value for {} is now {}",
+                            &date,
+                            &amount,
+                            &account_name,
+                            value,
+                        );
 
-            if let Some(amount) = amount {
-                use hashbrown::hash_map::Entry::*;
-
-                if account.is_currency_valid(&amount.currency) {
-                    match account.inventory.entry(amount.currency.clone()) {
-                        Occupied(mut position) => {
-                            let position = position.get_mut();
-                            position.add(amount.number);
-                        }
-                        Vacant(position) => {
-                            position.insert(amount.number);
+                        if value.is_zero() {
+                            position.remove_entry();
                         }
                     }
-                    account.postings.push(Posting::new(date.into(), amount));
-                } else {
-                    self.errors.push(posting.error_with_contexts(
-                        "invalid currency for account",
-                        vec![("open".to_string(), account.opened)],
-                    ));
+                    Vacant(position) => {
+                        position.insert(amount.number);
+                    }
                 }
+                account.postings.push(Posting::new(date, amount, flag));
+            } else {
+                self.errors.push(source.error_with_contexts(
+                    "invalid currency for account",
+                    vec![("open".to_string(), account.opened)],
+                ));
             }
-        } else if let Some(closed) = self
-            .closed_accounts
-            .get(&posting.account().item().to_string())
-        {
+        } else if let Some(closed) = self.closed_accounts.get(account_name) {
             self.errors.push(
-                posting.error_with_contexts(
+                source.error_with_contexts(
                     "account was closed",
                     vec![("close".to_string(), *closed)],
                 ),
             );
         } else {
-            self.errors.push(posting.error("account not open"));
+            self.errors.push(source.error("account not open"));
         }
     }
 
     fn price(&mut self, price: &parser::Price, directive: &Spanned<parser::Directive>) {}
 
-    fn balance(&mut self, balance: &parser::Balance, directive: &Spanned<parser::Directive>) {}
+    fn balance(&mut self, balance: &parser::Balance, directive: &Spanned<parser::Directive>) {
+        let account_name = balance.account().item().to_string();
+        let (margin, pad) = if self.open_accounts.contains_key(&account_name) {
+            let account = self.accounts.get_mut(&account_name).unwrap();
+
+            // what's the gap between what we have and what the balance says we should have?
+            let margin = account
+                .inventory
+                .iter()
+                .map(|(cur, number)| {
+                    if balance.atol().amount().currency().item().as_ref() == cur.as_str() {
+                        (
+                            cur,
+                            balance.atol().amount().number().item().value()
+                                - Into::<rust_decimal::Decimal>::into(*number),
+                        )
+                    } else {
+                        (cur, -(Into::<rust_decimal::Decimal>::into(*number)))
+                    }
+                })
+                .filter_map(|(cur, number)| {
+                    // discard anything below the tolerance
+                    (number.abs()
+                        > balance
+                            .atol()
+                            .tolerance()
+                            .map(|x| *x.item())
+                            .unwrap_or(rust_decimal::Decimal::ZERO))
+                    .then_some((cur.to_string(), number))
+                })
+                .collect::<HashMap<_, _>>();
+
+            // pad can't last beyond balance
+            ((!margin.is_empty()).then_some(margin), account.pad.take())
+        } else {
+            self.errors.push(directive.error("account not open"));
+            (None, None)
+        };
+
+        match (margin, pad) {
+            (Some(margin), Some(pad)) => {
+                tracing::debug!(
+                    "margin {}",
+                    margin
+                        .iter()
+                        .map(|(cur, number)| format!("{} {}", -number, cur))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
+
+                for (cur, number) in &margin {
+                    let amount = Into::<Amount>::into((*number, cur.to_string()));
+                    let pad_flag = Some("P".to_string());
+                    tracing::debug!("pad {} {} {}", pad.date.clone(), &account_name, &amount,);
+                    self.post(pad.date.clone(), &account_name, amount, pad_flag, &pad);
+                }
+            }
+            (Some(margin), None) => {
+                self.errors.push(directive.error(format!(
+                            "margin is {}",
+                            &margin
+                                .into_iter()
+                                .map(|(cur, number)| format!("{} {}", -number, cur))
+                                .collect::<Vec<String>>()
+                                .join(", ")
+                        )));
+            }
+            (None, Some(pad)) => {}
+            (None, None) => {}
+        }
+    }
 
     fn open(&mut self, open: &parser::Open, directive: &Spanned<parser::Directive>) {
         use hashbrown::hash_map::Entry::*;
@@ -330,7 +403,24 @@ impl LedgerBuilder {
     fn commodity(&mut self, commodity: &parser::Commodity, directive: &Spanned<parser::Directive>) {
     }
 
-    fn pad(&mut self, pad: &parser::Pad, directive: &Spanned<parser::Directive>) {}
+    fn pad(&mut self, pad: &parser::Pad, directive: &Spanned<parser::Directive>) {
+        let account_name = pad.account().item().to_string();
+        if self.open_accounts.contains_key(&account_name) {
+            let account = self.accounts.get_mut(&account_name).unwrap();
+            let unused_pad = account.pad.replace(parser::spanned(
+                Pad::new(directive.date().item(), pad.source()),
+                *directive.span(),
+            ));
+
+            // unused pad directives are errors
+            // https://beancount.github.io/docs/beancount_language_syntax.html#unused-pad-directives
+            if let Some(unused_pad) = unused_pad {
+                self.errors.push(unused_pad.error("unused"));
+            }
+        } else {
+            self.errors.push(directive.error("account not open"));
+        }
+    }
 
     fn document(&mut self, document: &parser::Document, directive: &Spanned<parser::Directive>) {}
 
@@ -345,17 +435,21 @@ impl LedgerBuilder {
 struct AccountBuilder {
     // TODO support cost in inventory
     currencies: HashSet<String>,
-    inventory: hashbrown::HashMap<String, Decimal>,
+    inventory: hashbrown::HashMap<String, Decimal>, // only non-zero positions are maintained
     opened: Span,
     // TODO
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
     postings: Vec<Posting>,
+    pad: Option<parser::Spanned<Pad>>, // the string is the pad account
 }
 
 impl AccountBuilder {
     fn build(self) -> Account {
+        // sort posting by date because pad posts were inserted at the balance directive not the pad
+        let mut postings = self.postings;
+        postings.sort_by_key(|post| post.date.julian());
         Account {
-            postings: self.postings.into_iter().collect(),
+            postings: postings.into_iter().collect(),
         }
     }
 
@@ -368,11 +462,33 @@ impl AccountBuilder {
             inventory: hashbrown::HashMap::default(),
             opened,
             postings: Vec::default(),
+            pad: None,
         }
     }
 
     /// all currencies are valid unless any were specified during open
     fn is_currency_valid(&self, currency: &String) -> bool {
         self.currencies.is_empty() || self.currencies.contains(currency)
+    }
+}
+
+#[derive(Debug)]
+struct Pad {
+    date: Date,
+    source: String,
+}
+
+impl Pad {
+    fn new(date: &time::Date, source: &parser::Account) -> Self {
+        Pad {
+            date: (*date).into(),
+            source: source.to_string(),
+        }
+    }
+}
+
+impl parser::ElementType for Pad {
+    fn element_type(&self) -> &'static str {
+        "pad"
     }
 }

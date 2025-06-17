@@ -18,6 +18,8 @@
   posting?
   posting-date
   posting-amount
+  posting-flag
+  make-posting-flagged-with?
   amount
   amount?
   amount-number

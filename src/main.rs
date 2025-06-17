@@ -8,6 +8,7 @@ use std::{
 };
 use steel::{steel_vm::engine::Engine, SteelVal};
 use steel_repl::run_repl;
+use tracing_subscriber::EnvFilter;
 
 const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
 
@@ -120,6 +121,11 @@ fn load_cog(steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
 fn main() -> Result<(), Error> {
     let mut steel_engine = Engine::new();
     let error_w = &std::io::stderr();
+
+    let subscriber = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let cog_paths = CogPaths::from_env();
     cog_paths.set_steel_search_path(&mut steel_engine);

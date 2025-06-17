@@ -11,6 +11,10 @@
       url = "github:tesujimath/steel/into-string";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    bean-sort = {
+      url = "github:tesujimath/bean-sort/main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs:
@@ -23,6 +27,7 @@
           };
           flakePkgs = {
             steel = inputs.steel.packages.${system}.default;
+            bean-sort = inputs.bean-sort.packages.${system}.default;
           };
           # cargo-nightly based on https://github.com/oxalica/rust-overlay/issues/82
           nightly = pkgs.rust-bin.selectLatestNightlyWith (t: t.default);
@@ -50,9 +55,10 @@
               cargo-edit
               gdb
 
-              # useful for reference:
+              # useful tools:
               beancount
               beanquery
+              flakePkgs.bean-sort
             ] ++ ci-packages;
 
             shellHook = ''

@@ -1,0 +1,52 @@
+1970-01-01 commodity NZD
+
+2016-03-01 open Equity:Unknown
+
+2016-03-01 open Assets:Bank:Current
+
+2016-03-01 open Expenses:Groceries NZD
+
+2016-03-01 open Expenses:Donations NZD
+
+2016-03-01 open Expenses:Entertainment:Drinks-and-snacks NZD
+
+2016-03-01 open Income:Interest NZD
+
+2016-03-01 open Income:Windfall NZD
+
+2023-04-10 * "WIKIMEDIA 877-600-9454" "WIKIMEDIA 877-600-9454 ;"
+  Assets:Bank:Current                   -10.00 NZD
+  Expenses:Donations
+
+2023-05-29 * "New World Gardens North East Va" "Very hungry"
+  Assets:Bank:Current                   -15.00 NZD
+  Expenses:Groceries
+
+2023-05-30* "Countdown" "For a friend"
+  Assets:Bank:Current                   -17.50 NZD
+  Expenses:Groceries
+
+2023-05-31 * "EMERSON S TAPROOM DUNEDIN" "With Kevin"
+  Assets:Bank:Current                   -25.00 NZD
+  Expenses:Entertainment:Drinks-and-snacks
+
+2023-06-10 * "EMERSON S TAPROOM DUNEDIN" "With Blair"
+  Assets:Bank:Current                   -23.00 NZD
+  Expenses:Entertainment:Drinks-and-snacks
+
+2023-07-01 balance Assets:Bank:Current  -90.50 NZD
+
+2023-07-20 * "Bonus"
+  Assets:Bank:Current                   100.00 NZD
+  Income:Windfall
+
+2023-08-01 balance Assets:Bank:Current    9.50 NZD
+
+2024-01-01 pad Assets:Bank:Current Equity:Unknown
+
+2025-03-31 txn "INTEREST EARNED" "INTEREST EARNED ;"
+  txnid: "99-1234-0123456-07.31Mar2025.1"
+  Assets:Bank:Current                     4.72 NZD
+  Income:Interest
+
+2025-05-01 balance Assets:Bank:Current   14.00 NZD
