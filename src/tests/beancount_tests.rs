@@ -4,7 +4,7 @@ use std::path::Path;
 use steel::steel_vm::engine::Engine;
 use test_generator::test_resources;
 
-use crate::{tests::report_test_failures, CogPaths, Ledger};
+use crate::{report_test_failures, CogPaths, Ledger};
 
 use super::load_cog_path;
 
@@ -18,6 +18,7 @@ fn beancount_tests(beancount_relpath: &str) {
     let ledger = Ledger::parse_from(Path::new(beancount_relpath), &std::io::stderr()).unwrap();
 
     let mut steel_engine = Engine::new();
+    crate::register_types(&mut steel_engine);
     ledger.register(&mut steel_engine);
 
     let cog_paths = CogPaths::from_env();

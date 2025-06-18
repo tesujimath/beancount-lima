@@ -7,7 +7,7 @@ use std::{
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
-use crate::{register_types_with_engine, AlistItem, Error};
+use crate::{AlistItem, Error};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Group {
@@ -79,18 +79,7 @@ impl Group {
         self.context.narrations()
     }
 
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Self>("ffi-imported?");
-        steel_engine.register_fn("ffi-import-group-sources", Self::sources);
-        steel_engine.register_fn("ffi-import-group-txnids", Self::txnids);
-        steel_engine.register_fn("ffi-import-group-payees", Self::payees);
-        steel_engine.register_fn("ffi-import-group-narrations", Self::narrations);
-    }
-
-    // TODO Ugh sort this and above
     pub(crate) fn register(self, steel_engine: &mut Engine) {
-        register_types_with_engine(steel_engine);
-
         steel_engine
             .register_external_value("*ffi-import-group*", self)
             .unwrap(); // can't fail
@@ -119,13 +108,19 @@ impl Source {
     fn transactions(&self) -> Vec<Vec<String>> {
         self.transactions.clone()
     }
+}
 
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Self>("ffi-import-source?");
-        steel_engine.register_fn("ffi-import-source-header", Self::header);
-        steel_engine.register_fn("ffi-import-source-fields", Self::fields);
-        steel_engine.register_fn("ffi-import-source-transactions", Self::transactions);
-    }
+pub(crate) fn register_types(steel_engine: &mut Engine) {
+    steel_engine.register_type::<Group>("ffi-import-group?");
+    steel_engine.register_fn("ffi-import-group-sources", Group::sources);
+    steel_engine.register_fn("ffi-import-group-txnids", Group::txnids);
+    steel_engine.register_fn("ffi-import-group-payees", Group::payees);
+    steel_engine.register_fn("ffi-import-group-narrations", Group::narrations);
+
+    steel_engine.register_type::<Source>("ffi-import-source?");
+    steel_engine.register_fn("ffi-import-source-header", Source::header);
+    steel_engine.register_fn("ffi-import-source-fields", Source::fields);
+    steel_engine.register_fn("ffi-import-source-transactions", Source::transactions);
 }
 
 mod context;

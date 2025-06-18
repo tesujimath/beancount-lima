@@ -1,6 +1,6 @@
 (provide fy make-fy?)
 
-(require "lima/count/prelude.scm")
+(require "lima/types.scm")
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 

@@ -11,8 +11,6 @@ use std::{
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
-use crate::register_types_with_engine;
-
 use super::{types::*, Error};
 
 #[derive(Clone, Debug, Steel)]
@@ -76,15 +74,7 @@ impl Ledger {
         self.accounts.clone()
     }
 
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Ledger>("ffi-ledger?");
-        steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
-    }
-
-    // TODO Ugh sort this and above
     pub(crate) fn register(self, steel_engine: &mut Engine) {
-        register_types_with_engine(steel_engine);
-
         steel_engine
             .register_external_value("*ffi-ledger*", self)
             .unwrap(); // can't fail
@@ -491,4 +481,9 @@ impl parser::ElementType for Pad {
     fn element_type(&self) -> &'static str {
         "pad"
     }
+}
+
+pub(crate) fn register_types(steel_engine: &mut Engine) {
+    steel_engine.register_type::<Ledger>("ffi-ledger?");
+    steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
 }

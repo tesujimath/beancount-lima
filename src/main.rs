@@ -1,5 +1,5 @@
 use config::get_config_string;
-use import::{Context, Group, Source};
+use import::{Context, Group};
 use ledger::Ledger;
 use std::{
     fmt::Display,
@@ -20,10 +20,6 @@ struct Cli {
     /// Don't run the REPL
     #[clap(long)]
     batch: bool,
-
-    /// Set test mode
-    #[clap(long)]
-    test: bool,
 
     /// Don't load the Scheme prelude
     #[clap(long)]
@@ -57,6 +53,12 @@ enum Commands {
         /// Cog to load for import
         #[arg(long, value_name = "COG")]
         using: Option<String>,
+    },
+
+    /// Test one or more cogs
+    Test {
+        /// Files to import
+        cogs: Vec<String>,
     },
 }
 
@@ -119,8 +121,10 @@ fn load_cog(steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
 }
 
 fn main() -> Result<(), Error> {
-    let mut steel_engine = Engine::new();
     let error_w = &std::io::stderr();
+
+    let mut steel_engine = Engine::new();
+    register_types(&mut steel_engine);
 
     let subscriber = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
@@ -186,11 +190,20 @@ fn main() -> Result<(), Error> {
             Some("lima/import/prelude.scm")
         }
 
+        Some(Commands::Test { cogs }) => {
+            set_test_mode(&mut steel_engine).unwrap();
+
+            for cog in cogs {
+                let cog_relpath = format!("lima/{}.scm", cog);
+                load_cog(&mut steel_engine, &cog_relpath)?;
+                report_test_failures(&mut steel_engine, &cog_relpath)?;
+            }
+
+            return Ok(());
+        }
+
         None => None,
     };
-    if cli.test {
-        set_test_mode(&mut steel_engine).unwrap();
-    }
 
     if cli.batch {
         return Ok(());
@@ -264,16 +277,10 @@ where
     run_emitting_error(steel_engine, error_context, input).map(|_result| ())
 }
 
-pub(crate) fn register_types_with_engine(steel_engine: &mut Engine) {
-    Account::register_with_engine(steel_engine);
-    Amount::register_with_engine(steel_engine);
-    Date::register_with_engine(steel_engine);
-    Decimal::register_with_engine(steel_engine);
-    Ledger::register_with_engine(steel_engine);
-    Posting::register_with_engine(steel_engine);
-    Group::register_with_engine(steel_engine);
-    Source::register_with_engine(steel_engine);
-    AlistItem::register_with_engine(steel_engine);
+fn register_types(steel_engine: &mut Engine) {
+    types::register_types(steel_engine);
+    ledger::register_types(steel_engine);
+    import::register_types(steel_engine);
 }
 
 #[derive(Debug)]
@@ -309,6 +316,20 @@ impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Error::Io(value)
     }
+}
+
+fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
+    run_emitting_error_discarding_result(
+        steel_engine,
+        "",
+        format!(
+            r#"
+                (require "steel/tests/unit-test.scm")
+                (when (not (empty? (hash-get (get-test-stats) 'failures))) (error! "test failures in {}"))
+            "#,
+            cog_relpath
+        ),
+    )
 }
 
 pub(crate) mod config;

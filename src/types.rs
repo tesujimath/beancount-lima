@@ -22,11 +22,6 @@ impl Account {
     fn postings(&self) -> Vec<Posting> {
         self.postings.clone()
     }
-
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Account>("ffi-account?");
-        steel_engine.register_fn("ffi-account-postings", Account::postings);
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -56,14 +51,6 @@ impl Posting {
     fn flag(&self) -> Option<String> {
         self.flag.clone()
     }
-
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Posting>("ffi-posting?");
-        steel_engine.register_fn("ffi-posting->string", Posting::to_string);
-        steel_engine.register_fn("ffi-posting-date", Posting::date);
-        steel_engine.register_fn("ffi-posting-amount", Posting::amount);
-        steel_engine.register_fn("ffi-posting-flag", Posting::flag);
-    }
 }
 
 impl Display for Posting {
@@ -92,13 +79,6 @@ impl Amount {
 
     fn currency(&self) -> String {
         self.currency.clone()
-    }
-
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Amount>("ffi-amount?");
-        steel_engine.register_fn("ffi-amount->string", Amount::to_string);
-        steel_engine.register_fn("ffi-amount-number", Amount::number);
-        steel_engine.register_fn("ffi-amount-currency", Amount::currency);
     }
 }
 
@@ -192,22 +172,6 @@ impl Date {
     pub(crate) fn julian(&self) -> i32 {
         self.0.to_julian_day()
     }
-
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Date>("date?");
-        steel_engine.register_fn("date", Date::new);
-        steel_engine.register_fn("date-bot", Date::bot);
-        steel_engine.register_fn("date-eot", Date::eot);
-        steel_engine.register_fn("date=?", Date::eq);
-        steel_engine.register_fn("date>?", Date::gt);
-        steel_engine.register_fn("date<?", Date::lt);
-        steel_engine.register_fn("date>=?", Date::ge);
-        steel_engine.register_fn("date<=?", Date::le);
-        steel_engine.register_fn("parse-date", Date::parse);
-        steel_engine.register_fn("date-after", Date::after);
-        steel_engine.register_fn("date-before", Date::before);
-        steel_engine.register_fn("date-julian", Date::julian);
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -264,25 +228,6 @@ impl Decimal {
         rust_decimal::Decimal::from_str_exact(&raw)
             .map_err(|e| SteelErr::new(steel::rerrs::ErrorKind::ConversionError, e.to_string()))
             .map(Self)
-    }
-
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<Decimal>("decimal?");
-        steel_engine.register_fn("decimal", Decimal::new);
-        steel_engine.register_fn("decimal=?", Decimal::eq);
-        steel_engine.register_fn("decimal>?", Decimal::gt);
-        steel_engine.register_fn("decimal<?", Decimal::lt);
-        steel_engine.register_fn("decimal>=?", Decimal::ge);
-        steel_engine.register_fn("decimal<=?", Decimal::le);
-        steel_engine.register_fn("decimal-zero", Decimal::zero);
-        steel_engine.register_fn("decimal-zero?", Decimal::is_zero);
-        steel_engine.register_fn("decimal-add", Decimal::add);
-        steel_engine.register_fn("decimal->string", Decimal::to_string);
-        steel_engine.register_fn("decimal-numerator", Decimal::numerator);
-        steel_engine.register_fn("decimal-denominator", Decimal::denominator);
-        steel_engine.register_fn("decimal-width-left", Decimal::width_left);
-        steel_engine.register_fn("decimal-width-right", Decimal::width_right);
-        steel_engine.register_fn("parse-decimal", Decimal::parse);
     }
 }
 
@@ -439,12 +384,6 @@ impl AlistItem {
     fn value(&self) -> SteelVal {
         self.value.clone()
     }
-
-    pub(crate) fn register_with_engine(steel_engine: &mut Engine) {
-        steel_engine.register_type::<AlistItem>("ffi-alistitem?");
-        steel_engine.register_fn("ffi-alistitem-key", AlistItem::key);
-        steel_engine.register_fn("ffi-alistitem-value", AlistItem::value);
-    }
 }
 
 impl<K, V> From<(K, V)> for AlistItem
@@ -458,4 +397,55 @@ where
             value: SteelVal::StringV(value.1.as_ref().to_string().into()),
         }
     }
+}
+
+pub(crate) fn register_types(steel_engine: &mut Engine) {
+    steel_engine.register_type::<Account>("ffi-account?");
+    steel_engine.register_fn("ffi-account-postings", Account::postings);
+
+    steel_engine.register_type::<Posting>("ffi-posting?");
+    steel_engine.register_fn("ffi-posting->string", Posting::to_string);
+    steel_engine.register_fn("ffi-posting-date", Posting::date);
+    steel_engine.register_fn("ffi-posting-amount", Posting::amount);
+    steel_engine.register_fn("ffi-posting-flag", Posting::flag);
+
+    steel_engine.register_type::<Amount>("ffi-amount?");
+    steel_engine.register_fn("ffi-amount->string", Amount::to_string);
+    steel_engine.register_fn("ffi-amount-number", Amount::number);
+    steel_engine.register_fn("ffi-amount-currency", Amount::currency);
+
+    steel_engine.register_type::<Date>("date?");
+    steel_engine.register_fn("date", Date::new);
+    steel_engine.register_fn("date-bot", Date::bot);
+    steel_engine.register_fn("date-eot", Date::eot);
+    steel_engine.register_fn("date=?", Date::eq);
+    steel_engine.register_fn("date>?", Date::gt);
+    steel_engine.register_fn("date<?", Date::lt);
+    steel_engine.register_fn("date>=?", Date::ge);
+    steel_engine.register_fn("date<=?", Date::le);
+    steel_engine.register_fn("parse-date", Date::parse);
+    steel_engine.register_fn("date-after", Date::after);
+    steel_engine.register_fn("date-before", Date::before);
+    steel_engine.register_fn("date-julian", Date::julian);
+
+    steel_engine.register_type::<Decimal>("decimal?");
+    steel_engine.register_fn("decimal", Decimal::new);
+    steel_engine.register_fn("decimal=?", Decimal::eq);
+    steel_engine.register_fn("decimal>?", Decimal::gt);
+    steel_engine.register_fn("decimal<?", Decimal::lt);
+    steel_engine.register_fn("decimal>=?", Decimal::ge);
+    steel_engine.register_fn("decimal<=?", Decimal::le);
+    steel_engine.register_fn("decimal-zero", Decimal::zero);
+    steel_engine.register_fn("decimal-zero?", Decimal::is_zero);
+    steel_engine.register_fn("decimal-add", Decimal::add);
+    steel_engine.register_fn("decimal->string", Decimal::to_string);
+    steel_engine.register_fn("decimal-numerator", Decimal::numerator);
+    steel_engine.register_fn("decimal-denominator", Decimal::denominator);
+    steel_engine.register_fn("decimal-width-left", Decimal::width_left);
+    steel_engine.register_fn("decimal-width-right", Decimal::width_right);
+    steel_engine.register_fn("parse-decimal", Decimal::parse);
+
+    steel_engine.register_type::<AlistItem>("ffi-alistitem?");
+    steel_engine.register_fn("ffi-alistitem-key", AlistItem::key);
+    steel_engine.register_fn("ffi-alistitem-value", AlistItem::value);
 }
