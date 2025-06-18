@@ -144,7 +144,7 @@ fn main() -> Result<(), Error> {
     load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();
-    let prelude_cog = match &cli.command {
+    match &cli.command {
         Some(Commands::Count { ledger, using }) => {
             let ledger = Ledger::parse_from(ledger, error_w)?;
             ledger.register(&mut steel_engine);
@@ -152,8 +152,6 @@ fn main() -> Result<(), Error> {
             if let Some(cog) = using {
                 load_cog(&mut steel_engine, &format!("lima/count/{}.scm", cog))?;
             }
-
-            Some("lima/count/prelude.scm")
         }
 
         Some(Commands::Import {
@@ -202,8 +200,6 @@ fn main() -> Result<(), Error> {
                     using.as_ref().map_or("default", |s| s.as_str())
                 ),
             )?;
-
-            Some("lima/import/prelude.scm")
         }
 
         Some(Commands::Test { cogs }) => {
@@ -218,7 +214,7 @@ fn main() -> Result<(), Error> {
             return Ok(());
         }
 
-        None => None,
+        None => (),
     };
 
     if cli.batch {
@@ -226,11 +222,8 @@ fn main() -> Result<(), Error> {
     }
 
     // the optional prelude is only auto-loaded for the REPL,
-    // all Scheme files must load it explicitly
-    if let Some(prelude_cog) = prelude_cog {
-        if !cli.no_prelude {
-            load_cog(&mut steel_engine, prelude_cog)?;
-        }
+    if !cli.no_prelude {
+        load_cog(&mut steel_engine, "lima/prelude.scm")?;
     }
 
     run_repl(steel_engine).map_err(Error::Io)?;

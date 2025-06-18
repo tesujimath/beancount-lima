@@ -1,4 +1,4 @@
-(require "lima/count/prelude.scm")
+(require "lima/prelude.scm")
 (require (for-syntax "steel/tests/unit-test.scm"))
 
 (let* ((current-psts (account-postings (hash-get (ledger-accounts *ledger*) "Assets:Bank:Current")))

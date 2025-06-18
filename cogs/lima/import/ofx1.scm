@@ -5,7 +5,6 @@
 (require "lima/list.scm")
 (require "lima/alist.scm")
 (require "lima/stdlib.scm")
-(require "lima/import/prelude.scm")
 (require "lima/import/extract.scm")
 (require "lima/import/types.scm")
 

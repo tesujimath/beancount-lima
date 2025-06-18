@@ -7,7 +7,7 @@
 (require "lima/import/dedupe.scm")
 (require "lima/import/account-inference.scm")
 (require "lima/import/pairing.scm")
-(require "lima/import/display.scm")
+(require "lima/import/format.scm")
 
 ;; default extractors:
 (require (only-in "lima/import/ofx1.scm"
@@ -47,6 +47,7 @@
       ; defaults
       (default-extractors `(("ofx1" . ((txn . ,ofx1-make-extract-txn)
                                        (bal . ,ofx1-extract-balance)))))
+      (extractors (alist-merge default-extractors extractors))
 
       ; group
       (payees (import-group-payees group))
@@ -56,7 +57,9 @@
                      (mapping (lambda (source)
                                (let* ((hdr (import-source-header source))
                                       (format (alist-get 'format hdr))
-                                      (extractor (alist-get format (alist-merge default-extractors extractors)))
+                                      (extractor (if (alist-contains? format extractors)
+                                                  (alist-get format extractors)
+                                                  (error! "no extractor defined for" format)))
                                       (txns (import-source-transactions source)))
                                  (transduce txns
                                    (mapping ((alist-get 'txn extractor) accounts-by-id source))

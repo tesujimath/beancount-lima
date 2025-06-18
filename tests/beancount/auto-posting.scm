@@ -1,4 +1,4 @@
-(require "lima/count/prelude.scm")
+(require "lima/prelude.scm")
 (require "lima/alist.scm")
 (require (for-syntax "steel/tests/unit-test.scm"))
 
