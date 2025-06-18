@@ -1,6 +1,6 @@
 (provide make-dedupe-transactions)
 
-(require "lima/alist.scm")
+(require "lima/lib/alist.scm")
 
 ;; a filter
 (define (make-dedupe-transactions existing-txnids)

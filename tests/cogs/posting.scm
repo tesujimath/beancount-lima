@@ -1,8 +1,8 @@
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 
-(require "lima/types.scm")
-(require "lima/posting.scm")
+(require "lima/lib/types.scm")
+(require "lima/lib/posting.scm")
 
 (test-module
   "posting tests"

@@ -4,9 +4,9 @@
   ;; for testing
   combined-predicate)
 
-(require "lima/types.scm")
-(require "lima/account.scm")
-(require "lima/posting.scm")
+(require "lima/lib/types.scm")
+(require "lima/lib/account.scm")
+(require "lima/lib/posting.scm")
 (require "steel/sorting/merge-sort.scm")
 
 ;; return a ledger from a hashmap of accounts

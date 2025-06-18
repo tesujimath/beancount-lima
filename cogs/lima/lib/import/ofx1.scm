@@ -1,12 +1,12 @@
 (provide make-extract-txn extract-balance)
 
 (require "srfi/srfi-28/format.scm")
-(require "lima/types.scm")
-(require "lima/list.scm")
-(require "lima/alist.scm")
-(require "lima/stdlib.scm")
-(require "lima/import/extract.scm")
-(require "lima/import/types.scm")
+(require "lima/lib/types.scm")
+(require "lima/lib/list.scm")
+(require "lima/lib/alist.scm")
+(require "lima/lib/stdlib.scm")
+(require "lima/lib/import/extract.scm")
+(require "lima/lib/import/types.scm")
 
 ;; extract balance from header if we can find the fields we need, otherwise return empty
 (define (extract-balance accounts-by-id source)

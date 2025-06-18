@@ -1,7 +1,7 @@
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 
-(require "lima/types.scm")
+(require "lima/lib/types.scm")
 
 (test-module
   "date tests"

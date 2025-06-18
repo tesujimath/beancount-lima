@@ -2,9 +2,9 @@
   ffi-alist->alist
   ffi-ledger->ledger)
 
-(require "lima/ledger.scm")
-(require "lima/account.scm")
-(require "lima/types.scm")
+(require "lima/lib/ledger.scm")
+(require "lima/lib/account.scm")
+(require "lima/lib/types.scm")
 
 ;; Steel does not allow construction of arbitrary native Steel values from Rust,
 ;; so we convert from FFI values to native values here.

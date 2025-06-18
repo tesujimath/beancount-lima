@@ -140,7 +140,7 @@ fn main() -> Result<(), Error> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    load_cog(&mut steel_engine, "lima/base-config.scm")?;
+    load_cog(&mut steel_engine, "lima/lib/base-config.scm")?;
     load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();

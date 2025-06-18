@@ -10,7 +10,7 @@
   alist-insert
   alist-merge)
 
-(require (only-in "lima/list.scm" all))
+(require (only-in "lima/lib/list.scm" all))
 
 (define (alist-remove key alist)
   (filter (lambda (kv) (not (equal? (car kv) key))) alist))

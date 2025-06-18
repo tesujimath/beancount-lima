@@ -1,11 +1,11 @@
 (provide format-transaction format-balance)
 
 (require "srfi/srfi-28/format.scm")
-(require "lima/types.scm")
-(require "lima/string.scm")
-(require "lima/alist.scm")
-(require "lima/import/types.scm")
-(require "lima/import/account-inference.scm")
+(require "lima/lib/types.scm")
+(require "lima/lib/string.scm")
+(require "lima/lib/alist.scm")
+(require "lima/lib/import/types.scm")
+(require "lima/lib/import/account-inference.scm")
 
 (define (quoted space value)
   (format "~a\"~a\"" space value))

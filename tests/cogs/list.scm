@@ -1,7 +1,7 @@
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 
-(require "lima/list.scm")
+(require "lima/lib/list.scm")
 
 (test-module
   "list-index tests"

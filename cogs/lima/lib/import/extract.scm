@@ -1,6 +1,6 @@
 (provide make-field-getter)
 
-(require "lima/list.scm")
+(require "lima/lib/list.scm")
 
 (define (make-field-getter field-names name parse)
   (let ((idx (list-index field-names name)))

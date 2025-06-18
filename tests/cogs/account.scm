@@ -1,9 +1,9 @@
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 
-(require "lima/account.scm")
-(require "lima/posting.scm")
-(require "lima/types.scm")
+(require "lima/lib/account.scm")
+(require "lima/lib/posting.scm")
+(require "lima/lib/types.scm")
 (require "steel/sorting/merge-sort.scm")
 
 (set-test-mode!)

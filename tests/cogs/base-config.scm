@@ -1,7 +1,7 @@
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 
-(require "lima/base-config.scm")
+(require "lima/lib/base-config.scm")
 
 (test-module
   "base-config tests"

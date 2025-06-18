@@ -1,5 +1,5 @@
 (provide *base-config* config-value-or-default merge-config)
-(require "lima/alist.scm")
+(require "lima/lib/alist.scm")
 
 (define *base-config*
   '((import . ((txn-directive . "txn")

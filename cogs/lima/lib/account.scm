@@ -3,9 +3,9 @@
   account-filter-postings
   account-currencies)
 
-(require "lima/alist.scm")
-(require "lima/types.scm")
-(require "lima/posting.scm")
+(require "lima/lib/alist.scm")
+(require "lima/lib/types.scm")
+(require "lima/lib/posting.scm")
 
 (define (add-posting p inv-alist)
   (let* ((amt (posting-amount p))

@@ -1,9 +1,9 @@
 (provide
   ffi-import-group->import-group)
 
-(require "lima/import/types.scm")
-(require "lima/alist.scm")
-(require "lima/ffi.scm")
+(require "lima/lib/import/types.scm")
+(require "lima/lib/alist.scm")
+(require "lima/lib/ffi.scm")
 
 (define (ffi-import-source->import-source imp)
   (import-source (ffi-alist->alist (ffi-import-source-header imp))

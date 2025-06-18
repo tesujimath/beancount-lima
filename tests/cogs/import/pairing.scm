@@ -1,8 +1,8 @@
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 
-(require "lima/types.scm")
-(require "lima/import/pairing.scm")
+(require "lima/lib/types.scm")
+(require "lima/lib/import/pairing.scm")
 
 (test-module
   "is-pair? tests"

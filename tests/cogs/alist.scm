@@ -1,7 +1,7 @@
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
 
-(require "lima/alist.scm")
+(require "lima/lib/alist.scm")
 
 (test-module
   "alist-remove tests"

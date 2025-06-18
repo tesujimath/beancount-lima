@@ -1,5 +1,5 @@
 (require "lima/prelude.scm")
-(require "lima/alist.scm")
+(require "lima/lib/alist.scm")
 
 (define (inventory-for-currencies inv currencies)
   (map (lambda (cur)

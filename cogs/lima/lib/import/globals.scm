@@ -1,6 +1,6 @@
 (provide *import-group*)
 
-(require "lima/import/ffi.scm")
+(require "lima/lib/import/ffi.scm")
 ;; The FFI import group is called `*ffi-import-group*`.
 ;; Here we create a native Steel import-group called `*import-group*`.
 ;

@@ -1,16 +1,16 @@
 (provide import)
 
 (require "steel/sorting/merge-sort.scm")
-(require "lima/alist.scm")
-(require "lima/base-config.scm")
-(require "lima/import/types.scm")
-(require "lima/import/dedupe.scm")
-(require "lima/import/account-inference.scm")
-(require "lima/import/pairing.scm")
-(require "lima/import/format.scm")
+(require "lima/lib/alist.scm")
+(require "lima/lib/base-config.scm")
+(require "lima/lib/import/types.scm")
+(require "lima/lib/import/dedupe.scm")
+(require "lima/lib/import/account-inference.scm")
+(require "lima/lib/import/pairing.scm")
+(require "lima/lib/import/format.scm")
 
 ;; default extractors:
-(require (only-in "lima/import/ofx1.scm"
+(require (only-in "lima/lib/import/ofx1.scm"
           [make-extract-txn ofx1-make-extract-txn]
           [extract-balance ofx1-extract-balance]))
 

@@ -1,5 +1,5 @@
 (provide *config*)
 
-(require "lima/base-config.scm")
+(require "lima/lib/base-config.scm")
 
 (define *config* *base-config*)

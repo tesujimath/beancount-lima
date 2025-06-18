@@ -1,8 +1,8 @@
 (require "steel/tests/unit-test.scm"
   (for-syntax "steel/tests/unit-test.scm"))
-(require "lima/types.scm")
-(require "lima/account.scm")
-(require "lima/ledger.scm")
+(require "lima/lib/types.scm")
+(require "lima/lib/account.scm")
+(require "lima/lib/ledger.scm")
 
 (test-module
   "ledger tests"

@@ -1,4 +1,4 @@
-(require "lima/types.scm")
+(require "lima/lib/types.scm")
 (provide
   decimal->rational
   ledger
@@ -25,10 +25,10 @@
   amount-number
   amount-currency)
 
-(require "lima/display/tabulate.scm")
+(require "lima/lib/tabulate.scm")
 (provide tabulate)
 
-(require "lima/ffi.scm")
+(require "lima/lib/ffi.scm")
 
 (provide
   *ledger*)

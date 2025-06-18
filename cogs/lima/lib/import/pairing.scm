@@ -1,9 +1,9 @@
 (provide is-pair? try-pair)
 
 (require "srfi/srfi-28/format.scm")
-(require "lima/types.scm")
-(require "lima/alist.scm")
-(require "lima/list.scm")
+(require "lima/lib/types.scm")
+(require "lima/lib/alist.scm")
+(require "lima/lib/list.scm")
 
 ;; not worth including in types
 (define (amount-zero-sum? a1 a2)
