@@ -120,19 +120,26 @@ fn load_cog(steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
     run_emitting_error_discarding_result(steel_engine, cog_relpath, &run_command)
 }
 
+pub(crate) fn create_engine() -> Engine {
+    let mut steel_engine = Engine::new();
+    register_types(&mut steel_engine);
+
+    let cog_paths = CogPaths::from_env();
+    cog_paths.set_steel_search_path(&mut steel_engine);
+
+    steel_engine
+}
+
 fn main() -> Result<(), Error> {
     let error_w = &std::io::stderr();
 
-    let mut steel_engine = Engine::new();
-    register_types(&mut steel_engine);
+    let mut steel_engine = create_engine();
 
     let subscriber = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let cog_paths = CogPaths::from_env();
-    cog_paths.set_steel_search_path(&mut steel_engine);
     load_cog(&mut steel_engine, "lima/base-config.scm")?;
     load_cog(&mut steel_engine, "lima/config.scm")?;
 
@@ -151,7 +158,7 @@ fn main() -> Result<(), Error> {
 
         Some(Commands::Import {
             import_files,
-            ledger,
+            ledger: ledger_path,
             using,
         }) => {
             let txnid_key =
@@ -165,7 +172,15 @@ fn main() -> Result<(), Error> {
                 &["import", "narration2-key"],
                 "narration2",
             )?;
-            let context = if let Some(ledger) = ledger {
+
+            let ledger = if let Some(ledger) = ledger_path.as_ref() {
+                Ledger::parse_from(ledger, error_w)?
+            } else {
+                Ledger::empty()
+            };
+            ledger.register(&mut steel_engine);
+
+            let context = if let Some(ledger) = ledger_path.as_ref() {
                 Context::parse_from(
                     ledger,
                     vec![txnid_key, txnid2_key],
@@ -176,6 +191,7 @@ fn main() -> Result<(), Error> {
             } else {
                 Context::default()
             };
+
             let import = Group::parse_from(import_files.as_slice(), context, error_w)?;
             import.register(&mut steel_engine);
 

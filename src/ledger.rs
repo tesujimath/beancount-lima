@@ -20,8 +20,7 @@ pub(crate) struct Ledger {
 }
 
 impl Ledger {
-    /// Empty ledger, for running cog tests only
-    #[cfg(test)]
+    /// Empty ledger
     pub(crate) fn empty() -> Self {
         Ledger {
             sources: BeancountSources::from(""),
