@@ -241,7 +241,9 @@ dependencies = [
 
 [[package]]
 name = "beancount-parser-lima"
-version = "0.9.0-alpha.1"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c0bd1a2391cccdd1af5c9316ef654c5dd9e3c8d79618e0143df7c474fb5b273"
 dependencies = [
  "anyhow",
  "ariadne",
@@ -2121,7 +2123,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "steel-core"
 version = "0.6.0"
-source = "git+https://github.com/tesujimath/steel?branch=struct-args-arity-warning#9d2c5a71277edf00c4f0fbb2254d5ffcf118597a"
+source = "git+https://github.com/mattwparas/steel#24f031d4e29dee7810b82e7d11db31c34fe1a3e6"
 dependencies = [
  "abi_stable",
  "arc-swap",
@@ -2173,7 +2175,7 @@ dependencies = [
 [[package]]
 name = "steel-derive"
 version = "0.5.0"
-source = "git+https://github.com/tesujimath/steel?branch=struct-args-arity-warning#9d2c5a71277edf00c4f0fbb2254d5ffcf118597a"
+source = "git+https://github.com/mattwparas/steel#24f031d4e29dee7810b82e7d11db31c34fe1a3e6"
 dependencies = [
  "proc-macro2 1.0.94",
  "quote 1.0.40",
@@ -2183,7 +2185,7 @@ dependencies = [
 [[package]]
 name = "steel-gen"
 version = "0.2.0"
-source = "git+https://github.com/tesujimath/steel?branch=struct-args-arity-warning#9d2c5a71277edf00c4f0fbb2254d5ffcf118597a"
+source = "git+https://github.com/mattwparas/steel#24f031d4e29dee7810b82e7d11db31c34fe1a3e6"
 dependencies = [
  "codegen",
  "serde",
@@ -2192,7 +2194,7 @@ dependencies = [
 [[package]]
 name = "steel-parser"
 version = "0.6.0"
-source = "git+https://github.com/tesujimath/steel?branch=struct-args-arity-warning#9d2c5a71277edf00c4f0fbb2254d5ffcf118597a"
+source = "git+https://github.com/mattwparas/steel#24f031d4e29dee7810b82e7d11db31c34fe1a3e6"
 dependencies = [
  "compact_str",
  "fxhash",
@@ -2209,7 +2211,7 @@ dependencies = [
 [[package]]
 name = "steel-repl"
 version = "0.6.0"
-source = "git+https://github.com/tesujimath/steel?branch=struct-args-arity-warning#9d2c5a71277edf00c4f0fbb2254d5ffcf118597a"
+source = "git+https://github.com/mattwparas/steel#24f031d4e29dee7810b82e7d11db31c34fe1a3e6"
 dependencies = [
  "colored",
  "crossbeam-utils",
