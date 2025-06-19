@@ -4,4 +4,4 @@
 (let* ((current-psts (account-postings (hash-get (ledger-accounts *ledger*) "Assets:Bank:Current")))
        (pad-psts (filter (make-posting-flagged-with? "P") current-psts)))
   (check-equal? "pad-postings" pad-psts
-    (list (posting (date 2024 1 1) (amount (decimal -22 2) "NZD") "P"))))
+    (list (posting (date 2024 1 1) (amount (decimal -22 2) "NZD") (optional-flag "P")))))

@@ -14,10 +14,12 @@
   period?
   period-within?
   make-period-within?
+  optional-flag
   posting
   posting?
   posting-date
   posting-amount
+  posting-has-flag
   posting-flag
   make-posting-flagged-with?
   amount

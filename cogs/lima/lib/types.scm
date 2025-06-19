@@ -13,16 +13,20 @@
   period?
   period-within?
   make-period-within?
+  optional-flag
   posting
   posting?
   posting-date
   posting-amount
+  posting-has-flag
   posting-flag
   make-posting-flagged-with?
   amount
   amount?
   amount-number
   amount-currency)
+
+(require "lima/lib/alist.scm")
 
 ;; convert decimal to native rational
 (define (decimal->rational r) (/ (decimal-numerator r) (decimal-denominator r)))
@@ -40,11 +44,19 @@
 
 (struct amount (number currency) #:transparent)
 
-(struct posting (date amount flag) #:transparent)
+;; create optional with flag
+(define (optional-flag flg) `((flag . ,flg)))
+
+(struct posting (date amount optional) #:transparent)
+(define (posting-has-flag pst)
+  (alist-contains? 'flag (posting-optional pst)))
+(define (posting-flag pst)
+  (alist-get 'flag (posting-optional pst)))
 
 ;; return a predicate which selects postings with given flag
 (define (make-posting-flagged-with? flag)
-  (lambda (pst) (equal? (posting-flag pst) flag)))
+  (lambda (pst) (and (posting-has-flag pst)
+                 (equal? (posting-flag pst) flag))))
 
 (struct account (inventory postings) #:transparent)
 

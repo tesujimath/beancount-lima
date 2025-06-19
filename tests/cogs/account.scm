@@ -21,16 +21,16 @@
 
   (check-equal? "account-filter-postings" (account-filter-postings (make-posting-within? (period (date 2025 1 1) (date 2025 2 1)))
                                            (postings->account (list
-                                                               (posting (date 2024 12 24) (amount (decimal 750 2) "NZD") #f)
-                                                               (posting (date 2025 1 5) (amount (decimal 1000 2) "NZD") #f)
-                                                               (posting (date 2025 2 19) (amount (decimal 150 2) "NZD") #f))))
+                                                               (posting (date 2024 12 24) (amount (decimal 750 2) "NZD") '())
+                                                               (posting (date 2025 1 5) (amount (decimal 1000 2) "NZD") '())
+                                                               (posting (date 2025 2 19) (amount (decimal 150 2) "NZD") '()))))
     (postings->account (list
-                        (posting (date 2025 1 5) (amount (decimal 1000 2) "NZD") #f))))
+                        (posting (date 2025 1 5) (amount (decimal 1000 2) "NZD") '()))))
   (check-equal? "account-currencies" (merge-sort (account-currencies
                                                   (postings->account (list
-                                                                      (posting (date 2024 12 24) (amount (decimal 750 2) "NZD") #f)
-                                                                      (posting (date 2025 1 5) (amount (decimal 1000 2) "GBP") #f)
-                                                                      (posting (date 2025 2 19) (amount (decimal 150 2) "NZD") #f))))
+                                                                      (posting (date 2024 12 24) (amount (decimal 750 2) "NZD") '())
+                                                                      (posting (date 2025 1 5) (amount (decimal 1000 2) "GBP") '())
+                                                                      (posting (date 2025 2 19) (amount (decimal 150 2) "NZD") '()))))
                                       #:comparator
                                       string<?)
     '("GBP" "NZD")))
