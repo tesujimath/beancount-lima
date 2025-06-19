@@ -1,6 +1,6 @@
 {
   "nodes": {
-    "bean-sort": {
+    "autobean-format": {
       "inputs": {
         "flake-utils": "flake-utils",
         "nixpkgs": [
@@ -8,17 +8,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1750119760,
-        "narHash": "sha256-oxikH29Me1laH21sO5DL3RsVh0nKV52L5r/2p6frWXc=",
+        "lastModified": 1750312786,
+        "narHash": "sha256-q+tN8dkxh0jUTG+vHyb3p6dS2uo2u9pW8dGDp+ZhUT4=",
         "owner": "tesujimath",
-        "repo": "bean-sort",
-        "rev": "513b115e7a984624927f81b485d89a28ed990c80",
+        "repo": "autobean-format.nix",
+        "rev": "4a25490eec332314c1f51406ba184fdfc6aba8da",
         "type": "github"
       },
       "original": {
         "owner": "tesujimath",
-        "ref": "main",
-        "repo": "bean-sort",
+        "repo": "autobean-format.nix",
         "type": "github"
       }
     },
@@ -128,7 +127,7 @@
     },
     "root": {
       "inputs": {
-        "bean-sort": "bean-sort",
+        "autobean-format": "autobean-format",
         "flake-utils": "flake-utils_2",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay",
