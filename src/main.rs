@@ -57,8 +57,12 @@ enum Commands {
 
     /// Test one or more cogs
     Test {
-        /// Files to import
-        cogs: Vec<String>,
+        /// Scheme files to load
+        scheme_files: Vec<String>,
+
+        /// Beancount ledger, if any
+        #[arg(long)]
+        ledger: Option<PathBuf>,
     },
 }
 
@@ -202,13 +206,20 @@ fn main() -> Result<(), Error> {
             )?;
         }
 
-        Some(Commands::Test { cogs }) => {
+        Some(Commands::Test {
+            scheme_files,
+            ledger: ledger_path,
+        }) => {
+            if let Some(ledger_path) = ledger_path.as_ref() {
+                let ledger = Ledger::parse_from(ledger_path, error_w)?;
+                ledger.register(&mut steel_engine);
+            };
+
             set_test_mode(&mut steel_engine).unwrap();
 
-            for cog in cogs {
-                let cog_relpath = format!("lima/{}.scm", cog);
-                load_cog(&mut steel_engine, &cog_relpath)?;
-                report_test_failures(&mut steel_engine, &cog_relpath)?;
+            for scheme_file in scheme_files {
+                load_cog(&mut steel_engine, scheme_file)?;
+                report_test_failures(&mut steel_engine, scheme_file)?;
             }
 
             return Ok(());
