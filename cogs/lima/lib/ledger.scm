@@ -10,11 +10,12 @@
 (require "steel/sorting/merge-sort.scm")
 
 ;; return a ledger from a hashmap of accounts
-(define (accounts->ledger accs)
+(define (accounts->ledger accs main-currency)
   (let* ((account-names (merge-sort (hash-keys->list accs) #:comparator string<?))
          (hashset-insert-all (lambda (hs items) (foldl (flip hashset-insert) hs items)))
          (currencies (foldl (lambda (acc all-curs) (hashset-insert-all all-curs (account-currencies acc))) (hashset) (hash-values->list accs))))
     (ledger (merge-sort (hashset->list currencies) #:comparator string<?)
+      main-currency
       account-names
       accs)))
 
@@ -38,7 +39,7 @@
                                (cons name filtered-acc)))
                      (into-hashmap)))))
     ;; TODO filter out now empty accounts
-    (accounts->ledger accounts)))
+    (accounts->ledger accounts (ledger-main-currency ldg))))
 
 ;; transducer to extract the combined predicate from a predicates alist
 ;; example:
@@ -75,5 +76,6 @@
              (into-hashmap))))
     (ledger
       (ledger-currencies ldg)
+      (ledger-main-currency ldg)
       filtered-account-names
       filtered-accounts)))

@@ -4,6 +4,7 @@
   ledger
   ledger?
   ledger-currencies
+  ledger-main-currency
   ledger-account-names
   ledger-accounts
   account

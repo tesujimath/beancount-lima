@@ -17,7 +17,10 @@ use super::{types::*, Error};
 pub(crate) struct Ledger {
     pub(crate) sources: BeancountSources,
     pub(crate) accounts: HashMap<String, Account>,
+    pub(crate) main_currency: String,
 }
+
+const DEFAULT_CURRENCY: &str = "USD"; // ugh
 
 impl Ledger {
     /// Empty ledger
@@ -25,6 +28,7 @@ impl Ledger {
         Ledger {
             sources: BeancountSources::from(""),
             accounts: HashMap::default(),
+            main_currency: DEFAULT_CURRENCY.to_string(),
         }
     }
 
@@ -73,6 +77,10 @@ impl Ledger {
         self.accounts.clone()
     }
 
+    fn main_currency(&self) -> String {
+        self.main_currency.clone()
+    }
+
     pub(crate) fn register(self, steel_engine: &mut Engine) {
         steel_engine
             .register_external_value("*ffi-ledger*", self)
@@ -86,6 +94,7 @@ struct LedgerBuilder {
     open_accounts: hashbrown::HashMap<String, Span>,
     closed_accounts: hashbrown::HashMap<String, Span>,
     accounts: HashMap<String, AccountBuilder>,
+    currency_usage: hashbrown::HashMap<String, i32>,
     errors: Vec<parser::Error>,
 }
 
@@ -104,17 +113,30 @@ impl LedgerBuilder {
     where
         W: Write + Copy,
     {
-        if self.errors.is_empty() {
+        let Self {
+            accounts,
+            currency_usage,
+            errors,
+            ..
+        } = self;
+
+        if errors.is_empty() {
+            let main_currency = currency_usage
+                .iter()
+                .max_by_key(|(_, n)| **n)
+                .map(|(cur, _)| cur.clone())
+                .unwrap_or(DEFAULT_CURRENCY.to_string());
+
             Ok(Ledger {
                 sources,
-                accounts: self
-                    .accounts
+                accounts: accounts
                     .into_iter()
                     .map(|(name, account)| (name, account.build()))
                     .collect(),
+                main_currency,
             })
         } else {
-            sources.write(error_w, self.errors).map_err(Error::Io)?;
+            sources.write(error_w, errors).map_err(Error::Io)?;
             Err(Error::Builder)
         }
     }
@@ -237,6 +259,18 @@ impl LedgerBuilder {
                         position.insert(amount.number);
                     }
                 }
+
+                // count currency usage
+                match self.currency_usage.entry(amount.currency.clone()) {
+                    Occupied(mut usage) => {
+                        let usage = usage.get_mut();
+                        *usage += 1;
+                    }
+                    Vacant(usage) => {
+                        usage.insert(1);
+                    }
+                }
+
                 account.postings.push(Posting::new(date, amount, flag));
             } else {
                 self.errors.push(source.error_with_contexts(
@@ -485,4 +519,5 @@ impl parser::ElementType for Pad {
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("ffi-ledger?");
     steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
+    steel_engine.register_fn("ffi-ledger-main-currency", Ledger::main_currency);
 }
