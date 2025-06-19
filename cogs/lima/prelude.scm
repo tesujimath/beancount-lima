@@ -27,18 +27,17 @@
   amount-number
   amount-currency)
 
+(require "lima/lib/fiscal-year.scm")
+(provide fy make-fy?)
+
+(require "lima/lib/ledger.scm")
+(provide ledger-filter)
+
 (require "lima/lib/tabulate.scm")
 (provide tabulate)
 
-(require "lima/lib/ffi.scm")
+(require "lima/lib/balances.scm")
+(provide display-balances)
 
-(provide
-  *ledger*)
-
-;; The FFI ledger is called `*ffi-ledger*`.
-;; Here we create a native Steel ledger called `*ledger*`.
-;
-; The reason we convert all FFIValues into native Steel ones is to avoid
-; keeping having to pass these across the FFI, as that requires cloning of values
-; rather than simply passing references.
-(define *ledger* (ffi-ledger->ledger *ffi-ledger*))
+(require "lima/lib/globals.scm")
+(provide *ledger*)
