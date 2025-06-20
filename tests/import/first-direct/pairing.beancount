@@ -1,0 +1,24 @@
+2016-03-01 open Assets:Bank:Uk:Current
+
+2016-03-01 open Assets:Bank:Uk:Savings
+
+2016-03-01 open Expenses:Groceries
+
+2016-03-01 open Expenses:Take-Aways
+
+2016-03-01 open Expenses:Tax
+
+2016-03-01 open Expenses:TV
+
+2016-03-01 open Income:Interest
+
+2016-03-01 open Income:Unknown
+
+2020-01-01 txn "TRANSFER FROM CURRENT"
+  Assets:Bank:Uk:Savings  10.00 GBP
+  Assets:Bank:Uk:Current
+
+2025-01-01 txn "TRANSFER TO SAVINGS"
+  Assets:Bank:Uk:Current  10.00 GBP
+  Assets:Bank:Uk:Savings
+
