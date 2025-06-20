@@ -36,13 +36,47 @@
             exec "${nightly}/bin/cargo" "$@"
           '';
 
+
           ci-packages = with pkgs; [
             bashInteractive
+            coreutils
+            diffutils
+            elvish
             just
             rust-bin.stable.latest.default
             gcc
             flakePkgs.steel
           ];
+
+          beancount-lima =
+            let cargo = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+            in pkgs.rustPlatform.buildRustPackage
+              {
+                pname = "beancount-lima";
+                version = cargo.package.version;
+
+                src = ./.;
+
+                cargoDeps = pkgs.rustPlatform.importCargoLock {
+                  lockFile = ./Cargo.lock;
+                  outputHashes = {
+                    "steel-core-0.6.0" = "sha256-ngPaqPLn3KC1r1A7t3gkYNIRzvd99ZmMKVcpXnuDOnU=";
+                  };
+                };
+
+                # skip tests which require environment
+                checkFlags = [
+                  "--skip=tests::beancount_tests"
+                  "--skip=tests::cog_tests"
+                ];
+
+                meta = with pkgs.lib; {
+                  description = "Beancount frontend using Steel Scheme and Lima parser";
+                  homepage = "https://github.com/tesujimath/beancount-lima";
+                  license = with licenses; [ asl20 mit ];
+                  # maintainers = [ maintainers.tesujimath ];
+                };
+              };
         in
         with pkgs;
         {
@@ -66,22 +100,23 @@
               # https://github.com/mattwparas/steel/tree/master/crates/steel-language-server#configuration
               export STEEL_LSP_HOME=$(pwd)/steel-lsp
 
-              export BEANCOUNT_LIMA_COGPATH="$BEANCOUNT_LIMA_COGPATH:$(pwd)/examples/cogs:$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
+              export BEANCOUNT_LIMA_COGPATH="''${BEANCOUNT_LIMA_COGPATH}''${BEANCOUNT_LIMA_COGPATH:+:}$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
 
               PATH=$PATH:$(pwd)/target/debug
             '';
           };
 
+          packages.default = beancount-lima;
+
           apps = {
             tests = {
               type = "app";
               program = "${writeShellScript "beancount-lima-tests" ''
-                export PATH=${pkgs.lib.makeBinPath ci-packages}
+                export PATH=${pkgs.lib.makeBinPath (ci-packages ++ [beancount-lima])}
                 export BEANCOUNT_LIMA_COGPATH="$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
                 just test
               ''}";
             };
-
           };
         }
       );

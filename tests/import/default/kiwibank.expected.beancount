@@ -1,0 +1,12 @@
+2025-03-31 txn "WIKIMEDIA 877-600-9454" "WIKIMEDIA 877-600-9454 ;"
+  txnid: "99-1234-0123456-07.31Mar2025.2"
+  Assets:Bank:Current  -10.00 NZD
+  Expenses:Unknown
+
+2025-03-31 txn "INTEREST EARNED" "INTEREST EARNED ;"
+  txnid: "99-1234-0123456-07.31Mar2025.1"
+  Assets:Bank:Current  4.72 NZD
+  Income:Unknown
+
+2025-04-13 balance Assets:Bank:Current  150.42 NZD
+
