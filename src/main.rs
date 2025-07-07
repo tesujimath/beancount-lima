@@ -26,11 +26,11 @@ struct Cli {
     no_prelude: bool,
 
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand)]
-enum Commands {
+enum Command {
     /// Count beans in a REPL
     Count {
         /// Beancount ledger
@@ -149,7 +149,7 @@ fn main() -> Result<(), Error> {
 
     let cli = Cli::parse();
     match &cli.command {
-        Some(Commands::Count { ledger, using }) => {
+        Some(Command::Count { ledger, using }) => {
             let ledger = Ledger::parse_from(ledger, error_w)?;
             ledger.register(&mut steel_engine);
 
@@ -158,7 +158,7 @@ fn main() -> Result<(), Error> {
             }
         }
 
-        Some(Commands::Import {
+        Some(Command::Import {
             import_files,
             ledger: ledger_path,
             using,
@@ -206,7 +206,7 @@ fn main() -> Result<(), Error> {
             )?;
         }
 
-        Some(Commands::Test {
+        Some(Command::Test {
             scheme_files,
             ledger: ledger_path,
         }) => {
@@ -225,7 +225,10 @@ fn main() -> Result<(), Error> {
             return Ok(());
         }
 
-        None => (),
+        None => {
+            let ledger = Ledger::empty();
+            ledger.register(&mut steel_engine);
+        }
     };
 
     if cli.batch {
