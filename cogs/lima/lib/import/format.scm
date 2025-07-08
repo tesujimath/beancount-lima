@@ -4,6 +4,7 @@
 (require "lima/lib/types.scm")
 (require "lima/lib/string.scm")
 (require "lima/lib/alist.scm")
+(require (only-in "lima/lib/tabulate.scm" spaces))
 (require "lima/lib/import/types.scm")
 (require "lima/lib/import/account-inference.scm")
 
@@ -16,6 +17,15 @@
     space
     (amount-currency amt)))
 
+(define (format-amount-in-column prefix cost-column amt space suffix)
+  (let
+    ((amount-width-left (decimal-width-left (amount-number amt))))
+    (format "~a~a~a~a"
+      prefix
+      (spaces (max 2 (- cost-column (+ (string-length prefix) amount-width-left))))
+      (format-amount amt space)
+      suffix)))
+
 (define (format-transaction
          txn
          txn-directive
@@ -26,49 +36,67 @@
          #:payee2-key
          [payee2-key "payee2"]
          #:narration2-key
-         [narration2-key "narration2"])
-  (let ((space " ")
-        (pad "  ")
-        (indent "  ")
-        (acc-width 60))
-    (format "~a~a~a~a\n~a~a~a~a~a~a~a~a~a\n~a\n"
-      (alist-get 'date txn)
+         [narration2-key "narration2"]
+         #:acc-width
+         [acc-width 60]
+         #:cost-column
+         [cost-column 76])
+  (let* ((space " ")
+         (pad "  ")
+         (indent "  ")
+         (date (alist-get 'date txn))
+         (payee (alist-get-or-default 'payee "" txn))
+         (narration (alist-get-or-default 'narration "" txn))
+         (comment (alist-get-or-empty 'comment txn))
+         (txnid (alist-get-or-empty 'txnid txn))
+         (txnid2 (alist-get-or-empty 'txnid2 txn))
+         (payee2 (alist-get-or-empty 'payee2 txn))
+         (narration2 (alist-get-or-empty 'narration2 txn))
+         (primary-account (alist-get 'primary-account txn))
+         (amt (alist-get 'amount txn))
+         (secondary-accounts (alist-get-or-empty 'secondary-accounts txn)))
+    (format "~a~a~a~a\n~a~a~a~a~a~a\n~a\n"
+      date
       space
       txn-directive
-      (let ((payee (alist-get-or-default 'payee "" txn))
-            (narration (alist-get-or-default 'narration "" txn)))
-        (cond
-          [(and (string-empty? payee) (string-empty? narration)) ""]
-          [(string-empty? payee) (quoted space narration)]
-          [else (format "~a~a" (quoted space payee) (quoted space narration))]))
-      (let ((comment (alist-get-or-empty 'comment txn)))
-        (if (empty? comment) ""
-          (format "~a; ~a\n" indent comment)))
-      (let ((txnid (alist-get-or-empty 'txnid txn)))
-        (if (empty? txnid) ""
-          (format "~a~a: \"~a\"\n" indent txnid-key txnid)))
-      (let ((txnid2 (alist-get-or-empty 'txnid2 txn)))
-        (if (empty? txnid2) ""
-          (format "~a~a: \"~a\"\n" indent txnid2-key txnid2)))
-      (let ((payee2 (alist-get-or-empty 'payee2 txn)))
-        (if (empty? payee2) ""
-          (format "~a~a: \"~a\"\n" indent payee2-key payee2)))
-      (let ((narration2 (alist-get-or-empty 'narration2 txn)))
-        (if (empty? narration2) ""
-          (format "~a~a: \"~a\"\n" indent narration2-key narration2)))
-      indent
-      (alist-get 'primary-account txn)
-      pad
-      (format-amount (alist-get 'amount txn) space)
+      (cond
+        [(and (string-empty? payee) (string-empty? narration)) ""]
+        [(string-empty? payee) (quoted space narration)]
+        [else (format "~a~a" (quoted space payee) (quoted space narration))])
+      (if (empty? comment) ""
+        (format "~a; ~a\n" indent comment))
+      (if (empty? txnid) ""
+        (format "~a~a: \"~a\"\n" indent txnid-key txnid))
+      (if (empty? txnid2) ""
+        (format "~a~a: \"~a\"\n" indent txnid2-key txnid2))
+      (if (empty? payee2) ""
+        (format "~a~a: \"~a\"\n" indent payee2-key payee2))
+      (if (empty? narration2) ""
+        (format "~a~a: \"~a\"\n" indent narration2-key narration2))
+      (format-amount-in-column
+        (format "~a~a" indent primary-account)
+        cost-column
+        amt
+        space
+        "")
       (foldl (lambda (acc s) (format "~a~a~a\n" s indent (format-secondary-account acc acc-width))) ""
-        (alist-get-or-empty 'secondary-accounts txn)))))
+        secondary-accounts))))
 
-(define (format-balance bln)
-  (let ((space " ") (pad "  "))
-    (format "~a~abalance~a~a~a~a\n\n"
-      (alist-get 'date bln)
+(define (format-balance bln
+         #:cost-column
+         [cost-column 76])
+  (let ((space " ")
+        (pad "  ")
+        (date (alist-get 'date bln))
+        (account (alist-get 'account bln))
+        (amt (alist-get 'amount bln)))
+    (format-amount-in-column
+      (format "~a~abalance~a~a"
+        date
+        space
+        space
+        account)
+      cost-column
+      amt
       space
-      space
-      (alist-get 'account bln)
-      pad
-      (format-amount (alist-get 'amount bln) space))))
+      "\n\n")))

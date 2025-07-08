@@ -5,7 +5,8 @@
   '((import . ((txn-directive . "txn")
                (txnid-key . "txnid")
                (txnid2-key . "txnid2")
-               (pairing-window-days . 3)))))
+               (pairing-window-days . 3)
+               (cost-column . 76)))))
 
 (define (config-value-or-default key-path default cfg)
   (if (empty? key-path) cfg
