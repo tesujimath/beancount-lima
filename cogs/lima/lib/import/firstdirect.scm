@@ -24,7 +24,7 @@
            ;; or there may be no transactions
            (has-at-least-one-transaction (not (empty? txns))))
       (if (and has-balance has-at-least-one-transaction)
-        (let ((get-balance (make-field-getter field-names "balance" parse-decimal))
+        (let ((get-balance (make-field-getter field-names "balance" parse-decimal-cents))
               (txn0 (car txns))
               ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
               (get-date (make-field-getter field-names "date" (lambda (x) (date-after (parse-date x "%d/%m/%Y") 1)))))
@@ -47,7 +47,7 @@
                              "Assets:Unknown"))
            (field-names (import-source-fields source))
            (get-date (make-field-getter field-names "date" (lambda (x) (parse-date x "%d/%m/%Y"))))
-           (get-amount (make-field-getter field-names "amount" parse-decimal))
+           (get-amount (make-field-getter field-names "amount" parse-decimal-cents))
            (get-description (make-field-getter field-names "description" identity)))
       (lambda (txn)
         ;; the description field is a composite of payee and narration with spaces between,

@@ -20,7 +20,7 @@
       '()
       ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
       (let ((date (date-after (parse-date dtasof "%Y%m%d") 1))
-            (amt (parse-decimal balamt)))
+            (amt (parse-decimal-cents balamt)))
         (list `((date . ,date)
                 (account . ,account)
                 (amount . ,(amount amt cur))))))))
@@ -33,7 +33,7 @@
          (primary-account (alist-get-or-default acctid "Assets:Unknown" accounts-by-id))
          (field-names (import-source-fields source))
          (get-dtposted (make-field-getter field-names "dtposted" (lambda (x) (parse-date x "%Y%m%d"))))
-         (get-trnamt (make-field-getter field-names "trnamt" parse-decimal))
+         (get-trnamt (make-field-getter field-names "trnamt" parse-decimal-cents))
          (get-fitid (make-field-getter field-names "fitid" identity))
          (get-name (make-field-getter field-names "name" identity))
          (get-memo (make-field-getter field-names "memo" identity)))

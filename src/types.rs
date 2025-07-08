@@ -230,6 +230,16 @@ impl Decimal {
             .map_err(|e| SteelErr::new(steel::rerrs::ErrorKind::ConversionError, e.to_string()))
             .map(Self)
     }
+
+    /// parse a decimal forcing at least 2 decimal places
+    fn parse_cents(raw: String) -> steel::rvals::Result<Self> {
+        Self::parse(raw).map(|Self(mut d)| {
+            if d.scale() < 2 {
+                d.rescale(2);
+            }
+            Self(d)
+        })
+    }
 }
 
 impl From<rust_decimal::Decimal> for Decimal {
@@ -445,6 +455,7 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("decimal-width-left", Decimal::width_left);
     steel_engine.register_fn("decimal-width-right", Decimal::width_right);
     steel_engine.register_fn("parse-decimal", Decimal::parse);
+    steel_engine.register_fn("parse-decimal-cents", Decimal::parse_cents);
 
     steel_engine.register_type::<AlistItem>("ffi-alistitem?");
     steel_engine.register_fn("ffi-alistitem-key", AlistItem::key);
