@@ -1,4 +1,4 @@
-(provide make-infer-secondary-accounts-from-payees-and-narrations format-secondary-account)
+(provide make-infer-secondary-accounts-from-payees-and-narrations)
 
 (require "srfi/srfi-28/format.scm")
 (require "steel/sorting/merge-sort.scm")
@@ -41,14 +41,3 @@
                  [(decimal<? amount (decimal-zero)) (list (list (cons 'name "Expenses:Unknown")))]
                  [else '()]))))
       (cons (cons 'secondary-accounts secondary-accounts) txn))))
-
-;; format the account name inferred above with a comment about where it came from
-(define (format-secondary-account acc width)
-  (let* ((name (alist-get 'name acc))
-         (pad (spaces (max (- width (string-length name)) 0)))
-         (count (alist-get-or-empty 'infer-count acc))
-         (category (alist-get-or-empty 'infer-category acc)))
-    (if (or (empty? count) (empty? category))
-      name
-      (let ((suffix (if (> count 1) "s" "")))
-        (format "~a~a ; inferred from ~a ~a~a" name pad count category suffix)))))

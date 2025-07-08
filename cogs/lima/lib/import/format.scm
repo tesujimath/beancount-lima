@@ -26,6 +26,25 @@
       (format-amount amt space)
       suffix)))
 
+;; format the inferred secondary account name with a comment about where it came from
+(define (format-secondary-account prefix comment-column acc suffix)
+  (let* ((name (alist-get 'name acc))
+         (count (alist-get-or-empty 'infer-count acc))
+         (category (alist-get-or-empty 'infer-category acc))
+         (no-inference (or (empty? count) (empty? category))))
+    (format "~a~a~a"
+      prefix
+      (if no-inference
+        name
+        (let ((plural (if (> count 1) "s" "")))
+          (format "~a~a; inferred from ~a ~a~a"
+            name
+            (spaces (max 1 (- comment-column (+ (string-length prefix) (string-length name)))))
+            count
+            category
+            plural)))
+      suffix)))
+
 (define (format-transaction
          txn
          txn-directive
@@ -37,8 +56,8 @@
          [payee2-key "payee2"]
          #:narration2-key
          [narration2-key "narration2"]
-         #:acc-width
-         [acc-width 60]
+         #:comment-column
+         [comment-column 40]
          #:cost-column
          [cost-column 76])
   (let* ((space " ")
@@ -79,7 +98,7 @@
         amt
         space
         "")
-      (foldl (lambda (acc s) (format "~a~a~a\n" s indent (format-secondary-account acc acc-width))) ""
+      (foldl (lambda (acc s) (format "~a~a" s (format-secondary-account indent comment-column acc "\n"))) ""
         secondary-accounts))))
 
 (define (format-balance bln

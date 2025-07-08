@@ -43,6 +43,8 @@
       (payee2-key (config-value-or-default '(payee2-key) "payee2" import-config))
       (narration2-key (config-value-or-default '(narration2-key) "narration2" import-config))
       (txn-directive (config-value-or-default '(txn-directive) "txn" import-config))
+      (comment-column (config-value-or-default '(comment-column) 40 import-config))
+      (cost-column (config-value-or-default '(cost-column) 76 import-config))
 
       ; defaults
       (extractors-by-format `(("ofx1" . ((txn . ,ofx1/make-extract-txn)
@@ -89,7 +91,11 @@
                                               #:payee2-key
                                               payee2-key
                                               #:narration2-key
-                                              narration2-key)
+                                              narration2-key
+                                              #:comment-column
+                                              comment-column
+                                              #:cost-column
+                                              cost-column)
                                             (format-balance directive))))))))
 
 ;; (bln (extract-balance hdr))) ; TODO balance
