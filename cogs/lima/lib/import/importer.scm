@@ -68,12 +68,14 @@
                                                     (alist-get format extractors-by-format)]
                                                   [else (error! "no extractor defined for" format)]))
                                       (txns (import-source-transactions source)))
-                                 (transduce txns
-                                   (mapping ((alist-get 'txn extractor) accounts-by-id source))
-                                   (filtering (make-dedupe-transactions existing-txnids))
-                                   (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
-                                   (extending ((alist-get 'bal extractor) accounts-by-id source))
-                                   (into-list)))))
+                                 (with-handler (lambda (err)
+                                                (error! err "when importing" path))
+                                   (transduce txns
+                                     (mapping ((alist-get 'txn extractor) accounts-by-id source))
+                                     (filtering (make-dedupe-transactions existing-txnids))
+                                     (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
+                                     (extending ((alist-get 'bal extractor) accounts-by-id source))
+                                     (into-list))))))
                      (flattening)
                      (into-reducer insert-by-date (hash)))))
     (transduce (all-by-date txns-by-date)

@@ -17,7 +17,7 @@
 (define (list-index lst x)
   (letrec ((list-index-acc
              (lambda (lst x n)
-               (cond [(empty? lst) (error! "not found")]
+               (cond [(empty? lst) (error! x "not found in" lst)]
                  [(equal? (car lst) x) n]
                  [else (list-index-acc (cdr lst) x (+ n 1))]))))
     (list-index-acc lst x 0)))

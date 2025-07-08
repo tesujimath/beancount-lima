@@ -19,13 +19,19 @@
                      "Assets:Unknown"))
            (field-names (import-source-fields source))
            (txns (import-source-transactions source))
-           (get-balance (make-field-getter field-names "balance" parse-decimal))
-           ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
-           (get-date (make-field-getter field-names "date" (lambda (x) (date-after (parse-date x "%d/%m/%Y") 1))))
-           (txn0 (car txns)))
-      (list `((date . ,(get-date txn0))
-              (amount . ,(amount (get-balance txn0) cur))
-              (account . ,account))))))
+           ;; we may not have a balance field, e.g. with credit card statements
+           (has-balance (member "balance" field-names))
+           ;; or there may be no transactions
+           (has-at-least-one-transaction (not (empty? txns))))
+      (if (and has-balance has-at-least-one-transaction)
+        (let ((get-balance (make-field-getter field-names "balance" parse-decimal))
+              (txn0 (car txns))
+              ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
+              (get-date (make-field-getter field-names "date" (lambda (x) (date-after (parse-date x "%d/%m/%Y") 1)))))
+          (list `((date . ,(get-date txn0))
+                  (amount . ,(amount (get-balance txn0) cur))
+                  (account . ,account))))
+        '()))))
 
 ;; extract imported First Direct flavour CSV transactions into an intermediate representation
 ;; where the account is inferred from the path by picking the first in `accounts-by-id`
