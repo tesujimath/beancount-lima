@@ -1,12 +1,11 @@
+(provide extractors)
+
 (require "lima/lib/types.scm")
 (require "lima/lib/list.scm")
 (require "lima/lib/alist.scm")
 (require "lima/lib/stdlib.scm")
-(require "lima/lib/base-config.scm")
-(require "lima/config.scm")
 (require "lima/lib/import/extract.scm")
 (require "lima/lib/import/types.scm")
-(require "lima/lib/import/globals.scm")
 (require "lima/lib/import/importer.scm")
 
 (define (extract-balance cur)
@@ -31,7 +30,7 @@
 ;; extract imported First Direct flavour CSV transactions into an intermediate representation
 ;; where the account is inferred from the path by picking the first in `accounts-by-id`
 ;; which is contained in the import path
-(define (make-extract cur)
+(define (make-extract-txn cur)
   (lambda (accounts-by-id source)
     (let* ((hdr (import-source-header source))
            (path (alist-get 'path hdr))
@@ -50,9 +49,8 @@
           (primary-account . ,primary-account)
           (narration . ,(get-description txn)))))))
 
-;; First Direct is a UK bank, so set currency accordingly
-(let ((cur "GBP"))
-  (import (config-value-or-default '(import) '() *config*)
-    `(("csv" . ((txn . ,(make-extract cur))
-                (bal . ,(extract-balance cur)))))
-    *import-group*))
+(define extractors
+  ;; First Direct is a UK bank, so set currency accordingly
+  (let ((cur "GBP"))
+    `((txn . ,(make-extract-txn cur))
+      (bal . ,(extract-balance cur)))))

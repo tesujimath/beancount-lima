@@ -1,17 +1,19 @@
-(provide *base-config* config-value-or-default merge-config)
+(provide *base-config* config-value-or-default config-value-or-empty merge-config)
 (require "lima/lib/alist.scm")
 
 (define *base-config*
   '((import . ((txn-directive . "txn")
                (txnid-key . "txnid")
                (txnid2-key . "txnid2")
-               (pairing-window-days . 3)))
-    (count . ((something-else . "booyah!")))))
+               (pairing-window-days . 3)))))
 
 (define (config-value-or-default key-path default cfg)
   (if (empty? key-path) cfg
     (let ((subcfg (assoc (car key-path) cfg)))
       (if subcfg (config-value-or-default (cdr key-path) default (cdr subcfg)) default))))
+
+(define (config-value-or-empty key-path cfg)
+  (config-value-or-default key-path '() cfg))
 
 ;; example
 ;; (config-value-or-default '(import txnid-key) "default-key" *base-config*)

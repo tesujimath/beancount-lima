@@ -1,6 +1,7 @@
 (provide import)
 
 (require "steel/sorting/merge-sort.scm")
+(require "lima/lib/list.scm")
 (require "lima/lib/alist.scm")
 (require "lima/lib/base-config.scm")
 (require "lima/lib/import/types.scm")
@@ -10,9 +11,7 @@
 (require "lima/lib/import/format.scm")
 
 ;; default extractors:
-(require (only-in "lima/lib/import/ofx1.scm"
-          [make-extract-txn ofx1-make-extract-txn]
-          [extract-balance ofx1-extract-balance]))
+(require (prefix-in ofx1/ (only-in "lima/lib/import/ofx1.scm")))
 
 ;; insert a transaction into the hash-by-date, trying to pair where we can
 ;; TODO check other dates up to pairing-window-days
@@ -33,21 +32,21 @@
 ; accounts - alist of account-id to account-name
 ; txnid-key - metadata key used for transaction IDs
 ; txn-directive - the directive written out for a transaction
-;
-; extractors is an alist by format of extractor for that format
-(define (import config extractors group)
+(define (import config group)
   (let*
-    ( ; config
-      (accounts-by-id (config-value-or-default '(accounts) '() config))
-      (txnid-key (config-value-or-default '(txnid-key) "txnid" config))
-      (payee2-key (config-value-or-default '(payee2-key) "payee2" config))
-      (narration2-key (config-value-or-default '(narration2-key) "narration2" config))
-      (txn-directive (config-value-or-default '(txn-directive) "txn" config))
+    (
+      ; config
+      (import-config (config-value-or-default '(import) '() config))
+      (extractors-by-path (config-value-or-default '(extractors) '() import-config))
+      (accounts-by-id (config-value-or-default '(accounts) '() import-config))
+      (txnid-key (config-value-or-default '(txnid-key) "txnid" import-config))
+      (payee2-key (config-value-or-default '(payee2-key) "payee2" import-config))
+      (narration2-key (config-value-or-default '(narration2-key) "narration2" import-config))
+      (txn-directive (config-value-or-default '(txn-directive) "txn" import-config))
 
       ; defaults
-      (default-extractors `(("ofx1" . ((txn . ,ofx1-make-extract-txn)
-                                       (bal . ,ofx1-extract-balance)))))
-      (extractors (alist-merge default-extractors extractors))
+      (extractors-by-format `(("ofx1" . ((txn . ,ofx1/make-extract-txn)
+                                         (bal . ,ofx1/extract-balance)))))
 
       ; group
       (payees (import-group-payees group))
@@ -56,10 +55,18 @@
       (txns-by-date (transduce (import-group-sources group)
                      (mapping (lambda (source)
                                (let* ((hdr (import-source-header source))
+                                      (path (alist-get 'path hdr))
                                       (format (alist-get 'format hdr))
-                                      (extractor (if (alist-contains? format extractors)
-                                                  (alist-get format extractors)
-                                                  (error! "no extractor defined for" format)))
+                                      (extractor-by-path (find-and-map-or-default
+                                                          (lambda (extractor-lookup) (string-contains? path (car extractor-lookup)))
+                                                          extractors-by-path
+                                                          cdr
+                                                          #f))
+                                      (extractor (cond
+                                                  [extractor-by-path extractor-by-path]
+                                                  [(alist-contains? format extractors-by-format)
+                                                    (alist-get format extractors-by-format)]
+                                                  [else (error! "no extractor defined for" format)]))
                                       (txns (import-source-transactions source)))
                                  (transduce txns
                                    (mapping ((alist-get 'txn extractor) accounts-by-id source))

@@ -17,9 +17,9 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// Don't run the REPL
-    #[clap(long)]
-    batch: bool,
+    /// Beancount ledger, if any, overrides value from config
+    #[arg(long)]
+    ledger: Option<PathBuf>,
 
     /// Don't load the Scheme prelude
     #[clap(long)]
@@ -31,38 +31,20 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Count beans in a REPL
-    Count {
-        /// Beancount ledger
-        ledger: PathBuf,
-
-        /// Cog to load for count
-        #[arg(long, value_name = "COG")]
-        using: Option<String>,
-    },
-
     /// Import from external CSV or OFX file
     Import {
+        /// Run the REPL instead of import and exit
+        #[clap(long)]
+        repl: bool,
+
         /// Files to import
         import_files: Vec<PathBuf>,
-
-        /// Base ledger for import
-        #[arg(long)]
-        ledger: Option<PathBuf>,
-
-        /// Cog to load for import
-        #[arg(long, value_name = "COG")]
-        using: Option<String>,
     },
 
     /// Test one or more cogs
     Test {
         /// Scheme files to load
         scheme_files: Vec<String>,
-
-        /// Beancount ledger, if any
-        #[arg(long)]
-        ledger: Option<PathBuf>,
     },
 }
 
@@ -148,39 +130,30 @@ fn main() -> Result<(), Error> {
     load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();
+
+    let ledger_path = cli
+        .ledger
+        .or(get_config_string(&mut steel_engine, &["ledger"])?.map(PathBuf::from));
+    let ledger = if let Some(ledger) = ledger_path.as_ref() {
+        Ledger::parse_from(ledger, error_w)?
+    } else {
+        Ledger::empty()
+    };
+    ledger.register(&mut steel_engine);
+
     match &cli.command {
-        Some(Command::Count { ledger, using }) => {
-            let ledger = Ledger::parse_from(ledger, error_w)?;
-            ledger.register(&mut steel_engine);
+        None => (),
 
-            if let Some(cog) = using {
-                load_cog(&mut steel_engine, &format!("lima/count/{}.scm", cog))?;
-            }
-        }
-
-        Some(Command::Import {
-            import_files,
-            ledger: ledger_path,
-            using,
-        }) => {
-            let txnid_key =
-                get_config_string(&mut steel_engine, &["import", "txnid-key"], "txnid")?;
-            let txnid2_key =
-                get_config_string(&mut steel_engine, &["import", "txnid2-key"], "txnid2")?;
-            let payee2_key =
-                get_config_string(&mut steel_engine, &["import", "payee2-key"], "payee2")?;
-            let narration2_key = get_config_string(
-                &mut steel_engine,
-                &["import", "narration2-key"],
-                "narration2",
-            )?;
-
-            let ledger = if let Some(ledger) = ledger_path.as_ref() {
-                Ledger::parse_from(ledger, error_w)?
-            } else {
-                Ledger::empty()
-            };
-            ledger.register(&mut steel_engine);
+        Some(Command::Import { repl, import_files }) => {
+            let txnid_key = get_config_string(&mut steel_engine, &["import", "txnid-key"])?
+                .unwrap_or("txnid".to_string());
+            let txnid2_key = get_config_string(&mut steel_engine, &["import", "txnid2-key"])?
+                .unwrap_or("txnid2".to_string());
+            let payee2_key = get_config_string(&mut steel_engine, &["import", "payee2-key"])?
+                .unwrap_or("payee2".to_string());
+            let narration2_key =
+                get_config_string(&mut steel_engine, &["import", "narration2-key"])?
+                    .unwrap_or("narration2".to_string());
 
             let context = if let Some(ledger) = ledger_path.as_ref() {
                 Context::parse_from(
@@ -197,19 +170,15 @@ fn main() -> Result<(), Error> {
             let import = Group::parse_from(import_files.as_slice(), context, error_w)?;
             import.register(&mut steel_engine);
 
-            load_cog(
-                &mut steel_engine,
-                &format!(
-                    "lima/import/{}.scm",
-                    using.as_ref().map_or("default", |s| s.as_str())
-                ),
-            )?;
+            if *repl {
+                load_cog(&mut steel_engine, "lima/lib/import/prelude.scm")?;
+            } else {
+                load_cog(&mut steel_engine, "lima/import.scm")?;
+                return Ok(());
+            }
         }
 
-        Some(Command::Test {
-            scheme_files,
-            ledger: ledger_path,
-        }) => {
+        Some(Command::Test { scheme_files }) => {
             if let Some(ledger_path) = ledger_path.as_ref() {
                 let ledger = Ledger::parse_from(ledger_path, error_w)?;
                 ledger.register(&mut steel_engine);
@@ -224,16 +193,7 @@ fn main() -> Result<(), Error> {
 
             return Ok(());
         }
-
-        None => {
-            let ledger = Ledger::empty();
-            ledger.register(&mut steel_engine);
-        }
     };
-
-    if cli.batch {
-        return Ok(());
-    }
 
     // the optional prelude is only auto-loaded for the REPL,
     if !cli.no_prelude {
