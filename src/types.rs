@@ -1,5 +1,6 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
+use color_eyre::eyre::Result;
 use std::{
     fmt::Display,
     ops::{Deref, DerefMut},

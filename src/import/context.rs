@@ -1,14 +1,13 @@
 use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Spanned,
 };
+use color_eyre::eyre::{eyre, Result};
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
     path::Path,
 };
 use steel_derive::Steel;
-
-use crate::Error;
 
 // context for import, i.e. ledger
 #[derive(Clone, Default, Debug, Steel)]
@@ -36,11 +35,11 @@ impl Context {
         payee2_key: String,
         narration2_key: String,
         error_w: W,
-    ) -> Result<Self, Error>
+    ) -> Result<Self>
     where
         W: Write + Copy,
     {
-        let sources = BeancountSources::try_from(path).map_err(Error::Io)?;
+        let sources = BeancountSources::try_from(path)?;
         let parser = BeancountParser::new(&sources);
 
         match parser.parse() {
@@ -50,7 +49,7 @@ impl Context {
                 plugins: _,
                 warnings,
             }) => {
-                sources.write(error_w, warnings).map_err(Error::Io)?;
+                sources.write(error_w, warnings)?;
                 let mut builder = ImportContextBuilder::new(txnid_keys, payee2_key, narration2_key);
 
                 for directive in &directives {
@@ -66,9 +65,9 @@ impl Context {
             }
 
             Err(ParseError { errors, warnings }) => {
-                sources.write(error_w, errors).map_err(Error::Io)?;
-                sources.write(error_w, warnings).map_err(Error::Io)?;
-                Err(Error::Parser)
+                sources.write(error_w, errors)?;
+                sources.write(error_w, warnings)?;
+                Err(eyre!("parse error"))
             }
         }
     }
@@ -99,7 +98,7 @@ impl<'a> ImportContextBuilder<'a> {
         }
     }
 
-    fn build<W>(self, sources: &BeancountSources, error_w: W) -> Result<Context, Error>
+    fn build<W>(self, sources: &BeancountSources, error_w: W) -> Result<Context>
     where
         W: Write + Copy,
     {
@@ -134,8 +133,8 @@ impl<'a> ImportContextBuilder<'a> {
                     .collect(),
             })
         } else {
-            sources.write(error_w, self.errors).map_err(Error::Io)?;
-            Err(Error::Builder)
+            sources.write(error_w, self.errors)?;
+            Err(eyre!("builder error"))
         }
     }
 

@@ -3,6 +3,7 @@
 use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
+use color_eyre::eyre::{eyre, Result, WrapErr};
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
@@ -11,7 +12,7 @@ use std::{
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
-use super::{types::*, Error};
+use super::types::*;
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
@@ -32,11 +33,12 @@ impl Ledger {
         }
     }
 
-    pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Self, Error>
+    pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Self>
     where
         W: Write + Copy,
     {
-        let sources = BeancountSources::try_from(path).map_err(Error::Io)?;
+        let sources =
+            BeancountSources::try_from(path).wrap_err(format!("failed to read {:?}", path))?;
         let parser = BeancountParser::new(&sources);
 
         let mut builder = match parser.parse() {
@@ -46,7 +48,7 @@ impl Ledger {
                 plugins: _,
                 warnings,
             }) => {
-                sources.write(error_w, warnings).map_err(Error::Io)?;
+                sources.write(error_w, warnings)?;
                 let mut builder = LedgerBuilder::default();
 
                 for directive in directives {
@@ -56,9 +58,9 @@ impl Ledger {
             }
 
             Err(ParseError { errors, warnings }) => {
-                sources.write(error_w, errors).map_err(Error::Io)?;
-                sources.write(error_w, warnings).map_err(Error::Io)?;
-                Err(Error::Parser)
+                sources.write(error_w, errors)?;
+                sources.write(error_w, warnings)?;
+                Err(eyre! {"parse error"})
             }
         }?;
 
@@ -66,11 +68,7 @@ impl Ledger {
 
         builder.validate();
 
-        match builder.build(sources, error_w) {
-            Err(errors) => Err(Error::Builder),
-
-            Ok(ledger) => Ok(ledger),
-        }
+        builder.build(sources, error_w)
     }
 
     fn accounts(&self) -> HashMap<String, Account> {
@@ -109,7 +107,7 @@ impl LedgerBuilder {
         }
     }
 
-    fn build<W>(self, sources: BeancountSources, error_w: W) -> Result<Ledger, Error>
+    fn build<W>(self, sources: BeancountSources, error_w: W) -> Result<Ledger>
     where
         W: Write + Copy,
     {
@@ -136,8 +134,8 @@ impl LedgerBuilder {
                 main_currency,
             })
         } else {
-            sources.write(error_w, errors).map_err(Error::Io)?;
-            Err(Error::Builder)
+            sources.write(error_w, errors)?;
+            Err(eyre!("builder error"))
         }
     }
 

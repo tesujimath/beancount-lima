@@ -1,11 +1,12 @@
+use color_eyre::eyre::Result;
 use steel::{steel_vm::engine::Engine, SteelVal};
 
-use crate::{run_emitting_error, Error};
+use crate::run_emitting_error;
 
 pub(crate) fn get_config_string(
     steel_engine: &mut Engine,
     path: &[&str],
-) -> Result<Option<String>, Error> {
+) -> Result<Option<String>> {
     run_emitting_error(
         steel_engine,
         "get_config_value",

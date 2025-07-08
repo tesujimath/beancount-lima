@@ -1,8 +1,8 @@
+use color_eyre::eyre::{eyre, Result};
+use serde::Deserialize;
 use std::path::Path;
 
-use serde::Deserialize;
-
-use crate::{import::Source, Error};
+use crate::import::Source;
 
 #[derive(Deserialize, Debug)]
 struct Document {
@@ -99,7 +99,7 @@ impl StmtTrn {
     }
 }
 
-pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source, Error> {
+pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source> {
     let sgml = sgmlish::Parser::builder()
         .lowercase_names()
         .expand_entities(|entity| match entity {
@@ -109,10 +109,9 @@ pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source, Error> {
             "nbsp" => Some(" "),
             _ => None,
         })
-        .parse(ofx_content)
-        .map_err(Into::<Error>::into)?;
-    let sgml = sgmlish::transforms::normalize_end_tags(sgml).map_err(Into::<Error>::into)?;
-    let doc = sgmlish::from_fragment::<Document>(sgml).map_err(Into::<Error>::into)?;
+        .parse(ofx_content)?;
+    let sgml = sgmlish::transforms::normalize_end_tags(sgml)?;
+    let doc = sgmlish::from_fragment::<Document>(sgml)?;
 
     match doc {
         Document {
@@ -149,7 +148,7 @@ pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source, Error> {
                 }),
         } => Ok((curdef, acctid, balamt, dtasof, stmttrns)),
 
-        _ => Err(Error::ImportFormat("unsupported OFX1 document".to_string())),
+        _ => Err(eyre!("unsupported OFX1 document {:?}", path)),
     }
     .map(|(curdef, acctid, balamt, dtasof, stmttrns)| Source {
         header: vec![
@@ -166,22 +165,4 @@ pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source, Error> {
             .map(StmtTrn::values)
             .collect::<Vec<_>>(),
     })
-}
-
-impl From<sgmlish::Error> for Error {
-    fn from(value: sgmlish::Error) -> Self {
-        Error::ImportFormat(format!("OFX format error: {}", value))
-    }
-}
-
-impl From<sgmlish::de::DeserializationError> for Error {
-    fn from(value: sgmlish::de::DeserializationError) -> Self {
-        Error::ImportFormat(format!("OFX format error: {}", value))
-    }
-}
-
-impl From<sgmlish::transforms::NormalizationError> for Error {
-    fn from(value: sgmlish::transforms::NormalizationError) -> Self {
-        Error::ImportFormat(format!("OFX format error: {}", value))
-    }
 }

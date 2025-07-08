@@ -1,14 +1,11 @@
-use config::get_config_string;
+use color_eyre::eyre::{eyre, Result};
 use import::{Context, Group};
-use ledger::Ledger;
-use std::{
-    fmt::Display,
-    io::{self},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 use steel::{steel_vm::engine::Engine, SteelVal};
 use steel_repl::run_repl;
 use tracing_subscriber::EnvFilter;
+
+use crate::{config::get_config_string, ledger::Ledger};
 
 const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
 
@@ -101,7 +98,7 @@ fn user_cog_dir() -> Option<PathBuf> {
 }
 
 /// Load the cog using Steel's search path
-fn load_cog(steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
+fn load_cog(steel_engine: &mut Engine, cog_relpath: &str) -> Result<()> {
     let run_command = format!(r#"(require "{}")"#, cog_relpath);
     run_emitting_error_discarding_result(steel_engine, cog_relpath, &run_command)
 }
@@ -116,7 +113,7 @@ pub(crate) fn create_engine() -> Engine {
     steel_engine
 }
 
-fn main() -> Result<(), Error> {
+fn main() -> Result<()> {
     let error_w = &std::io::stderr();
 
     let mut steel_engine = create_engine();
@@ -200,12 +197,12 @@ fn main() -> Result<(), Error> {
         load_cog(&mut steel_engine, "lima/prelude.scm")?;
     }
 
-    run_repl(steel_engine).map_err(Error::Io)?;
+    run_repl(steel_engine)?;
 
     Ok(())
 }
 
-fn set_test_mode(steel_engine: &mut Engine) -> Result<(), Error> {
+fn set_test_mode(steel_engine: &mut Engine) -> Result<()> {
     run_emitting_error_discarding_result(steel_engine, "", "(set-test-mode!)")
 }
 
@@ -213,7 +210,7 @@ fn run_emitting_error<S>(
     steel_engine: &mut Engine,
     error_context: &str,
     input: S,
-) -> Result<Vec<SteelVal>, Error>
+) -> Result<Vec<SteelVal>>
 where
     S: AsRef<str>,
 {
@@ -244,7 +241,7 @@ where
             // if let Some(msg) = steel_engine.raise_error_to_string(e) {
             //     eprintln!("{}", msg);
             // }
-            Err(Error::Scheme)
+            Err(eyre!("scheme error"))
         }
     }
 }
@@ -253,7 +250,7 @@ fn run_emitting_error_discarding_result<S>(
     steel_engine: &mut Engine,
     error_context: &str,
     input: S,
-) -> Result<(), Error>
+) -> Result<()>
 where
     S: AsRef<str>,
 {
@@ -266,42 +263,7 @@ fn register_types(steel_engine: &mut Engine) {
     import::register_types(steel_engine);
 }
 
-#[derive(Debug)]
-pub(crate) enum Error {
-    Io(io::Error),
-    Csv(csv::Error),
-    ImportFormat(String),
-    Parser,
-    Builder,
-    Scheme,
-    Cli(String),
-    NotYetImplemented(&'static str),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use Error::*;
-
-        match self {
-            Io(e) => e.fmt(f),
-            Csv(e) => e.fmt(f),
-            ImportFormat(e) => e.fmt(f),
-            Parser => f.write_str("parser error"),
-            Builder => f.write_str("builder errors"),
-            Scheme => f.write_str("error in Scheme"),
-            Cli(e) => f.write_str(e),
-            NotYetImplemented(feature) => write!(f, "{} not yet implemented", feature),
-        }
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(value: io::Error) -> Self {
-        Error::Io(value)
-    }
-}
-
-fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<(), Error> {
+fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<()> {
     run_emitting_error_discarding_result(
         steel_engine,
         "",

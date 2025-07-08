@@ -1,3 +1,4 @@
+use color_eyre::eyre::{eyre, Result};
 pub(crate) use context::Context;
 use std::{
     collections::HashMap,
@@ -7,7 +8,7 @@ use std::{
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
-use crate::{AlistItem, Error};
+use crate::AlistItem;
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Group {
@@ -27,39 +28,29 @@ enum Format {
     Ofx,
 }
 
-fn get_format(path: &Path) -> Result<Format, Error> {
+fn get_format(path: &Path) -> Result<Format> {
     path.extension()
-        .ok_or(Error::Cli(format!(
-            "missing import file extension for {:?}",
-            path
-        )))
+        .ok_or(eyre!("missing import file extension for {:?}", path))
         .and_then(|ext| {
             if ext == "csv" || ext == "CSV" {
                 Ok(Format::Csv)
             } else if ext == "ofx" || ext == "OFX" {
                 Ok(Format::Ofx)
             } else {
-                Err(Error::Cli(format!(
-                    "unsupported import file extension {:?}",
-                    ext
-                )))
+                Err(eyre!("unsupported import file extension {:?}", ext))
             }
         })
 }
 
 impl Group {
-    pub(crate) fn parse_from<W>(
-        paths: &[PathBuf],
-        context: Context,
-        error_w: W,
-    ) -> Result<Self, Error>
+    pub(crate) fn parse_from<W>(paths: &[PathBuf], context: Context, error_w: W) -> Result<Self>
     where
         W: Write + Copy,
     {
         let sources = paths
             .iter()
             .map(|path| Source::parse_from(path, error_w))
-            .collect::<Result<Vec<Source>, Error>>()?;
+            .collect::<Result<Vec<Source>>>()?;
         Ok(Group { sources, context })
     }
 
@@ -87,7 +78,7 @@ impl Group {
 }
 
 impl Source {
-    pub(crate) fn parse_from<W>(path: &Path, _error_w: W) -> Result<Self, Error>
+    pub(crate) fn parse_from<W>(path: &Path, _error_w: W) -> Result<Self>
     where
         W: Write + Copy,
     {
