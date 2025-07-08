@@ -44,10 +44,17 @@
            (get-amount (make-field-getter field-names "amount" parse-decimal))
            (get-description (make-field-getter field-names "description" identity)))
       (lambda (txn)
-        `((date . ,(get-date txn))
-          (amount . ,(amount (get-amount txn) cur))
-          (primary-account . ,primary-account)
-          (narration . ,(get-description txn)))))))
+        ;; the description field is a composite of payee and narration with spaces between,
+        ;; so we attempt to split, and if we can't just take it as narration
+        (let* ((description (get-description txn))
+               (payee-narration (split-once description "  "))
+               (payee (if (list? payee-narration) (first payee-narration) description))
+               (narration (if (list? payee-narration) (trim (second payee-narration)) "")))
+          `((date . ,(get-date txn))
+            (amount . ,(amount (get-amount txn) cur))
+            (primary-account . ,primary-account)
+            (payee . ,payee)
+            (narration . ,narration)))))))
 
 (define extractors
   ;; First Direct is a UK bank, so set currency accordingly
