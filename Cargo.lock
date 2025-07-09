@@ -246,7 +246,7 @@ dependencies = [
 
 [[package]]
 name = "beancount-lima"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "abi_stable",
  "beancount-parser-lima",

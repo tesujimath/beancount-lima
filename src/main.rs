@@ -1,11 +1,14 @@
+use crate::{
+    config::get_config_string,
+    import::{Context, Group},
+    ledger::Ledger,
+    options::OptionsBuilder,
+};
 use color_eyre::eyre::{eyre, Result};
-use import::{Context, Group};
 use std::path::PathBuf;
 use steel::{steel_vm::engine::Engine, SteelVal};
 use steel_repl::run_repl;
 use tracing_subscriber::EnvFilter;
-
-use crate::{config::get_config_string, ledger::Ledger};
 
 const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
 
@@ -33,6 +36,10 @@ enum Command {
         /// Run the REPL instead of import and exit
         #[clap(long)]
         repl: bool,
+
+        /// Emit an include pragma so the imported Beancount file can standalone
+        #[clap(long)]
+        standalone: bool,
 
         /// Files to import
         import_files: Vec<PathBuf>,
@@ -127,6 +134,7 @@ fn main() -> Result<()> {
     load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();
+    let mut options = OptionsBuilder::default();
 
     let ledger_path = cli
         .ledger
@@ -139,9 +147,13 @@ fn main() -> Result<()> {
     ledger.register(&mut steel_engine);
 
     match &cli.command {
-        None => (),
+        None => options.register(&mut steel_engine),
 
-        Some(Command::Import { repl, import_files }) => {
+        Some(Command::Import {
+            repl,
+            standalone,
+            import_files,
+        }) => {
             let txnid_key = get_config_string(&mut steel_engine, &["import", "txnid-key"])?
                 .unwrap_or("txnid".to_string());
             let txnid2_key = get_config_string(&mut steel_engine, &["import", "txnid2-key"])?
@@ -167,6 +179,11 @@ fn main() -> Result<()> {
             let import = Group::parse_from(import_files.as_slice(), context, error_w)?;
             import.register(&mut steel_engine);
 
+            if *standalone {
+                options.standalone();
+            }
+            options.register(&mut steel_engine);
+
             if *repl {
                 load_cog(&mut steel_engine, "lima/lib/import/prelude.scm")?;
             } else {
@@ -180,6 +197,8 @@ fn main() -> Result<()> {
                 let ledger = Ledger::parse_from(ledger_path, error_w)?;
                 ledger.register(&mut steel_engine);
             };
+
+            options.register(&mut steel_engine);
 
             set_test_mode(&mut steel_engine).unwrap();
 
@@ -280,6 +299,7 @@ fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<
 pub(crate) mod config;
 pub(crate) mod import;
 pub(crate) mod ledger;
+pub(crate) mod options;
 pub(crate) mod types;
 pub(crate) use types::*;
 #[cfg(test)]

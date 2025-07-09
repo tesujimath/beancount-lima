@@ -58,6 +58,10 @@ impl Group {
         self.sources.to_vec()
     }
 
+    fn path(&self) -> String {
+        self.context.path()
+    }
+
     fn txnids(&self) -> Vec<String> {
         self.context.txnids()
     }
@@ -104,6 +108,7 @@ impl Source {
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Group>("ffi-import-group?");
     steel_engine.register_fn("ffi-import-group-sources", Group::sources);
+    steel_engine.register_fn("ffi-import-group-path", Group::path);
     steel_engine.register_fn("ffi-import-group-txnids", Group::txnids);
     steel_engine.register_fn("ffi-import-group-payees", Group::payees);
     steel_engine.register_fn("ffi-import-group-narrations", Group::narrations);

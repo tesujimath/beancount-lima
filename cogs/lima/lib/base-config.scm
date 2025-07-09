@@ -7,6 +7,7 @@
                (txnid2-key . "txnid2")
                (pairing-window-days . 3)
                (comment-column . 40)
+               (indent . 2)
                (cost-column . 76)))))
 
 (define (config-value-or-default key-path default cfg)

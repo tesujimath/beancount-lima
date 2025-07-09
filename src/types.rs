@@ -400,12 +400,12 @@ impl AlistItem {
 impl<K, V> From<(K, V)> for AlistItem
 where
     K: AsRef<str>,
-    V: AsRef<str>,
+    V: Into<SteelVal>,
 {
     fn from(value: (K, V)) -> Self {
         AlistItem {
             key: value.0.as_ref().to_string(),
-            value: SteelVal::StringV(value.1.as_ref().to_string().into()),
+            value: value.1.into(),
         }
     }
 }

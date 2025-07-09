@@ -12,6 +12,7 @@ use steel_derive::Steel;
 // context for import, i.e. ledger
 #[derive(Clone, Default, Debug, Steel)]
 pub(crate) struct Context {
+    pub(crate) path: String,
     pub(crate) txnids: HashSet<String>,
     pub(crate) payees: HashMap<String, HashMap<String, isize>>,
     pub(crate) narrations: HashMap<String, HashMap<String, isize>>,
@@ -19,6 +20,7 @@ pub(crate) struct Context {
 
 #[derive(Default, Debug)]
 struct ImportContextBuilder<'a> {
+    path: String,
     txnid_keys: Vec<String>,
     payee2_key: String,
     narration2_key: String,
@@ -50,7 +52,12 @@ impl Context {
                 warnings,
             }) => {
                 sources.write(error_w, warnings)?;
-                let mut builder = ImportContextBuilder::new(txnid_keys, payee2_key, narration2_key);
+                let mut builder = ImportContextBuilder::new(
+                    path.to_string_lossy().into_owned(),
+                    txnid_keys,
+                    payee2_key,
+                    narration2_key,
+                );
 
                 for directive in &directives {
                     builder.directive(directive);
@@ -72,6 +79,10 @@ impl Context {
         }
     }
 
+    pub(crate) fn path(&self) -> String {
+        self.path.clone()
+    }
+
     pub(crate) fn txnids(&self) -> Vec<String> {
         self.txnids.iter().cloned().collect::<Vec<_>>()
     }
@@ -86,8 +97,14 @@ impl Context {
 }
 
 impl<'a> ImportContextBuilder<'a> {
-    fn new(txnid_keys: Vec<String>, payee2_key: String, narration2_key: String) -> Self {
+    fn new(
+        path: String,
+        txnid_keys: Vec<String>,
+        payee2_key: String,
+        narration2_key: String,
+    ) -> Self {
         Self {
+            path,
             txnid_keys,
             payee2_key,
             narration2_key,
@@ -104,6 +121,7 @@ impl<'a> ImportContextBuilder<'a> {
     {
         if self.errors.is_empty() {
             Ok(Context {
+                path: self.path,
                 txnids: self.txnids,
                 payees: self
                     .payees

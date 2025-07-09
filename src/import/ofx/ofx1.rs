@@ -152,12 +152,12 @@ pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source> {
     }
     .map(|(curdef, acctid, balamt, dtasof, stmttrns)| Source {
         header: vec![
-            ("format", "ofx1").into(),
+            ("format", "ofx1".to_string()).into(),
             ("curdef", curdef).into(),
             ("acctid", acctid).into(),
             ("balamt", balamt).into(),
             ("dtasof", dtasof).into(),
-            ("path", path.to_string_lossy()).into(),
+            ("path", path.to_string_lossy().into_owned()).into(),
         ],
         fields: StmtTrn::fields(),
         transactions: stmttrns

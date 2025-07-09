@@ -32,7 +32,7 @@
 ; accounts - alist of account-id to account-name
 ; txnid-key - metadata key used for transaction IDs
 ; txn-directive - the directive written out for a transaction
-(define (import config group)
+(define (import config options group)
   (let*
     (
       ; config
@@ -43,8 +43,12 @@
       (payee2-key (config-value-or-default '(payee2-key) "payee2" import-config))
       (narration2-key (config-value-or-default '(narration2-key) "narration2" import-config))
       (txn-directive (config-value-or-default '(txn-directive) "txn" import-config))
+      (indent (config-value-or-default '(indent) 4 import-config))
       (comment-column (config-value-or-default '(comment-column) 40 import-config))
       (cost-column (config-value-or-default '(cost-column) 76 import-config))
+
+      ; options
+      (standalone (alist-get-or-default 'standalone #f options))
 
       ; defaults
       (extractors-by-format `(("ofx1" . ((txn . ,ofx1/make-extract-txn)
@@ -80,6 +84,8 @@
                                      (into-list))))))
                      (flattening)
                      (into-reducer insert-by-date (hash)))))
+    (if standalone
+      (display (format-include (import-group-path group))))
     (transduce (all-by-date txns-by-date)
       (into-for-each (lambda (directive) (display
                                           (if (alist-contains? 'primary-account directive)
@@ -92,11 +98,16 @@
                                               payee2-key
                                               #:narration2-key
                                               narration2-key
+                                              #:indent
+                                              indent
                                               #:comment-column
                                               comment-column
                                               #:cost-column
                                               cost-column)
-                                            (format-balance directive))))))))
+                                            (format-balance
+                                              directive
+                                              #:cost-column
+                                              cost-column))))))))
 
 ;; (bln (extract-balance hdr))) ; TODO balance
 

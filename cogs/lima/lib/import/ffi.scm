@@ -12,6 +12,7 @@
 
 (define (ffi-import-group->import-group imp)
   (import-group (map ffi-import-source->import-source (ffi-import-group-sources imp))
+    (ffi-import-group-path imp)
     (list->hashset (ffi-import-group-txnids imp))
     (ffi-import-group-payees imp)
     (ffi-import-group-narrations imp)))

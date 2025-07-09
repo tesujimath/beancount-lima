@@ -1,4 +1,4 @@
-(provide format-transaction format-balance)
+(provide format-transaction format-balance format-include)
 
 (require "srfi/srfi-28/format.scm")
 (require "lima/lib/types.scm")
@@ -56,13 +56,13 @@
          [payee2-key "payee2"]
          #:narration2-key
          [narration2-key "narration2"]
+         #:indent
+         [indent 4]
          #:comment-column
          [comment-column 40]
          #:cost-column
          [cost-column 76])
   (let* ((space " ")
-         (pad "  ")
-         (indent "  ")
          (date (alist-get 'date txn))
          (payee (alist-get-or-default 'payee "" txn))
          (narration (alist-get-or-default 'narration "" txn))
@@ -83,29 +83,28 @@
         [(string-empty? payee) (quoted space narration)]
         [else (format "~a~a" (quoted space payee) (quoted space narration))])
       (if (empty? comment) ""
-        (format "~a; ~a\n" indent comment))
+        (format "~a; ~a\n" (spaces indent) comment))
       (if (empty? txnid) ""
-        (format "~a~a: \"~a\"\n" indent txnid-key txnid))
+        (format "~a~a: \"~a\"\n" (spaces indent) txnid-key txnid))
       (if (empty? txnid2) ""
-        (format "~a~a: \"~a\"\n" indent txnid2-key txnid2))
+        (format "~a~a: \"~a\"\n" (spaces indent) txnid2-key txnid2))
       (if (or (empty? payee2) (string-empty? payee2)) ""
-        (format "~a~a: \"~a\"\n" indent payee2-key payee2))
+        (format "~a~a: \"~a\"\n" (spaces indent) payee2-key payee2))
       (if (or (empty? narration2) (string-empty? narration2)) ""
-        (format "~a~a: \"~a\"\n" indent narration2-key narration2))
+        (format "~a~a: \"~a\"\n" (spaces indent) narration2-key narration2))
       (format-amount-in-column
-        (format "~a~a" indent primary-account)
+        (format "~a~a" (spaces indent) primary-account)
         cost-column
         amt
         space
         "")
-      (foldl (lambda (acc s) (format "~a~a" s (format-secondary-account indent comment-column acc "\n"))) ""
+      (foldl (lambda (acc s) (format "~a~a" s (format-secondary-account (spaces indent) comment-column acc "\n"))) ""
         secondary-accounts))))
 
 (define (format-balance bln
          #:cost-column
          [cost-column 76])
   (let ((space " ")
-        (pad "  ")
         (date (alist-get 'date bln))
         (account (alist-get 'account bln))
         (amt (alist-get 'amount bln)))
@@ -119,3 +118,6 @@
       amt
       space
       "\n\n")))
+
+(define (format-include path)
+  (format "include \"~a\"\n\n" path))

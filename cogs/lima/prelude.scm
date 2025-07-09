@@ -41,4 +41,4 @@
 (provide display-balances)
 
 (require "lima/lib/globals.scm")
-(provide *ledger*)
+(provide *ledger* *options*)

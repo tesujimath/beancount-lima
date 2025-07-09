@@ -1,12 +1,16 @@
 (require "lima/config.scm")
 (provide *config*)
 
+(require "lima/lib/globals.scm")
+(provide *ledger* *options*)
+
 (require "lima/lib/import/globals.scm")
 (provide *import-group*)
 
 (require "lima/lib/import/types.scm")
 (provide import-group
   import-group-sources
+  import-group-path
   import-group-txnids
   import-group-payees
   import-group-narrations
