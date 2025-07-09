@@ -14,11 +14,11 @@
 
 2016-03-01 open Income:Unknown
 
-2020-01-01 txn "TRANSFER FROM CURRENT"
+2020-01-01 txn "TRANSFER FROM CURRENT" ""
   Assets:Bank:Uk:Savings  10.00 GBP
   Assets:Bank:Uk:Current
 
-2025-01-01 txn "TRANSFER TO SAVINGS"
+2025-01-01 txn "TRANSFER TO SAVINGS" ""
   Assets:Bank:Uk:Current  10.00 GBP
   Assets:Bank:Uk:Savings
 

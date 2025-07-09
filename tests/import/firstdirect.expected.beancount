@@ -1,70 +1,70 @@
-2024-05-04 txn "GROSS INTEREST    TO 03MAY2024"
-  Assets:Bank:Uk:Current  1.00 GBP
+2024-05-04 txn "GROSS INTEREST" "TO 03MAY2024"
+  Assets:Bank:Uk:Current                       1.00 GBP
   Income:Unknown
 
-2024-06-04 txn "GROSS INTEREST    TO 03JUN2024"
-  Assets:Bank:Uk:Current  1.03 GBP
+2024-06-04 txn "GROSS INTEREST" "TO 03JUN2024"
+  Assets:Bank:Uk:Current                       1.03 GBP
   Income:Unknown
 
-2024-07-04 txn "GROSS INTEREST    TO 03JUL2024"
-  Assets:Bank:Uk:Current  1.00 GBP
+2024-07-04 txn "GROSS INTEREST" "TO 03JUL2024"
+  Assets:Bank:Uk:Current                       1.00 GBP
   Income:Unknown
 
-2024-08-04 txn "GROSS INTEREST    TO 03AUG2024"
-  Assets:Bank:Uk:Current  1.03 GBP
+2024-08-04 txn "GROSS INTEREST" "TO 03AUG2024"
+  Assets:Bank:Uk:Current                       1.03 GBP
   Income:Unknown
 
-2024-08-13 txn "MR BUMP           WINDFALL"
-  Assets:Bank:Uk:Current  1328.00 GBP
+2024-08-13 txn "MR BUMP" "WINDFALL"
+  Assets:Bank:Uk:Current                    1328.00 GBP
   Income:Unknown
 
-2024-08-14 txn "MR TOPSY TURVEY   TRANSFER"
-  Assets:Bank:Uk:Current  -1328.00 GBP
+2024-08-14 txn "MR TOPSY TURVEY" "TRANSFER"
+  Assets:Bank:Uk:Current                   -1328.00 GBP
   Expenses:Unknown
 
-2024-09-04 txn "GROSS INTEREST    TO 03SEP2024"
-  Assets:Bank:Uk:Current  1.11 GBP
+2024-09-04 txn "GROSS INTEREST" "TO 03SEP2024"
+  Assets:Bank:Uk:Current                       1.11 GBP
   Income:Unknown
 
-2024-10-04 txn "GROSS INTEREST    TO 03OCT2024"
-  Assets:Bank:Uk:Current  1.00 GBP
+2024-10-04 txn "GROSS INTEREST" "TO 03OCT2024"
+  Assets:Bank:Uk:Current                       1.00 GBP
   Income:Unknown
 
-2024-11-04 txn "GROSS INTEREST    TO 03NOV2024"
-  Assets:Bank:Uk:Current  1.04 GBP
+2024-11-04 txn "GROSS INTEREST" "TO 03NOV2024"
+  Assets:Bank:Uk:Current                       1.04 GBP
   Income:Unknown
 
-2024-12-04 txn "GROSS INTEREST    TO 03DEC2024"
-  Assets:Bank:Uk:Current  0.94 GBP
+2024-12-04 txn "GROSS INTEREST" "TO 03DEC2024"
+  Assets:Bank:Uk:Current                       0.94 GBP
   Income:Unknown
 
-2025-01-04 txn "GROSS INTEREST    TO 03JAN2025"
-  Assets:Bank:Uk:Current  0.91 GBP
+2025-01-04 txn "GROSS INTEREST" "TO 03JAN2025"
+  Assets:Bank:Uk:Current                       0.91 GBP
   Income:Unknown
 
-2025-02-04 txn "GROSS INTEREST    TO 03FEB2025"
-  Assets:Bank:Uk:Current  0.88 GBP
+2025-02-04 txn "GROSS INTEREST" "TO 03FEB2025"
+  Assets:Bank:Uk:Current                       0.88 GBP
   Income:Unknown
 
-2025-02-10 txn "TRANSFER TO SAVINGS"
-  ; paired with "" "TRANSFER FROM CURRENT"
-  narration2: "TRANSFER FROM CURRENT"
-  Assets:Bank:Uk:Current  -34.28 GBP
-  Assets:Bank:Uk:Savings                                       ; inferred from 1 narration
+2025-02-10 txn "TRANSFER TO SAVINGS" ""
+  ; paired with "TRANSFER FROM CURRENT" ""
+  payee2: "TRANSFER FROM CURRENT"
+  Assets:Bank:Uk:Current                     -34.28 GBP
+  Assets:Bank:Uk:Savings                ; inferred from 1 payee
 
-2025-02-10 txn "TESCO             GROCERIES"
-  Assets:Bank:Uk:Current  -17.84 GBP
+2025-02-10 txn "TESCO" "GROCERIES"
+  Assets:Bank:Uk:Current                     -17.84 GBP
   Expenses:Unknown
 
-2025-02-11 balance Assets:Bank:Uk:Savings  134.28 GBP
+2025-02-11 balance Assets:Bank:Uk:Savings    134.28 GBP
 
-2025-03-04 txn "GROSS INTEREST    TO 03MAR2025"
-  Assets:Bank:Uk:Current  0.66 GBP
+2025-03-04 txn "GROSS INTEREST" "TO 03MAR2025"
+  Assets:Bank:Uk:Current                       0.66 GBP
   Income:Unknown
 
-2025-04-04 txn "GROSS INTEREST    TO 03APR2025"
-  Assets:Bank:Uk:Current  0.72 GBP
+2025-04-04 txn "GROSS INTEREST" "TO 03APR2025"
+  Assets:Bank:Uk:Current                       0.72 GBP
   Income:Unknown
 
-2025-04-05 balance Assets:Bank:Uk:Current  570.69 GBP
+2025-04-05 balance Assets:Bank:Uk:Current    570.69 GBP
 

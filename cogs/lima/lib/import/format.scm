@@ -88,9 +88,9 @@
         (format "~a~a: \"~a\"\n" indent txnid-key txnid))
       (if (empty? txnid2) ""
         (format "~a~a: \"~a\"\n" indent txnid2-key txnid2))
-      (if (empty? payee2) ""
+      (if (or (empty? payee2) (string-empty? payee2)) ""
         (format "~a~a: \"~a\"\n" indent payee2-key payee2))
-      (if (empty? narration2) ""
+      (if (or (empty? narration2) (string-empty? narration2)) ""
         (format "~a~a: \"~a\"\n" indent narration2-key narration2))
       (format-amount-in-column
         (format "~a~a" indent primary-account)
