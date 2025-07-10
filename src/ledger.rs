@@ -195,7 +195,8 @@ impl LedgerBuilder {
             self.post(
                 (*directive.date().item()).into(),
                 &posting.account().to_string(),
-                (amount, currency.to_string()).into(),
+                amount,
+                currency.to_string(),
                 posting.flag().map(|flag| flag.item().to_string()),
                 posting,
             );
@@ -207,7 +208,8 @@ impl LedgerBuilder {
                 self.post(
                     (*directive.date().item()).into(),
                     &unspecified.account().to_string(),
-                    (-number, currency.to_string()).into(),
+                    -number,
+                    currency.to_string(),
                     unspecified.flag().map(|flag| flag.item().to_string()),
                     unspecified,
                 );
@@ -224,7 +226,8 @@ impl LedgerBuilder {
         &mut self,
         date: Date,
         account_name: &str,
-        amount: Amount,
+        amount: rust_decimal::Decimal,
+        currency: String,
         flag: Option<String>,
         source: &Spanned<E>,
     ) where
@@ -235,11 +238,11 @@ impl LedgerBuilder {
 
             use hashbrown::hash_map::Entry::*;
 
-            if account.is_currency_valid(&amount.currency) {
-                match account.inventory.entry(amount.currency.clone()) {
+            if account.is_currency_valid(&currency) {
+                match account.inventory.entry(currency.clone()) {
                     Occupied(mut position) => {
                         let value = position.get_mut();
-                        *value = value.add(amount.number);
+                        *value += amount;
 
                         tracing::debug!(
                             "post {} {} value for {} is now {}",
@@ -254,12 +257,12 @@ impl LedgerBuilder {
                         }
                     }
                     Vacant(position) => {
-                        position.insert(amount.number);
+                        position.insert(amount);
                     }
                 }
 
                 // count currency usage
-                match self.currency_usage.entry(amount.currency.clone()) {
+                match self.currency_usage.entry(currency.clone()) {
                     Occupied(mut usage) => {
                         let usage = usage.get_mut();
                         *usage += 1;
@@ -269,7 +272,9 @@ impl LedgerBuilder {
                     }
                 }
 
-                account.postings.push(Posting::new(date, amount, flag));
+                account
+                    .postings
+                    .push(Posting::new(date, (amount, currency).into(), flag));
             } else {
                 self.errors.push(source.error_with_contexts(
                     "invalid currency for account",
@@ -296,11 +301,13 @@ impl LedgerBuilder {
             let account = self.accounts.get_mut(&account_name).unwrap();
 
             // what's the gap between what we have and what the balance says we should have?
-            let margin = account
+            let mut inventory_has_balance_currency = false;
+            let mut margin = account
                 .inventory
                 .iter()
                 .map(|(cur, number)| {
                     if balance.atol().amount().currency().item().as_ref() == cur.as_str() {
+                        inventory_has_balance_currency = true;
                         (
                             cur,
                             balance.atol().amount().number().item().value()
@@ -322,6 +329,21 @@ impl LedgerBuilder {
                 })
                 .collect::<HashMap<_, _>>();
 
+            // cope with the case of balance currency wasn't in inventory
+            if !inventory_has_balance_currency
+                && (balance.atol().amount().number().item().value().abs()
+                    > balance
+                        .atol()
+                        .tolerance()
+                        .map(|x| *x.item())
+                        .unwrap_or(rust_decimal::Decimal::ZERO))
+            {
+                margin.insert(
+                    balance.atol().amount().currency().item().to_string(),
+                    balance.atol().amount().number().item().value(),
+                );
+            }
+
             // pad can't last beyond balance
             ((!margin.is_empty()).then_some(margin), account.pad.take())
         } else {
@@ -341,28 +363,66 @@ impl LedgerBuilder {
                 );
 
                 for (cur, number) in &margin {
-                    let amount = Into::<Amount>::into((*number, cur.to_string()));
                     let pad_flag = Some("P".to_string());
-                    tracing::debug!("pad {} {} {}", pad.date.clone(), &account_name, &amount,);
-                    self.post(pad.date.clone(), &account_name, amount, pad_flag, &pad);
+                    tracing::debug!(
+                        "pad {} {} {} {}",
+                        pad.date.clone(),
+                        &account_name,
+                        number,
+                        cur
+                    );
+                    self.post(
+                        pad.date.clone(),
+                        &account_name,
+                        *number,
+                        cur.clone(),
+                        pad_flag,
+                        &pad,
+                    );
                 }
             }
             (Some(margin), None) => {
-                let account = self.accounts.get(&account_name).unwrap();
+                let account = self.accounts.get_mut(&account_name).unwrap();
                 self.errors.push(directive.error(format!(
                         "accumulated {}, error {}",
-                        &account
+                        if account.inventory.is_empty() { "zero".to_string() } else {
+                        account
                             .inventory
                             .iter()
                             .map(|(cur, number)| format!( "{} {}", number, cur ))
                             .collect::<Vec<String>>()
-                            .join(", "),
-                        &margin
-                            .into_iter()
-                            .map(|(cur, number)| format!("{} {}", -number, cur))
+                            .join(", ")},
+                        margin
+                            .iter()
+                            .map(|(cur, number)| format!("{} {}", number, cur))
                             .collect::<Vec<String>>()
                             .join(", ")
                     )));
+
+                tracing::debug!(
+                    "adjusting inventory {:?} for {:?}",
+                    &account.inventory,
+                    &margin
+                );
+
+                // reset accumulated balance to what was asserted, to localise errors
+                for (k, v) in margin.into_iter() {
+                    match account.inventory.entry(k) {
+                        hashbrown::hash_map::Entry::Occupied(mut entry) => {
+                            let accumulated = entry.get_mut();
+                            tracing::debug!(
+                                "adjusting inventory {} for balance by {}",
+                                accumulated,
+                                &v
+                            );
+                            *accumulated += v;
+                        }
+                        hashbrown::hash_map::Entry::Vacant(entry) => {
+                            tracing::debug!("adjusting empty inventory for balance to {}", &v);
+                            entry.insert(v);
+                        }
+                    };
+                }
             }
             (None, Some(pad)) => {}
             (None, None) => {}
@@ -463,7 +523,7 @@ impl LedgerBuilder {
 struct AccountBuilder {
     // TODO support cost in inventory
     currencies: HashSet<String>,
-    inventory: hashbrown::HashMap<String, Decimal>, // only non-zero positions are maintained
+    inventory: hashbrown::HashMap<String, rust_decimal::Decimal>, // only non-zero positions are maintained
     opened: Span,
     // TODO
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive

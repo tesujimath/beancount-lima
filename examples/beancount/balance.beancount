@@ -1,0 +1,47 @@
+; an example Beancount file
+
+1970-01-01 commodity NZD
+
+2016-03-01 open Assets:Bank:Current
+
+2016-03-01 open Expenses:Groceries NZD
+
+2016-03-01 open Expenses:Entertainment NZD
+
+2016-03-01 open Income:Unknown NZD
+
+2020-01-01 * "Initial income"
+  Assets:Bank:Current                   1000.00 NZD
+  Income:Unknown
+
+2020-01-28 balance Assets:Bank:Current  1000.00 NZD
+
+2020-02-01 * "Food"
+  Assets:Bank:Current                    -50.00 NZD
+  Expenses:Groceries
+
+2020-02-02 * "Drinks"
+  Assets:Bank:Current                    -15.00 NZD
+  Expenses:Entertainment
+
+2020-02-28 balance Assets:Bank:Current   940.00 NZD
+
+2020-03-01 * "Food"
+  Assets:Bank:Current                   -100.00 NZD
+  Expenses:Groceries
+
+2020-03-28 balance Assets:Bank:Current   840.00 NZD
+
+2020-04-01 * "Big trip"
+  Assets:Bank:Current                   -840.00 NZD
+  Expenses:Entertainment
+
+2020-04-27 balance Assets:Bank:Current     0.00 NZD
+
+2020-04-28 balance Assets:Bank:Current    10.00 NZD
+
+2020-05-01 * "Food"
+  Assets:Bank:Current                     -5.00 NZD
+  Expenses:Groceries
+
+2020-05-28 balance Assets:Bank:Current     5.00 NZD
