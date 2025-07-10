@@ -1,7 +1,8 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima::{
-    self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
+    self as parser, spanned, BeancountParser, BeancountSources, ElementType, ParseError,
+    ParseSuccess, Span, Spanned,
 };
 use color_eyre::eyre::{eyre, Result, WrapErr};
 use std::{
@@ -275,6 +276,10 @@ impl LedgerBuilder {
                 account
                     .postings
                     .push(Posting::new(date, (amount, currency).into(), flag));
+
+                account
+                    .postings_since_last_balance
+                    .push(PseudoElement::Post.spanned_with(source))
             } else {
                 self.errors.push(source.error_with_contexts(
                     "invalid currency for account",
@@ -383,21 +388,36 @@ impl LedgerBuilder {
             }
             (Some(margin), None) => {
                 let account = self.accounts.get_mut(&account_name).unwrap();
-                self.errors.push(directive.error(format!(
-                        "accumulated {}, error {}",
-                        if account.inventory.is_empty() { "zero".to_string() } else {
+
+                let reason = format!(
+                    "accumulated {}, error {}",
+                    if account.inventory.is_empty() {
+                        "zero".to_string()
+                    } else {
                         account
                             .inventory
-                            .iter()
-                            .map(|(cur, number)| format!( "{} {}", number, cur ))
-                            .collect::<Vec<String>>()
-                            .join(", ")},
-                        margin
                             .iter()
                             .map(|(cur, number)| format!("{} {}", number, cur))
                             .collect::<Vec<String>>()
                             .join(", ")
-                    )));
+                    },
+                    margin
+                        .iter()
+                        .map(|(cur, number)| format!("{} {}", number, cur))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                );
+
+                // determine context for error by collating postings since last balance
+                let contexts = account
+                    .last_balance
+                    .iter()
+                    .chain(account.postings_since_last_balance.iter())
+                    .map(|el| (el.element_type().to_string(), *el.span()))
+                    .collect::<Vec<_>>();
+
+                self.errors
+                    .push(directive.error_with_contexts(reason, contexts));
 
                 tracing::debug!(
                     "adjusting inventory {:?} for {:?}",
@@ -427,6 +447,10 @@ impl LedgerBuilder {
             (None, Some(pad)) => {}
             (None, None) => {}
         }
+
+        let account = self.accounts.get_mut(&account_name).unwrap();
+        account.last_balance = Some(PseudoElement::Balance.spanned_with(directive));
+        account.postings_since_last_balance.clear();
     }
 
     fn open(&mut self, open: &parser::Open, directive: &Spanned<parser::Directive>) {
@@ -529,6 +553,8 @@ struct AccountBuilder {
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
     postings: Vec<Posting>,
     pad: Option<parser::Spanned<Pad>>, // the string is the pad account
+    last_balance: Option<Spanned<PseudoElement>>,
+    postings_since_last_balance: Vec<Spanned<PseudoElement>>,
 }
 
 impl AccountBuilder {
@@ -551,6 +577,8 @@ impl AccountBuilder {
             opened,
             postings: Vec::default(),
             pad: None,
+            last_balance: None,
+            postings_since_last_balance: Vec::default(),
         }
     }
 
@@ -578,6 +606,30 @@ impl Pad {
 impl parser::ElementType for Pad {
     fn element_type(&self) -> &'static str {
         "pad"
+    }
+}
+
+/// PseudoElement is used solely for attaching a span for error reporting in context
+#[derive(Debug)]
+enum PseudoElement {
+    Balance,
+    Post,
+}
+
+impl PseudoElement {
+    fn spanned_with<T>(self, other: &Spanned<T>) -> Spanned<PseudoElement> {
+        spanned(self, *other.span())
+    }
+}
+
+impl parser::ElementType for PseudoElement {
+    fn element_type(&self) -> &'static str {
+        use PseudoElement::*;
+
+        match self {
+            Balance => "balance",
+            Post => "post",
+        }
     }
 }
 
