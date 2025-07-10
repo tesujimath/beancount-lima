@@ -348,14 +348,21 @@ impl LedgerBuilder {
                 }
             }
             (Some(margin), None) => {
+                let account = self.accounts.get(&account_name).unwrap();
                 self.errors.push(directive.error(format!(
-                            "margin is {}",
-                            &margin
-                                .into_iter()
-                                .map(|(cur, number)| format!("{} {}", -number, cur))
-                                .collect::<Vec<String>>()
-                                .join(", ")
-                        )));
+                        "accumulated {}, error {}",
+                        &account
+                            .inventory
+                            .iter()
+                            .map(|(cur, number)| format!( "{} {}", number, cur ))
+                            .collect::<Vec<String>>()
+                            .join(", "),
+                        &margin
+                            .into_iter()
+                            .map(|(cur, number)| format!("{} {}", -number, cur))
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    )));
             }
             (None, Some(pad)) => {}
             (None, None) => {}
