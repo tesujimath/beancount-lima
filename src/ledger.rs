@@ -1,8 +1,7 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima::{
-    self as parser, spanned, BeancountParser, BeancountSources, ElementType, ParseError,
-    ParseSuccess, Span, Spanned,
+    self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
 use color_eyre::eyre::{eyre, Result, WrapErr};
 use std::{
@@ -94,7 +93,7 @@ struct LedgerBuilder {
     closed_accounts: hashbrown::HashMap<String, Span>,
     accounts: HashMap<String, AccountBuilder>,
     currency_usage: hashbrown::HashMap<String, i32>,
-    errors: Vec<parser::Error>,
+    errors: Vec<parser::AnnotatedError>,
 }
 
 impl LedgerBuilder {
@@ -103,7 +102,7 @@ impl LedgerBuilder {
         // check for unused pad directives
         for account in self.accounts.values() {
             if let Some(pad) = &account.pad {
-                self.errors.push(pad.error("unused"))
+                self.errors.push(pad.error("unused").into())
             }
         }
     }
@@ -193,12 +192,22 @@ impl LedgerBuilder {
         {
             let amount = posting.amount().unwrap().item().value();
             let currency = posting.currency().unwrap().item();
+            let description = transaction.payee().map_or_else(
+                || {
+                    transaction
+                        .narration()
+                        .map_or("post", |narration| narration.item())
+                },
+                |payee| payee.item(),
+            );
+
             self.post(
                 (*directive.date().item()).into(),
                 &posting.account().to_string(),
                 amount,
                 currency.to_string(),
                 posting.flag().map(|flag| flag.item().to_string()),
+                description,
                 posting,
             );
         }
@@ -206,32 +215,49 @@ impl LedgerBuilder {
         // auto-post if required
         if let Some(unspecified) = unspecified.pop() {
             for (currency, number) in residual {
+                let description = transaction.payee().map_or_else(
+                    || {
+                        transaction
+                            .narration()
+                            .map_or("post", |narration| narration.item())
+                    },
+                    |payee| payee.item(),
+                );
+
                 self.post(
                     (*directive.date().item()).into(),
                     &unspecified.account().to_string(),
                     -number,
                     currency.to_string(),
                     unspecified.flag().map(|flag| flag.item().to_string()),
+                    description,
                     unspecified,
                 );
             }
         }
         // any other unspecified postings are errors
         for unspecified in unspecified.iter() {
-            self.errors
-                .push(unspecified.error("more than one posting without amount/currency"));
+            self.errors.push(
+                unspecified
+                    .error("more than one posting without amount/currency")
+                    .into(),
+            );
         }
     }
 
-    fn post<E>(
+    // not without guilt, but oh well
+    #[allow(clippy::too_many_arguments)]
+    fn post<D, E>(
         &mut self,
         date: Date,
         account_name: &str,
         amount: rust_decimal::Decimal,
         currency: String,
         flag: Option<String>,
+        description: D,
         source: &Spanned<E>,
     ) where
+        D: Into<String>,
         E: parser::ElementType,
     {
         if self.open_accounts.contains_key(account_name) {
@@ -273,28 +299,47 @@ impl LedgerBuilder {
                     }
                 }
 
-                account
-                    .postings
-                    .push(Posting::new(date, (amount, currency).into(), flag));
+                let amount: Amount = (amount, currency).into();
+
+                // collate balance from inventory across all currencies, sorted so deterministic
+                let mut currencies = account.inventory.keys().collect::<Vec<_>>();
+                currencies.sort();
+                let balance = currencies
+                    .into_iter()
+                    .map(|cur| {
+                        let amount = account.inventory.get(cur).unwrap();
+                        (*amount, cur.clone()).into()
+                    })
+                    .collect::<Vec<Amount>>();
 
                 account
-                    .postings_since_last_balance
-                    .push(PseudoElement::Post.spanned_with(source))
+                    .postings
+                    .push(Posting::new(date.clone(), amount.clone(), flag));
+
+                account.balance_diagnostics.push(BalanceDiagnostic {
+                    date,
+                    description: Some(description.into()),
+                    amount: Some(amount),
+                    balance,
+                })
             } else {
-                self.errors.push(source.error_with_contexts(
-                    "invalid currency for account",
-                    vec![("open".to_string(), account.opened)],
-                ));
+                self.errors.push(
+                    source
+                        .error_with_contexts(
+                            "invalid currency for account",
+                            vec![("open".to_string(), account.opened)],
+                        )
+                        .into(),
+                );
             }
         } else if let Some(closed) = self.closed_accounts.get(account_name) {
             self.errors.push(
-                source.error_with_contexts(
-                    "account was closed",
-                    vec![("close".to_string(), *closed)],
-                ),
+                source
+                    .error_with_contexts("account was closed", vec![("close".to_string(), *closed)])
+                    .into(),
             );
         } else {
-            self.errors.push(source.error("account not open"));
+            self.errors.push(source.error("account not open").into());
         }
     }
 
@@ -352,7 +397,7 @@ impl LedgerBuilder {
             // pad can't last beyond balance
             ((!margin.is_empty()).then_some(margin), account.pad.take())
         } else {
-            self.errors.push(directive.error("account not open"));
+            self.errors.push(directive.error("account not open").into());
             (None, None)
         };
 
@@ -382,6 +427,7 @@ impl LedgerBuilder {
                         *number,
                         cur.clone(),
                         pad_flag,
+                        "pad",
                         &pad,
                     );
                 }
@@ -409,15 +455,32 @@ impl LedgerBuilder {
                 );
 
                 // determine context for error by collating postings since last balance
-                let contexts = account
-                    .last_balance
-                    .iter()
-                    .chain(account.postings_since_last_balance.iter())
-                    .map(|el| (el.element_type().to_string(), *el.span()))
+                let annotation = account
+                    .balance_diagnostics
+                    .drain(..)
+                    .map(|bd| {
+                        vec![
+                            bd.date.to_string(),
+                            bd.amount
+                                .map(|amt| amt.to_string())
+                                .unwrap_or("          ".to_string()),
+                            bd.balance
+                                .into_iter()
+                                .map(|amt| amt.to_string())
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                            bd.description.unwrap_or("".to_string()),
+                        ]
+                    })
                     .collect::<Vec<_>>();
 
+                use super::tabulate::Align::*;
+                let annotation =
+                    super::tabulate::tabulate(annotation, vec![Left, Right, Right, Left], "  ")
+                        .join("\n");
+
                 self.errors
-                    .push(directive.error_with_contexts(reason, contexts));
+                    .push(directive.error(reason).with_annotation(annotation));
 
                 tracing::debug!(
                     "adjusting inventory {:?} for {:?}",
@@ -449,18 +512,27 @@ impl LedgerBuilder {
         }
 
         let account = self.accounts.get_mut(&account_name).unwrap();
-        account.last_balance = Some(PseudoElement::Balance.spanned_with(directive));
-        account.postings_since_last_balance.clear();
+        account.balance_diagnostics.clear();
+        account.balance_diagnostics.push(BalanceDiagnostic {
+            date: (*directive.date().item()).into(),
+            description: None,
+            amount: None,
+            balance: vec![balance.atol().amount().item().into()],
+        });
     }
 
     fn open(&mut self, open: &parser::Open, directive: &Spanned<parser::Directive>) {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(open.account().item().to_string()) {
             Occupied(open_entry) => {
-                self.errors.push(directive.error_with_contexts(
-                    "account already opened",
-                    vec![("open".to_string(), *open_entry.get())],
-                ));
+                self.errors.push(
+                    directive
+                        .error_with_contexts(
+                            "account already opened",
+                            vec![("open".to_string(), *open_entry.get())],
+                        )
+                        .into(),
+                );
             }
             Vacant(open_entry) => {
                 let span = *directive.span();
@@ -468,10 +540,14 @@ impl LedgerBuilder {
 
                 // cannot reopen a closed account
                 if let Some(closed) = self.closed_accounts.get(&open.account().item().to_string()) {
-                    self.errors.push(directive.error_with_contexts(
-                        "account was closed",
-                        vec![("close".to_string(), *closed)],
-                    ));
+                    self.errors.push(
+                        directive
+                            .error_with_contexts(
+                                "account was closed",
+                                vec![("close".to_string(), *closed)],
+                            )
+                            .into(),
+                    );
                 } else {
                     self.accounts.insert(
                         open.account().item().to_string(),
@@ -495,10 +571,14 @@ impl LedgerBuilder {
                 {
                     Occupied(closed_entry) => {
                         // cannot reclose a closed account
-                        self.errors.push(directive.error_with_contexts(
-                            "account was already closed",
-                            vec![("close".to_string(), *closed_entry.get())],
-                        ));
+                        self.errors.push(
+                            directive
+                                .error_with_contexts(
+                                    "account was already closed",
+                                    vec![("close".to_string(), *closed_entry.get())],
+                                )
+                                .into(),
+                        );
                     }
                     Vacant(closed_entry) => {
                         open_entry.remove_entry();
@@ -507,7 +587,7 @@ impl LedgerBuilder {
                 }
             }
             Vacant(_) => {
-                self.errors.push(directive.error("account not open"));
+                self.errors.push(directive.error("account not open").into());
             }
         }
     }
@@ -527,10 +607,10 @@ impl LedgerBuilder {
             // unused pad directives are errors
             // https://beancount.github.io/docs/beancount_language_syntax.html#unused-pad-directives
             if let Some(unused_pad) = unused_pad {
-                self.errors.push(unused_pad.error("unused"));
+                self.errors.push(unused_pad.error("unused").into());
             }
         } else {
-            self.errors.push(directive.error("account not open"));
+            self.errors.push(directive.error("account not open").into());
         }
     }
 
@@ -544,6 +624,14 @@ impl LedgerBuilder {
 }
 
 #[derive(Debug)]
+struct BalanceDiagnostic {
+    date: Date,
+    description: Option<String>,
+    amount: Option<Amount>,
+    balance: Vec<Amount>,
+}
+
+#[derive(Debug)]
 struct AccountBuilder {
     // TODO support cost in inventory
     currencies: HashSet<String>,
@@ -553,8 +641,7 @@ struct AccountBuilder {
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
     postings: Vec<Posting>,
     pad: Option<parser::Spanned<Pad>>, // the string is the pad account
-    last_balance: Option<Spanned<PseudoElement>>,
-    postings_since_last_balance: Vec<Spanned<PseudoElement>>,
+    balance_diagnostics: Vec<BalanceDiagnostic>,
 }
 
 impl AccountBuilder {
@@ -577,8 +664,7 @@ impl AccountBuilder {
             opened,
             postings: Vec::default(),
             pad: None,
-            last_balance: None,
-            postings_since_last_balance: Vec::default(),
+            balance_diagnostics: Vec::default(),
         }
     }
 
@@ -606,30 +692,6 @@ impl Pad {
 impl parser::ElementType for Pad {
     fn element_type(&self) -> &'static str {
         "pad"
-    }
-}
-
-/// PseudoElement is used solely for attaching a span for error reporting in context
-#[derive(Debug)]
-enum PseudoElement {
-    Balance,
-    Post,
-}
-
-impl PseudoElement {
-    fn spanned_with<T>(self, other: &Spanned<T>) -> Spanned<PseudoElement> {
-        spanned(self, *other.span())
-    }
-}
-
-impl parser::ElementType for PseudoElement {
-    fn element_type(&self) -> &'static str {
-        use PseudoElement::*;
-
-        match self {
-            Balance => "balance",
-            Post => "post",
-        }
     }
 }
 

@@ -27,3 +27,25 @@ This requires secondary account inference to have allocated a single candidate a
 
 Pairing is performed only where the source and destination accounts and the value match, and the date is within some configurable threshold (default 3 days).
 The result is a single transaction with both `txnid` and `txnid2` metadata values, or a comment in the case of import files missing transaction IDs. The payee and narration from the second transaction are also preserved as `payee2` and `narration2` metadata fields.  These fields are used for account inference in subsequent imports.
+
+## Diagnostics for mismatched balances
+
+A bother when importing transactions is finding that the asserted balance is different from the sum of the postings.
+
+To facilitate resolving such problems, when a balance mismatch is detected, all posts to that account since the
+most recent balance assertion are printed along with the error message.
+
+For example:
+```
+aya> lima --ledger examples/beancount/balance.beancount
+Error: invalid balance
+    ╭─[ examples/beancount/balance.beancount:27:1 ]
+    │
+ 27 │ 2020-02-28 balance Assets:Bank:Current   940.00 NZD
+    │ ─────────────────────────┬─────────────────────────
+    │                          ╰─────────────────────────── accumulated 935.00 NZD, error 5.00 NZD
+────╯
+2020-01-28              1000.00 NZD
+2020-02-01  -50.00 NZD   950.00 NZD  Food
+2020-02-02  -15.00 NZD   935.00 NZD  Drinks
+```

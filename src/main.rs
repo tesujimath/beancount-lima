@@ -300,6 +300,7 @@ pub(crate) mod config;
 pub(crate) mod import;
 pub(crate) mod ledger;
 pub(crate) mod options;
+pub(crate) mod tabulate;
 pub(crate) mod types;
 pub(crate) use types::*;
 #[cfg(test)]

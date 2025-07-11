@@ -1,5 +1,6 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
+use beancount_parser_lima as parser;
 use color_eyre::eyre::Result;
 use std::{
     fmt::Display,
@@ -100,6 +101,15 @@ impl From<(rust_decimal::Decimal, String)> for Amount {
         Amount {
             number: value.0.into(),
             currency: value.1,
+        }
+    }
+}
+
+impl From<&parser::Amount<'_>> for Amount {
+    fn from(value: &parser::Amount) -> Self {
+        Amount {
+            number: value.number().value().into(),
+            currency: value.currency().to_string(),
         }
     }
 }

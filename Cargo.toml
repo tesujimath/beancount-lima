@@ -9,7 +9,8 @@ path = "src/main.rs"
 
 [dependencies]
 abi_stable = "0.11.3"
-beancount-parser-lima = "0.9.0"
+beancount-parser-lima = "0.10.0"
+# beancount-parser-lima = { version = "0.10.0-alpha.1", path = "../beancount-parser-lima" }
 steel-core = { git = "https://github.com/mattwparas/steel" }
 steel-repl = { git = "https://github.com/mattwparas/steel" }
 steel-derive = { git = "https://github.com/mattwparas/steel" }
