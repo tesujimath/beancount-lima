@@ -5,7 +5,7 @@
 (define *config*
   (merge-config
     *base-config*
-    '((ledger . "full.beancount")
+    '((ledger . "examples/beancount/simple.beancount")
       (import . ((accounts .
                   (("99-1234-0123456-07" . "Assets:Bank:Current")
                    ("99-1234-0123456-21" . "Assets:Bank:Savings")

@@ -8,16 +8,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1750312786,
-        "narHash": "sha256-q+tN8dkxh0jUTG+vHyb3p6dS2uo2u9pW8dGDp+ZhUT4=",
-        "owner": "tesujimath",
-        "repo": "autobean-format.nix",
-        "rev": "4a25490eec332314c1f51406ba184fdfc6aba8da",
+        "lastModified": 1752432578,
+        "narHash": "sha256-MRyYwyXR84FPXH6vacSGg+T4jvOZljRunsRv1jUgaiI=",
+        "owner": "SEIAROTg",
+        "repo": "autobean-format",
+        "rev": "7405f618c29335997bdb5070e32a69f257f58452",
         "type": "github"
       },
       "original": {
-        "owner": "tesujimath",
-        "repo": "autobean-format.nix",
+        "owner": "SEIAROTg",
+        "repo": "autobean-format",
         "type": "github"
       }
     },
