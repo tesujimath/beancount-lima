@@ -1,6 +1,6 @@
 (provide
-  ffi-alist->alist
-  ffi-ledger->ledger)
+ ffi-alist->alist
+ ffi-ledger->ledger)
 
 (require "lima/lib/ledger.scm")
 (require "lima/lib/account.scm")
@@ -11,8 +11,8 @@
 
 (define (ffi-alist->alist alst)
   (map (lambda(item) (cons (string->symbol (ffi-alistitem-key item))
-                      (ffi-alistitem-value item)))
-    alst))
+                           (ffi-alistitem-value item)))
+       alst))
 
 (define (ffi-amount->amount amt)
   (amount (ffi-amount-number amt) (ffi-amount-currency amt)))
@@ -30,6 +30,6 @@
 (define (ffi-ledger->ledger ldg)
   (let* ((ffi-accounts (ffi-ledger-accounts ldg))
          (accounts (transduce (hash-keys->list ffi-accounts)
-                    (mapping (lambda (name) (cons name (ffi-account->account (hash-get ffi-accounts name)))))
-                    (into-hashmap))))
+                              (mapping (lambda (name) (cons name (ffi-account->account (hash-get ffi-accounts name)))))
+                              (into-hashmap))))
     (accounts->ledger accounts (ffi-ledger-main-currency ldg))))

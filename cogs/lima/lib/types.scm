@@ -1,31 +1,31 @@
 (provide
-  decimal->rational
-  ledger
-  ledger?
-  ledger-currencies
-  ledger-main-currency
-  ledger-account-names
-  ledger-accounts
-  account
-  account?
-  account-inventory
-  account-postings
-  period
-  period?
-  period-within?
-  make-period-within?
-  optional-flag
-  posting
-  posting?
-  posting-date
-  posting-amount
-  posting-has-flag
-  posting-flag
-  make-posting-flagged-with?
-  amount
-  amount?
-  amount-number
-  amount-currency)
+ decimal->rational
+ ledger
+ ledger?
+ ledger-currencies
+ ledger-main-currency
+ ledger-account-names
+ ledger-accounts
+ account
+ account?
+ account-inventory
+ account-postings
+ period
+ period?
+ period-within?
+ make-period-within?
+ optional-flag
+ posting
+ posting?
+ posting-date
+ posting-amount
+ posting-has-flag
+ posting-flag
+ make-posting-flagged-with?
+ amount
+ amount?
+ amount-number
+ amount-currency)
 
 (require "lima/lib/alist.scm")
 
@@ -34,9 +34,9 @@
 
 ;; a half-open date range, including start, not including end
 (struct period (start end) #:transparent)
-; TODO:
-; (define/contract (period start end)
-;   (and (date? start) (date? end)))
+                                        ; TODO:
+                                        ; (define/contract (period start end)
+                                        ;   (and (date? start) (date? end)))
 
 (define (period-within? p d) (and (date>=? d (period-start p)) (date<? d (period-end p))))
 
@@ -57,7 +57,7 @@
 ;; return a predicate which selects postings with given flag
 (define (make-posting-flagged-with? flag)
   (lambda (pst) (and (posting-has-flag pst)
-                 (equal? (posting-flag pst) flag))))
+                     (equal? (posting-flag pst) flag))))
 
 (struct account (inventory postings) #:transparent)
 
