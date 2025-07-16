@@ -9,14 +9,15 @@
         (alist-get-or-default cur "" inv))
     currencies))
 
-(define (format-balances ledger)
-  (let ((all-currencies (ledger-currencies ledger)))
+;; collate means build a list of rows with columns ready for tabulation
+(define (collate-balances ldg)
+  (let ((all-currencies (ledger-currencies ldg)))
     (cons
       (cons "" all-currencies)
-      (transduce (ledger-account-names ledger)
+      (transduce (ledger-account-names ldg)
         (compose
           (mapping (lambda (account-name)
-                    (let* ((account (hash-get (ledger-accounts ledger) account-name))
+                    (let* ((account (hash-get (ledger-accounts ldg) account-name))
                            (inv (account-inventory account)))
                       (cons account-name inv))))
           (filtering (lambda (pair) (not (empty? (cdr pair)))))
@@ -26,5 +27,5 @@
                       (cons account-name (inventory-for-currencies inv all-currencies))))))
         (into-list)))))
 
-(define (display-balances ledger)
-  (display (tabulate (format-balances ledger) 'left 'centre)))
+(define (display-balances ldg)
+  (display (tabulate (collate-balances ldg) 'left 'centre)))
