@@ -11,16 +11,14 @@
 
 ;; make a single rollup row, ready for tabulation
 (define (rollup-row accname rollup-bal rollup-merged bal depth max-depth)
-  (cons accname (cons (format "~a ~a ~a" depth max-depth rollup-merged)
-                      (if rollup-merged
-                          (append (repeated "" (- depth 1))
-                                  (list (if (decimal-zero? rollup-bal) "" rollup-bal))
-                                  (repeated "" (- max-depth depth 1))
-                                  (list (if (decimal-zero? bal) "" bal)))
-                          (append (repeated "" (- max-depth 1))
-                                  (list (if (decimal-zero? bal) "" bal)))
-                          )
-                      )))
+  (cons accname (if rollup-merged
+                    (append (repeated "" (- depth 1))
+                            (list (if (decimal-zero? rollup-bal) "" rollup-bal))
+                            (repeated "" (- max-depth depth 1))
+                            (list (if (decimal-zero? bal) "" bal)))
+                    (append (repeated "" (- max-depth 1))
+                            (list (if (decimal-zero? bal) "" bal)))
+                    )))
 
 ;; collate means build a list of rows with columns ready for tabulation
 (define (collate-rollup
