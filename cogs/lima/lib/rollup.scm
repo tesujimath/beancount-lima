@@ -6,10 +6,21 @@
 (require "lima/lib/alist.scm")
 (require "lima/lib/tabulate.scm")
 
-(define (inventory-for-currencies inv currencies)
-  (map (lambda (cur)
-         (alist-get-or-default cur "" inv))
-       currencies))
+(define (repeated value n) (letrec ((repeated_ (lambda (value n a) (if (<= n 0) a (repeated_ value (- n 1) (cons value a))))))
+                             (repeated_ value n '())))
+
+;; make a single rollup row, ready for tabulation
+(define (rollup-row accname rollup-bal rollup-merged bal depth max-depth)
+  (cons accname (cons (format "~a ~a ~a" depth max-depth rollup-merged)
+                      (if rollup-merged
+                          (append (repeated "" (- depth 1))
+                                  (list (if (decimal-zero? rollup-bal) "" rollup-bal))
+                                  (repeated "" (- max-depth depth 1))
+                                  (list (if (decimal-zero? bal) "" bal)))
+                          (append (repeated "" (- max-depth 1))
+                                  (list (if (decimal-zero? bal) "" bal)))
+                          )
+                      )))
 
 ;; collate means build a list of rows with columns ready for tabulation
 (define (collate-rollup
@@ -18,41 +29,55 @@
          [cur (ledger-main-currency ldg)])
   (let* ((account-names (ledger-account-names ldg))
          (accounts (ledger-accounts ldg))
-         (depth-rollup (foldl (lambda (accname depth-rollup)
-                                (let* ((depth (car depth-rollup))
-                                       (rollup0 (cdr depth-rollup))
-                                       (acc (hash-get accounts accname))
-                                       (bal (alist-get-or-default cur (decimal-zero) (account-inventory acc)))
-                                       (subacns (split-many accname ":"))
-                                       (parent-accnames (foldl (lambda (sub accs)
+         (depth-rollup (foldl (lambda (accname0 depth-rollup)
+                                (let* ((depth (first depth-rollup))
+                                       (rollup0 (second depth-rollup))
+                                       (acc0 (hash-get accounts accname0))
+                                       (subacns (split-many accname0 ":"))
+                                       (parent-accnames0 (foldl (lambda (sub accs)
                                                                  (let* ((last-parent (car accs))
                                                                         (next-parent (format "~a:~a" last-parent sub)))
                                                                    (cons next-parent accs)))
                                                                (list (car subacns))
                                                                (cdr subacns)))
-                                       (rollup1 (foldl (lambda (accname rollup)
-                                                         (let* ((oldbal (or (hash-try-get rollup accname) (decimal-zero)))
-                                                                (newbal (decimal-add oldbal bal)))
-                                                           (hash-insert rollup accname newbal)))
-                                                       rollup0
-                                                       parent-accnames)))
-                                  (cons (max depth (length subacns)) rollup1)))
-                              (cons 0 (hash))
+                                       (bal0 (alist-get-or-default cur (decimal-zero) (account-inventory acc0)))
+                                       (rollup1 (if (decimal-zero? bal0)
+                                                    rollup0
+                                                    (foldl (lambda (accname1 rollup)
+                                                             (let* ((old-bal-merged (or (hash-try-get rollup accname1) (list (decimal-zero) #f)))
+                                                                    (old-bal (first old-bal-merged))
+                                                                    (old-merged (second old-bal-merged))
+                                                                    (new-bal (decimal-add old-bal bal0))
+                                                                    (new-merged (or old-merged (not (equal? accname1 accname0)))))
+                                                               (hash-insert rollup accname1 (list new-bal new-merged))))
+                                                           rollup0
+                                                           parent-accnames0))))
+                                  (list (max depth (length subacns)) rollup1)))
+                              (list 0 (hash))
                               account-names))
-         (depth (car depth-rollup))
-         (rollup (transduce (cdr depth-rollup)
-                            (filtering (lambda (name-bal) (not (decimal-zero? (second name-bal)))))
+         (max-depth (first depth-rollup))
+         (rollup (transduce (second depth-rollup)
+                            (filtering (lambda (name-bal) (not (decimal-zero? (first (second name-bal))))))
                             (into-hashmap)))
          (rollup-account-names (merge-sort (transduce rollup
                                                       (mapping first)
                                                       (into-list))
                                            #:comparator string<?))
          (rollup-combined (transduce rollup-account-names
-                                     (mapping (lambda (accname) (list accname
-                                                                      (hash-get rollup accname)
-                                                                      (let ((acc (hash-try-get accounts accname)))
-                                                                        (if acc (alist-get-or-default cur (decimal-zero) (account-inventory acc))
-                                                                            (decimal-zero))))))
+                                     (mapping (lambda (accname0)
+                                                (let* ((depth (length (split-many accname0 ":")))
+                                                      (rollup-bal-merged (hash-get rollup accname0))
+                                                      (rollup-bal (first rollup-bal-merged))
+                                                      (rollup-merged (second rollup-bal-merged))
+                                                      (bal (let ((acc (hash-try-get accounts accname0)))
+                                                             (if acc (alist-get-or-default cur (decimal-zero) (account-inventory acc))
+                                                                 (decimal-zero)))))
+                                                  (rollup-row accname0
+                                                              rollup-bal
+                                                              rollup-merged
+                                                              bal
+                                                              depth
+                                                              max-depth))))
                                      (into-list))))
     rollup-combined))
 
