@@ -12,15 +12,40 @@ A number of useful queries are provided out-of-the-box.
 ## Example
 
 ```
-aya> lima count --using balances examples/beancount/simple.beancount
-                                           GBP    NZD
-Assets:Bank:Current                              -80.78
+aya> lima
+
+     _____ __            __
+    / ___// /____  ___  / /          Version 0.7.0
+    \__ \/ __/ _ \/ _ \/ /           https://github.com/mattwparas/steel
+   ___/ / /_/  __/  __/ /            :? for help
+  /____/\__/\___/\___/_/
+
+λ > (display-balances *ledger*)
+                                           GBP     NZD
+Assets:Bank:Current                              -100.78
 Assets:Bank:UK                            -5.00
-Expenses:Donations                                10.00
-Expenses:Entertainment:Drinks-and-snacks          48.00
-Expenses:Groceries                         5.00   27.50
-Income:Unknown                                    -4.72
+Expenses:Donations                                 10.00
+Expenses:Donations:Other                           20.00
+Expenses:Entertainment:Drinks-and-snacks           48.00
+Expenses:Groceries                         5.00    27.50
+Income:Unknown                                     -4.72
+
+
+λ > (display-rollup *ledger*)
+Assets                                    -100.78
+Assets:Bank                                        -100.78
+Assets:Bank:Current                                         -100.78
+Expenses                                   105.50
+Expenses:Donations                                   30.00    10.00
+Expenses:Donations:Other                                      20.00
+Expenses:Entertainment                               48.00
+Expenses:Entertainment:Drinks-and-snacks                      48.00
+Expenses:Groceries                                            27.50
+Income                                      -4.72
+Income:Unknown                                                -4.72
 ```
+
+Note: the rollup ignores all but the primary currency (as determined by frequency of use).
 
 ## Import
 
