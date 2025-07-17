@@ -49,3 +49,7 @@ Error: invalid balance
 2020-02-01  -50.00 NZD   950.00 NZD  Food
 2020-02-02  -15.00 NZD   935.00 NZD  Drinks
 ```
+
+## Standlone mode
+
+When run as `lima -o standalone import` the reference ledger is `include`d in the output, so that it stands alone.

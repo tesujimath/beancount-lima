@@ -2,7 +2,7 @@ use crate::{
     config::get_config_string,
     import::{Context, Group},
     ledger::Ledger,
-    options::OptionsBuilder,
+    options::register_options,
 };
 use color_eyre::eyre::{eyre, Result};
 use std::path::PathBuf;
@@ -25,6 +25,10 @@ struct Cli {
     #[clap(long)]
     no_prelude: bool,
 
+    /// Extensible comma-separated options, each split on `=` and passed as strings, or as bools if no `=`
+    #[clap(short, value_delimiter = ',')]
+    options: Vec<String>,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -36,10 +40,6 @@ enum Command {
         /// Run the REPL instead of import and exit
         #[clap(long)]
         repl: bool,
-
-        /// Emit an include pragma so the imported Beancount file can standalone
-        #[clap(long)]
-        standalone: bool,
 
         /// Files to import
         import_files: Vec<PathBuf>,
@@ -134,7 +134,7 @@ fn main() -> Result<()> {
     load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();
-    let mut options = OptionsBuilder::default();
+    register_options(&mut steel_engine, cli.options);
 
     let ledger_path = cli
         .ledger
@@ -147,13 +147,9 @@ fn main() -> Result<()> {
     ledger.register(&mut steel_engine);
 
     match &cli.command {
-        None => options.register(&mut steel_engine),
+        None => (),
 
-        Some(Command::Import {
-            repl,
-            standalone,
-            import_files,
-        }) => {
+        Some(Command::Import { repl, import_files }) => {
             let txnid_key = get_config_string(&mut steel_engine, &["import", "txnid-key"])?
                 .unwrap_or("txnid".to_string());
             let txnid2_key = get_config_string(&mut steel_engine, &["import", "txnid2-key"])?
@@ -179,11 +175,6 @@ fn main() -> Result<()> {
             let import = Group::parse_from(import_files.as_slice(), context, error_w)?;
             import.register(&mut steel_engine);
 
-            if *standalone {
-                options.standalone();
-            }
-            options.register(&mut steel_engine);
-
             if *repl {
                 load_cog(&mut steel_engine, "lima/lib/import/prelude.scm")?;
             } else {
@@ -197,8 +188,6 @@ fn main() -> Result<()> {
                 let ledger = Ledger::parse_from(ledger_path, error_w)?;
                 ledger.register(&mut steel_engine);
             };
-
-            options.register(&mut steel_engine);
 
             set_test_mode(&mut steel_engine).unwrap();
 

@@ -3,7 +3,7 @@
 use std::path::Path;
 use test_generator::test_resources;
 
-use crate::{create_engine, report_test_failures, Ledger, OptionsBuilder};
+use crate::{create_engine, register_options, report_test_failures, Ledger};
 
 use super::load_cog_path;
 
@@ -19,7 +19,7 @@ fn beancount_tests(beancount_relpath: &str) {
     let mut steel_engine = create_engine();
 
     ledger.register(&mut steel_engine);
-    OptionsBuilder::default().register(&mut steel_engine);
+    register_options(&mut steel_engine, Vec::default());
 
     load_cog_path(&mut steel_engine, &cog_relpath).unwrap();
     report_test_failures(&mut steel_engine, &cog_relpath).unwrap();

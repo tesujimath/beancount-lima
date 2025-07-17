@@ -2,26 +2,22 @@ use steel::steel_vm::engine::Engine;
 
 use crate::AlistItem;
 
-#[derive(Default)]
-pub(crate) struct OptionsBuilder {
-    standalone: bool,
-}
+/// Register options, each of which may be name=value or just name,
+/// where values are strings, and bare names register as boolean true.
+pub(crate) fn register_options(steel_engine: &mut Engine, options: Vec<String>) {
+    let options = options
+        .into_iter()
+        .map(|opt| {
+            if let Some((k, v)) = opt.split_once("=") {
+                (k, v.to_string()).into()
+            } else {
+                // bool option, set true
+                (opt, true).into()
+            }
+        })
+        .collect::<Vec<AlistItem>>();
 
-impl OptionsBuilder {
-    pub(crate) fn standalone(&mut self) {
-        self.standalone = true;
-    }
-
-    fn build(self) -> Vec<AlistItem> {
-        self.standalone
-            .then_some(("standalone", true).into())
-            .into_iter()
-            .collect::<Vec<AlistItem>>()
-    }
-
-    pub(crate) fn register(self, steel_engine: &mut Engine) {
-        steel_engine
-            .register_external_value("*ffi-options*", self.build())
-            .unwrap(); // can't fail
-    }
+    steel_engine
+        .register_external_value("*ffi-options*", options)
+        .unwrap(); // can't fail
 }

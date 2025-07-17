@@ -13,8 +13,8 @@ with pwd = tests/import {
     var output-path = (str:replace .expected .actual $expected-path)
     var ledger-args = [--ledger $ledger-path]
     echo
-    echo lima $@ledger-args import --standalone $import-dir/*
-    lima $@ledger-args import --standalone $import-dir/* >$output-path
+    echo lima -o standalone $@ledger-args import $import-dir/*
+    lima -o standalone $@ledger-args import $import-dir/* >$output-path
     diff -w $expected-path $output-path
   }
 }
