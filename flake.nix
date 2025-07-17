@@ -6,9 +6,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     steel = {
-      # TODO switch back to mainline Steel once into-string PR merged
-      # url = "github:mattwparas/steel/master";
-      url = "github:tesujimath/steel/into-string";
+      url = "github:mattwparas/steel/master";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     autobean-format = {
@@ -59,9 +57,6 @@
 
                 cargoDeps = pkgs.rustPlatform.importCargoLock {
                   lockFile = ./Cargo.lock;
-                  outputHashes = {
-                    "steel-core-0.6.0" = "sha256-ngPaqPLn3KC1r1A7t3gkYNIRzvd99ZmMKVcpXnuDOnU=";
-                  };
                 };
 
                 # skip tests which require environment
