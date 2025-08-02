@@ -174,7 +174,11 @@ impl LedgerBuilder {
                 match residual.entry(currency.item()) {
                     Occupied(mut residual_entry) => {
                         let accumulated = residual_entry.get() + amount.value();
-                        residual_entry.insert(accumulated);
+                        if accumulated.is_zero() {
+                            residual_entry.remove_entry();
+                        } else {
+                            residual_entry.insert(accumulated);
+                        }
                     }
                     Vacant(residual_entry) => {
                         residual_entry.insert(amount.value());
@@ -234,6 +238,29 @@ impl LedgerBuilder {
                     unspecified,
                 );
             }
+        } else if !residual.is_empty() {
+            // TODO error should be reinstated once the currency exchange transaction balancing is done
+            // any residual means the transaction doesn't balance
+            tracing::warn!(
+                "unbalanced transaction, residual {}",
+                residual
+                    .iter()
+                    .map(|(cur, number)| format!("{} {}", -number, cur))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            );
+            // self.errors.push(
+            //     directive
+            //         .error(format!(
+            //             "unbalanced transaction, residual {}",
+            //             residual
+            //                 .iter()
+            //                 .map(|(cur, number)| format!("{} {}", -number, cur))
+            //                 .collect::<Vec<String>>()
+            //                 .join(", ")
+            //         ))
+            //         .into(),
+            // );
         }
         // any other unspecified postings are errors
         for unspecified in unspecified.iter() {
