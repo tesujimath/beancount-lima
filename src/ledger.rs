@@ -170,10 +170,11 @@ impl LedgerBuilder {
         for posting in transaction.postings() {
             use hashbrown::hash_map::Entry::*;
 
-            if let (Some(amount), Some(currency)) = (posting.amount(), posting.currency()) {
-                match residual.entry(currency.item()) {
+            if let Some((amount, currency)) = get_posting_amount_for_balancing_transaction(posting)
+            {
+                match residual.entry(currency) {
                     Occupied(mut residual_entry) => {
-                        let accumulated = residual_entry.get() + amount.value();
+                        let accumulated = residual_entry.get() + amount;
                         if accumulated.is_zero() {
                             residual_entry.remove_entry();
                         } else {
@@ -181,7 +182,7 @@ impl LedgerBuilder {
                         }
                     }
                     Vacant(residual_entry) => {
-                        residual_entry.insert(amount.value());
+                        residual_entry.insert(amount);
                     }
                 }
             } else {
@@ -239,28 +240,18 @@ impl LedgerBuilder {
                 );
             }
         } else if !residual.is_empty() {
-            // TODO error should be reinstated once the currency exchange transaction balancing is done
-            // any residual means the transaction doesn't balance
-            tracing::warn!(
-                "unbalanced transaction, residual {}",
-                residual
-                    .iter()
-                    .map(|(cur, number)| format!("{} {}", -number, cur))
-                    .collect::<Vec<String>>()
-                    .join(", ")
+            self.errors.push(
+                directive
+                    .error(format!(
+                        "unbalanced transaction, residual {}",
+                        residual
+                            .iter()
+                            .map(|(cur, number)| format!("{} {}", -number, cur))
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    ))
+                    .into(),
             );
-            // self.errors.push(
-            //     directive
-            //         .error(format!(
-            //             "unbalanced transaction, residual {}",
-            //             residual
-            //                 .iter()
-            //                 .map(|(cur, number)| format!("{} {}", -number, cur))
-            //                 .collect::<Vec<String>>()
-            //                 .join(", ")
-            //         ))
-            //         .into(),
-            // );
         }
         // any other unspecified postings are errors
         for unspecified in unspecified.iter() {
@@ -648,6 +639,36 @@ impl LedgerBuilder {
     fn event(&mut self, event: &parser::Event, directive: &Spanned<parser::Directive>) {}
 
     fn query(&mut self, query: &parser::Query, directive: &Spanned<parser::Directive>) {}
+}
+
+/// For balancing a transaction we use the price if there is one, otherwise simply the amount.
+///
+/// I don't understand why you would have a price annotation not fully specified, so this case is ignored.
+fn get_posting_amount_for_balancing_transaction<'a, 'b>(
+    posting: &'b parser::Posting<'a>,
+) -> Option<(rust_decimal::Decimal, &'b parser::Currency<'a>)>
+where
+    'b: 'a,
+{
+    if let Some(price) = posting.price_annotation() {
+        use parser::PriceSpec::*;
+        use parser::ScopedExprValue::*;
+
+        match price.item() {
+            BareCurrency(_price_currency) => None,
+            BareAmount(_price_amount) => None,
+            CurrencyAmount(PerUnit(price_amount), price_currency) => posting
+                .amount()
+                .map(|amount| (amount.value() * price_amount.value(), price_currency)),
+            CurrencyAmount(Total(price_amount), price_currency) => {
+                Some((price_amount.value(), price_currency))
+            }
+        }
+    } else if let (Some(amount), Some(currency)) = (posting.amount(), posting.currency()) {
+        Some((amount.value(), currency.item()))
+    } else {
+        None
+    }
 }
 
 #[derive(Debug)]
