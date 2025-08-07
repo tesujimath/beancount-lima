@@ -44,12 +44,12 @@ impl Ledger {
         let mut builder = match parser.parse() {
             Ok(ParseSuccess {
                 directives,
-                options: _,
+                options,
                 plugins: _,
                 warnings,
             }) => {
                 sources.write(error_w, warnings)?;
-                let mut builder = LedgerBuilder::default();
+                let mut builder = LedgerBuilder::new(&options);
 
                 for directive in directives {
                     builder.directive(&directive);
@@ -86,17 +86,29 @@ impl Ledger {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct LedgerBuilder {
     // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
     open_accounts: hashbrown::HashMap<String, Span>,
     closed_accounts: hashbrown::HashMap<String, Span>,
     accounts: HashMap<String, AccountBuilder>,
     currency_usage: hashbrown::HashMap<String, i32>,
+    inferred_tolerance: InferredTolerance,
     errors: Vec<parser::AnnotatedError>,
 }
 
 impl LedgerBuilder {
+    fn new(options: &parser::Options<'_>) -> Self {
+        Self {
+            open_accounts: hashbrown::HashMap::default(),
+            closed_accounts: hashbrown::HashMap::default(),
+            accounts: HashMap::default(),
+            currency_usage: hashbrown::HashMap::default(),
+            inferred_tolerance: InferredTolerance::new(options),
+            errors: Vec::default(),
+        }
+    }
+
     // generate any errors before building
     fn validate(&mut self) {
         // check for unused pad directives
@@ -191,12 +203,30 @@ impl LedgerBuilder {
         }
 
         // record each posting for which we have both amount and currency
+        let mut coarsest_scale_for_tolerance =
+            hashbrown::HashMap::<&parser::Currency, u32>::default();
+
         for posting in transaction
             .postings()
             .filter(|posting| posting.amount().is_some() && posting.currency().is_some())
         {
             let amount = posting.amount().unwrap().item().value();
             let currency = posting.currency().unwrap().item();
+
+            // track coarsest scale so far by currency
+            use hashbrown::hash_map::Entry::*;
+            match coarsest_scale_for_tolerance.entry(currency) {
+                Occupied(mut entry) => {
+                    let coarsest_so_far = entry.get_mut();
+                    if amount.scale() < *coarsest_so_far {
+                        *coarsest_so_far = amount.scale();
+                    }
+                }
+                Vacant(entry) => {
+                    entry.insert(amount.scale());
+                }
+            }
+
             let description = transaction.payee().map_or_else(
                 || {
                     transaction
@@ -239,19 +269,26 @@ impl LedgerBuilder {
                     unspecified,
                 );
             }
-        } else if !residual.is_empty() {
-            self.errors.push(
-                directive
-                    .error(format!(
-                        "unbalanced transaction, residual {}",
-                        residual
-                            .iter()
-                            .map(|(cur, number)| format!("{} {}", -number, cur))
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    ))
-                    .into(),
-            );
+        } else {
+            let residual = self
+                .inferred_tolerance
+                .remove_tolerated_residuals(residual, &coarsest_scale_for_tolerance);
+
+            if !residual.is_empty() {
+                // check if within tolerance
+                self.errors.push(
+                    directive
+                        .error(format!(
+                            "unbalanced transaction, residual {}",
+                            residual
+                                .iter()
+                                .map(|(cur, number)| format!("{} {}", -number, cur))
+                                .collect::<Vec<String>>()
+                                .join(", ")
+                        ))
+                        .into(),
+                );
+            }
         }
         // any other unspecified postings are errors
         for unspecified in unspecified.iter() {
@@ -289,13 +326,13 @@ impl LedgerBuilder {
                         let value = position.get_mut();
                         *value += amount;
 
-                        tracing::debug!(
-                            "post {} {} value for {} is now {}",
-                            &date,
-                            &amount,
-                            &account_name,
-                            value,
-                        );
+                        // tracing::debug!(
+                        //     "post {} {} value for {} is now {}",
+                        //     &date,
+                        //     &amount,
+                        //     &account_name,
+                        //     value,
+                        // );
 
                         if value.is_zero() {
                             position.remove_entry();
@@ -639,6 +676,89 @@ impl LedgerBuilder {
     fn event(&mut self, event: &parser::Event, directive: &Spanned<parser::Directive>) {}
 
     fn query(&mut self, query: &parser::Query, directive: &Spanned<parser::Directive>) {}
+}
+
+#[derive(Debug)]
+struct InferredTolerance {
+    fallback: Option<rust_decimal::Decimal>,
+    by_currency: HashMap<String, rust_decimal::Decimal>,
+
+    multiplier: rust_decimal::Decimal,
+}
+
+impl InferredTolerance {
+    fn new(options: &parser::Options<'_>) -> Self {
+        Self {
+            fallback: options.inferred_tolerance_default_fallback(),
+            by_currency: options
+                .inferred_tolerance_defaults()
+                .filter_map(|(cur, value)| cur.map(|cur| (cur.to_string(), value)))
+                .collect::<HashMap<_, _>>(),
+            multiplier: options.inferred_tolerance_multiplier(),
+        }
+    }
+
+    // Beancount Precision & Tolerances, Martin Blais, May 2015, Updated May 2025
+    // https://docs.google.com/document/d/1lgHxUUEY-UVEgoF6cupz2f_7v7vEF7fiJyiSlYYlhOo
+    //
+    // Note that inferring tolerances from cost is not currently supported.
+    fn remove_tolerated_residuals<'a, 'b>(
+        &self,
+        residual: hashbrown::HashMap<&'a parser::Currency<'b>, rust_decimal::Decimal>,
+        coarsest_scale_for_tolerance: &hashbrown::HashMap<&parser::Currency, u32>,
+    ) -> hashbrown::HashMap<&'a parser::Currency<'b>, rust_decimal::Decimal> {
+        residual
+            .into_iter()
+            .filter(|(cur, value)| {
+                let abs_value = value.abs();
+
+                let coarsest_scale = coarsest_scale_for_tolerance.get(cur);
+                if coarsest_scale == Some(&0) {
+                    // this particular residual is for an integer currency, so no tolerance
+                    tracing::debug!("no tolerance for residual {:?} for integer currency {:?}", abs_value, cur);
+                    true
+                } else if let Some(tol) = self
+                    .by_currency
+                    .get(cur.as_ref())
+                    .or(self.fallback.as_ref())
+                {
+                    let intolerable =  &abs_value > tol;
+
+                    if intolerable {
+                        tracing::debug!(
+                            "tolerance {} for {:?} {:?} against {:?}",
+                            if intolerable { "exceeded" } else { "ok" },
+                            abs_value,
+                            cur,
+                            tol,
+                        );
+                    }
+
+                    intolerable
+                } else if let Some(coarsest_scale) = coarsest_scale {
+                    let unit = rust_decimal::Decimal::new(1, *coarsest_scale);
+                    let tol = unit * self.multiplier;
+                    let intolerable =  abs_value > tol;
+
+                    if intolerable {
+                        tracing::debug!(
+                            "tolerance {} for {:?} {:?} against unit = {:?}, multiplier = {:?}, tol = {:?}",
+                            if intolerable { "exceeded" } else { "ok" },
+                            abs_value,
+                            cur,
+                            unit,
+                            self.multiplier,
+                            tol,
+                        );
+                    }
+
+                    intolerable
+                } else {
+                    true
+                }
+            })
+            .collect::<hashbrown::HashMap<_, _>>()
+    }
 }
 
 /// For balancing a transaction we use the price if there is one, otherwise simply the amount.
