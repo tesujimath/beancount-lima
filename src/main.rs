@@ -72,8 +72,7 @@ impl CogPaths {
                     paths.push(dir);
                 } else {
                     eprintln!(
-                        "warning: ${} contains directory {} which does not exist",
-                        BEANCOUNT_LIMA_COGPATH, path
+                        "warning: ${BEANCOUNT_LIMA_COGPATH} contains directory {path} which does not exist"
                     )
                 }
             }
@@ -106,7 +105,7 @@ fn user_cog_dir() -> Option<PathBuf> {
 
 /// Load the cog using Steel's search path
 fn load_cog(steel_engine: &mut Engine, cog_relpath: &str) -> Result<()> {
-    let run_command = format!(r#"(require "{}")"#, cog_relpath);
+    let run_command = format!(r#"(require "{cog_relpath}")"#);
     run_emitting_error_discarding_result(steel_engine, cog_relpath, &run_command)
 }
 
@@ -278,9 +277,8 @@ fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<
         format!(
             r#"
                 (require "steel/tests/unit-test.scm")
-                (when (not (empty? (hash-get (get-test-stats) 'failures))) (error! "test failures in {}"))
-            "#,
-            cog_relpath
+                (when (not (empty? (hash-get (get-test-stats) 'failures))) (error! "test failures in {cog_relpath}"))
+            "#
         ),
     )
 }

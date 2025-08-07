@@ -41,7 +41,7 @@ impl Ledger {
         W: Write + Copy,
     {
         let sources =
-            BeancountSources::try_from(path).wrap_err(format!("failed to read {:?}", path))?;
+            BeancountSources::try_from(path).wrap_err(format!("failed to read {path:?}"))?;
         let parser = BeancountParser::new(&sources);
 
         let mut builder = match parser.parse() {
@@ -509,13 +509,13 @@ impl LedgerBuilder {
                         account
                             .inventory
                             .iter()
-                            .map(|(cur, number)| format!("{} {}", number, cur))
+                            .map(|(cur, number)| format!("{number} {cur}"))
                             .collect::<Vec<String>>()
                             .join(", ")
                     },
                     margin
                         .iter()
-                        .map(|(cur, number)| format!("{} {}", number, cur))
+                        .map(|(cur, number)| format!("{number} {cur}"))
                         .collect::<Vec<String>>()
                         .join(", ")
                 );

@@ -135,14 +135,14 @@ impl Date {
             .map_err(|e| {
                 SteelErr::new(
                     steel::rerrs::ErrorKind::ConversionError,
-                    format!("bad date format: {}", e),
+                    format!("bad date format: {e}"),
                 )
             })?;
         time::Date::parse(&raw, &format_descr)
             .map_err(|e| {
                 SteelErr::new(
                     steel::rerrs::ErrorKind::ConversionError,
-                    format!("bad date: {}", e),
+                    format!("bad date: {e}"),
                 )
             })
             .map(Self)
