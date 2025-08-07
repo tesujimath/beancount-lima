@@ -32,4 +32,4 @@
          (accounts (transduce (hash-keys->list ffi-accounts)
                               (mapping (lambda (name) (cons name (ffi-account->account (hash-get ffi-accounts name)))))
                               (into-hashmap))))
-    (accounts->ledger accounts (ffi-ledger-main-currency ldg))))
+    (accounts->ledger accounts (ffi-ledger-main-currency ldg) (ffi-alist->alist (ffi-ledger-options ldg)))))

@@ -7,6 +7,7 @@ use color_eyre::eyre::{eyre, Result, WrapErr};
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
+    iter::once,
     path::Path,
 };
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
@@ -19,6 +20,7 @@ pub(crate) struct Ledger {
     pub(crate) sources: BeancountSources,
     pub(crate) accounts: HashMap<String, Account>,
     pub(crate) main_currency: String,
+    pub(crate) options: Vec<AlistItem>,
 }
 
 const DEFAULT_CURRENCY: &str = "USD"; // ugh
@@ -30,6 +32,7 @@ impl Ledger {
             sources: BeancountSources::from(""),
             accounts: HashMap::default(),
             main_currency: DEFAULT_CURRENCY.to_string(),
+            options: Vec::default(),
         }
     }
 
@@ -79,6 +82,10 @@ impl Ledger {
         self.main_currency.clone()
     }
 
+    fn options(&self) -> Vec<AlistItem> {
+        self.options.clone()
+    }
+
     pub(crate) fn register(self, steel_engine: &mut Engine) {
         steel_engine
             .register_external_value("*ffi-ledger*", self)
@@ -94,6 +101,7 @@ struct LedgerBuilder {
     accounts: HashMap<String, AccountBuilder>,
     currency_usage: hashbrown::HashMap<String, i32>,
     inferred_tolerance: InferredTolerance,
+    parser_options: Vec<AlistItem>,
     errors: Vec<parser::AnnotatedError>,
 }
 
@@ -105,6 +113,7 @@ impl LedgerBuilder {
             accounts: HashMap::default(),
             currency_usage: hashbrown::HashMap::default(),
             inferred_tolerance: InferredTolerance::new(options),
+            parser_options: convert_parser_options(options),
             errors: Vec::default(),
         }
     }
@@ -126,6 +135,7 @@ impl LedgerBuilder {
         let Self {
             accounts,
             currency_usage,
+            parser_options,
             errors,
             ..
         } = self;
@@ -144,6 +154,7 @@ impl LedgerBuilder {
                     .map(|(name, account)| (name, account.build()))
                     .collect(),
                 main_currency,
+                options: parser_options,
             })
         } else {
             sources.write(error_w, errors)?;
@@ -863,8 +874,60 @@ impl parser::ElementType for Pad {
     }
 }
 
+/// Convert just those parser options that make sense to expose to Scheme.
+/// TODO incomplete
+fn convert_parser_options(options: &parser::Options<'_>) -> Vec<AlistItem> {
+    once(
+        (
+            "name_assets",
+            options
+                .account_type_name(parser::AccountType::Assets)
+                .to_string(),
+        )
+            .into(),
+    )
+    .chain(once(
+        (
+            "name_liabilities",
+            options
+                .account_type_name(parser::AccountType::Liabilities)
+                .to_string(),
+        )
+            .into(),
+    ))
+    .chain(once(
+        (
+            "name_equity",
+            options
+                .account_type_name(parser::AccountType::Equity)
+                .to_string(),
+        )
+            .into(),
+    ))
+    .chain(once(
+        (
+            "name_income",
+            options
+                .account_type_name(parser::AccountType::Income)
+                .to_string(),
+        )
+            .into(),
+    ))
+    .chain(once(
+        (
+            "name_expenses",
+            options
+                .account_type_name(parser::AccountType::Expenses)
+                .to_string(),
+        )
+            .into(),
+    ))
+    .collect::<Vec<AlistItem>>()
+}
+
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("ffi-ledger?");
     steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
     steel_engine.register_fn("ffi-ledger-main-currency", Ledger::main_currency);
+    steel_engine.register_fn("ffi-ledger-options", Ledger::options);
 }

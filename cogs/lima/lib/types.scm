@@ -6,6 +6,7 @@
  ledger-main-currency
  ledger-account-names
  ledger-accounts
+ ledger-options
  account
  account?
  account-inventory
@@ -61,4 +62,4 @@
 
 (struct account (inventory postings) #:transparent)
 
-(struct ledger (currencies main-currency account-names accounts) #:transparent)
+(struct ledger (currencies main-currency account-names accounts options) #:transparent)

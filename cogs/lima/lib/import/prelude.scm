@@ -2,7 +2,7 @@
 (provide *config*)
 
 (require "lima/lib/globals.scm")
-(provide *ledger* *options*)
+(provide *ledger* *cli-options**)
 
 (require "lima/lib/import/globals.scm")
 (provide *import-group*)

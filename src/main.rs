@@ -1,8 +1,8 @@
 use crate::{
+    cli_options::register_cli_options,
     config::get_config_string,
     import::{Context, Group},
     ledger::Ledger,
-    options::register_options,
 };
 use color_eyre::eyre::{eyre, Result};
 use std::path::PathBuf;
@@ -134,7 +134,7 @@ fn main() -> Result<()> {
     load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();
-    register_options(&mut steel_engine, cli.options);
+    register_cli_options(&mut steel_engine, cli.options);
 
     let ledger_path = cli
         .ledger
@@ -285,10 +285,10 @@ fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<
     )
 }
 
+pub(crate) mod cli_options;
 pub(crate) mod config;
 pub(crate) mod import;
 pub(crate) mod ledger;
-pub(crate) mod options;
 pub(crate) mod tabulate;
 pub(crate) mod types;
 pub(crate) use types::*;

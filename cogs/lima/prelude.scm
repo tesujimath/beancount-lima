@@ -7,6 +7,7 @@
  ledger-main-currency
  ledger-account-names
  ledger-accounts
+ ledger-options
  account
  account?
  account-inventory
@@ -44,4 +45,4 @@
 (provide display-rollup)
 
 (require "lima/lib/globals.scm")
-(provide *ledger* *options*)
+(provide *ledger* *cli-options**)
