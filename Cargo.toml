@@ -1,6 +1,6 @@
 [package]
 name = "beancount-lima"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Beancount frontend using Steel Scheme and Lima parser"
@@ -14,8 +14,8 @@ path = "src/main.rs"
 
 [dependencies]
 abi_stable = "0.11.3"
-# beancount-parser-lima = "0.11.0"
-beancount-parser-lima = { version = "0.11.0-alpha.1", path = "../beancount-parser-lima" }
+beancount-parser-lima = "0.11.0"
+# beancount-parser-lima = { version = "0.11.0-alpha.1", path = "../beancount-parser-lima" }
 steel-core = "0.7.0"
 steel-repl = "0.7.0"
 steel-derive = "0.6.0"
