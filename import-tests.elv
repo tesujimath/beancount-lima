@@ -4,7 +4,7 @@ use os
 use str
 
 # all import tests currently run with the same config
-set-env BEANCOUNT_LIMA_COGPATH (pwd)/tests/import.config:$E:BEANCOUNT_LIMA_COGPATH
+set-env LIMA_COGPATH (pwd)/tests/import.config:$E:LIMA_COGPATH
 
 with pwd = tests/import {
   for expected-path [*[nomatch-ok].expected.beancount] {

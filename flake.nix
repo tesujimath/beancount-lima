@@ -98,7 +98,7 @@
               # https://github.com/mattwparas/steel/tree/master/crates/steel-language-server#configuration
               export STEEL_LSP_HOME=$(pwd)/steel-lsp
 
-              export BEANCOUNT_LIMA_COGPATH="''${BEANCOUNT_LIMA_COGPATH}''${BEANCOUNT_LIMA_COGPATH:+:}$(pwd)/examples/cogs:$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
+              export LIMA_COGPATH="''${LIMA_COGPATH}''${LIMA_COGPATH:+:}$(pwd)/examples/cogs:$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
 
               PATH=$PATH:$(pwd)/target/debug
             '';
@@ -111,7 +111,7 @@
               type = "app";
               program = "${writeShellScript "beancount-lima-tests" ''
                 export PATH=${pkgs.lib.makeBinPath (ci-packages ++ [beancount-lima])}
-                export BEANCOUNT_LIMA_COGPATH="$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
+                export LIMA_COGPATH="$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
                 just test
               ''}";
             };

@@ -10,7 +10,7 @@ use steel::{steel_vm::engine::Engine, SteelVal};
 use steel_repl::run_repl;
 use tracing_subscriber::EnvFilter;
 
-const BEANCOUNT_LIMA_COGPATH: &str = "BEANCOUNT_LIMA_COGPATH";
+const LIMA_COGPATH: &str = "LIMA_COGPATH";
 
 use clap::{Parser, Subcommand};
 
@@ -65,7 +65,7 @@ impl CogPaths {
             paths.push(cog_dir);
         }
 
-        if let Ok(path) = std::env::var(BEANCOUNT_LIMA_COGPATH) {
+        if let Ok(path) = std::env::var(LIMA_COGPATH) {
             for path in path.split(":") {
                 if path.is_empty() {
                     continue;
@@ -75,7 +75,7 @@ impl CogPaths {
                     paths.push(dir);
                 } else {
                     eprintln!(
-                        "warning: ${BEANCOUNT_LIMA_COGPATH} contains directory {path} which does not exist"
+                        "warning: ${LIMA_COGPATH} contains directory {path} which does not exist"
                     )
                 }
             }
