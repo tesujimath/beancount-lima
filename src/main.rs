@@ -1,6 +1,6 @@
 use crate::{
     cli_options::register_cli_options,
-    config::get_config_string,
+    config::{get_config_string, LedgerBuilderConfig},
     import::{Context, Group},
     ledger::Ledger,
 };
@@ -146,7 +146,11 @@ fn main() -> Result<()> {
         .ledger
         .or(get_config_string(&mut steel_engine, &["ledger"])?.map(PathBuf::from));
     let ledger = if let Some(ledger) = ledger_path.as_ref() {
-        Ledger::parse_from(ledger, error_w)?
+        Ledger::parse_from(
+            ledger,
+            LedgerBuilderConfig::get(&mut steel_engine)?,
+            error_w,
+        )?
     } else {
         Ledger::empty()
     };
@@ -196,7 +200,11 @@ fn main() -> Result<()> {
 
         Some(Command::Test { scheme_files }) => {
             if let Some(ledger_path) = ledger_path.as_ref() {
-                let ledger = Ledger::parse_from(ledger_path, error_w)?;
+                let ledger = Ledger::parse_from(
+                    ledger_path,
+                    LedgerBuilderConfig::get(&mut steel_engine)?,
+                    error_w,
+                )?;
                 ledger.register(&mut steel_engine);
             };
 

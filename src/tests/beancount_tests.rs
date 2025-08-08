@@ -3,7 +3,9 @@
 use std::path::Path;
 use test_generator::test_resources;
 
-use crate::{create_engine, register_cli_options, report_test_failures, Ledger};
+use crate::{
+    create_engine, register_cli_options, report_test_failures, Ledger, LedgerBuilderConfig,
+};
 
 use super::load_cog_path;
 
@@ -14,7 +16,12 @@ fn beancount_tests(beancount_relpath: &str) {
         beancount_relpath.strip_suffix(".beancount").unwrap(),
     );
 
-    let ledger = Ledger::parse_from(Path::new(beancount_relpath), &std::io::stderr()).unwrap();
+    let ledger = Ledger::parse_from(
+        Path::new(beancount_relpath),
+        LedgerBuilderConfig::default(),
+        &std::io::stderr(),
+    )
+    .unwrap();
 
     let mut steel_engine = create_engine();
 

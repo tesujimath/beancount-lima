@@ -13,7 +13,7 @@ use std::{
 use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
 use steel_derive::Steel;
 
-use super::types::*;
+use crate::{config::LedgerBuilderConfig, types::*};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
@@ -36,7 +36,11 @@ impl Ledger {
         }
     }
 
-    pub(crate) fn parse_from<W>(path: &Path, error_w: W) -> Result<Self>
+    pub(crate) fn parse_from<W>(
+        path: &Path,
+        config: LedgerBuilderConfig,
+        error_w: W,
+    ) -> Result<Self>
     where
         W: Write + Copy,
     {
@@ -52,7 +56,7 @@ impl Ledger {
                 warnings,
             }) => {
                 sources.write(error_w, warnings)?;
-                let mut builder = LedgerBuilder::new(&options);
+                let mut builder = LedgerBuilder::new(&options, config);
 
                 for directive in directives {
                     builder.directive(&directive);
@@ -102,11 +106,12 @@ struct LedgerBuilder {
     currency_usage: hashbrown::HashMap<String, i32>,
     inferred_tolerance: InferredTolerance,
     parser_options: Vec<AlistItem>,
+    config: LedgerBuilderConfig,
     errors: Vec<parser::AnnotatedError>,
 }
 
 impl LedgerBuilder {
-    fn new(options: &parser::Options<'_>) -> Self {
+    fn new(options: &parser::Options<'_>, config: LedgerBuilderConfig) -> Self {
         Self {
             open_accounts: hashbrown::HashMap::default(),
             closed_accounts: hashbrown::HashMap::default(),
@@ -114,6 +119,7 @@ impl LedgerBuilder {
             currency_usage: hashbrown::HashMap::default(),
             inferred_tolerance: InferredTolerance::new(options),
             parser_options: convert_parser_options(options),
+            config,
             errors: Vec::default(),
         }
     }
@@ -411,26 +417,68 @@ impl LedgerBuilder {
 
     fn price(&mut self, price: &parser::Price, directive: &Spanned<parser::Directive>) {}
 
+    // base account is known
+    fn rollup_inventory(
+        &self,
+        base_account_name: &str,
+    ) -> hashbrown::HashMap<String, rust_decimal::Decimal> {
+        if self.config.balance_rollup {
+            let mut rollup_inventory =
+                hashbrown::HashMap::<String, rust_decimal::Decimal>::default();
+            self.accounts
+                .keys()
+                .filter_map(|s| {
+                    s.starts_with(base_account_name)
+                        .then_some(&self.accounts.get(s).unwrap().inventory)
+                })
+                .for_each(|inv| {
+                    inv.iter().for_each(|(cur, number)| {
+                        use hashbrown::hash_map::Entry::*;
+                        match rollup_inventory.entry(cur.clone()) {
+                            Occupied(mut entry) => {
+                                let existing_number = entry.get_mut();
+                                *existing_number += *number;
+                            }
+                            Vacant(entry) => {
+                                entry.insert(*number);
+                            }
+                        }
+                    });
+                });
+            tracing::debug!(
+                "rollup inventory for {:?} with config {:?} is {:?}",
+                base_account_name,
+                &rollup_inventory,
+                &self.config
+            );
+            rollup_inventory
+        } else {
+            self.accounts
+                .get(base_account_name)
+                .unwrap()
+                .inventory
+                .clone()
+        }
+    }
+
     fn balance(&mut self, balance: &parser::Balance, directive: &Spanned<parser::Directive>) {
         let account_name = balance.account().item().to_string();
         let (margin, pad) = if self.open_accounts.contains_key(&account_name) {
-            let account = self.accounts.get_mut(&account_name).unwrap();
-
             // what's the gap between what we have and what the balance says we should have?
             let mut inventory_has_balance_currency = false;
-            let mut margin = account
-                .inventory
-                .iter()
+            let mut margin = self
+                .rollup_inventory(&account_name)
+                .into_iter()
                 .map(|(cur, number)| {
                     if balance.atol().amount().currency().item().as_ref() == cur.as_str() {
                         inventory_has_balance_currency = true;
                         (
                             cur,
                             balance.atol().amount().number().item().value()
-                                - Into::<rust_decimal::Decimal>::into(*number),
+                                - Into::<rust_decimal::Decimal>::into(number),
                         )
                     } else {
-                        (cur, -(Into::<rust_decimal::Decimal>::into(*number)))
+                        (cur, -(Into::<rust_decimal::Decimal>::into(number)))
                     }
                 })
                 .filter_map(|(cur, number)| {
@@ -444,6 +492,8 @@ impl LedgerBuilder {
                     .then_some((cur.to_string(), number))
                 })
                 .collect::<HashMap<_, _>>();
+
+            let account = self.accounts.get_mut(&account_name).unwrap();
 
             // cope with the case of balance currency wasn't in inventory
             if !inventory_has_balance_currency

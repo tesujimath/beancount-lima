@@ -7,6 +7,26 @@ pub(crate) fn get_config_string(
     steel_engine: &mut Engine,
     path: &[&str],
 ) -> Result<Option<String>> {
+    get_config_val(steel_engine, path).map(|v| {
+        if let Some(SteelVal::StringV(v)) = v {
+            Some(v.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+pub(crate) fn get_config_bool(steel_engine: &mut Engine, path: &[&str]) -> Result<Option<bool>> {
+    get_config_val(steel_engine, path).map(|v| {
+        if let Some(SteelVal::BoolV(v)) = v {
+            Some(v)
+        } else {
+            None
+        }
+    })
+}
+
+pub(crate) fn get_config_val(steel_engine: &mut Engine, path: &[&str]) -> Result<Option<SteelVal>> {
     run_emitting_error(
         steel_engine,
         "get_config_value",
@@ -17,13 +37,17 @@ pub(crate) fn get_config_string(
             path.join(" "),
         ),
     )
-    .map(|result| {
-        result.first().and_then(|s| {
-            if let SteelVal::StringV(s) = s {
-                Some(s.to_string())
-            } else {
-                None
-            }
-        })
-    })
+    .map(|result| result.into_iter().next())
+}
+
+#[derive(Default, Debug)]
+pub(crate) struct LedgerBuilderConfig {
+    pub(crate) balance_rollup: bool,
+}
+
+impl LedgerBuilderConfig {
+    pub(crate) fn get(steel_engine: &mut Engine) -> Result<Self> {
+        let balance_rollup = get_config_bool(steel_engine, &["balance-rollup"])?.unwrap_or(false);
+        Ok(Self { balance_rollup })
+    }
 }

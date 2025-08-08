@@ -51,6 +51,16 @@ Note: the rollup ignores all but the primary currency (as determined by frequenc
 
 [Import](doc/import.md) is particularly convenient and addresses pain points I encountered with import using classic Beancount tools.
 
+## Balance assertions
+
+A point of difference from classic Beancount is that balance assertions may be configured to assert the total for an account an all its subaccounts, using
+the lima config item `balance-rollup`.  For example, if a bank account holds multiple logical amounts, they may be tracked as subaccounts, without violating
+balance assertions.
+
+Padding is only ever performed on the actual account asserted in the balance directive, never on its subaccounts.
+
+The default behaviour is not to do this.
+
 ## Contributions
 
 While issues are welcome, and I am particularly interested in more example files for import, given the current pace of development I am unlikely to be able to accept PRs for now.
