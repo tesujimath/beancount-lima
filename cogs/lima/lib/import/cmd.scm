@@ -3,4 +3,4 @@
 (require "lima/lib/import/globals.scm")
 (require "lima/lib/import/importer.scm")
 
-(import *config* *cli-options** *import-group*)
+(import *config* *cli-options* *import-group*)

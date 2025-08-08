@@ -35,6 +35,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Evaluate arbitrary cog then exit
+    Report { cog: String },
+
     /// Import from external CSV or OFX file
     Import {
         /// Run the REPL instead of import and exit
@@ -104,7 +107,11 @@ fn user_cog_dir() -> Option<PathBuf> {
 }
 
 /// Load the cog using Steel's search path
-fn load_cog(steel_engine: &mut Engine, cog_relpath: &str) -> Result<()> {
+fn load_cog<S>(steel_engine: &mut Engine, cog_relpath: S) -> Result<()>
+where
+    S: AsRef<str>,
+{
+    let cog_relpath = cog_relpath.as_ref();
     let run_command = format!(r#"(require "{cog_relpath}")"#);
     run_emitting_error_discarding_result(steel_engine, cog_relpath, &run_command)
 }
@@ -148,6 +155,11 @@ fn main() -> Result<()> {
     match &cli.command {
         None => (),
 
+        Some(Command::Report { cog }) => {
+            load_cog(&mut steel_engine, format!("lima/reports/{}.scm", &cog))?;
+            return Ok(());
+        }
+
         Some(Command::Import { repl, import_files }) => {
             let txnid_key = get_config_string(&mut steel_engine, &["import", "txnid-key"])?
                 .unwrap_or("txnid".to_string());
@@ -177,7 +189,7 @@ fn main() -> Result<()> {
             if *repl {
                 load_cog(&mut steel_engine, "lima/lib/import/prelude.scm")?;
             } else {
-                load_cog(&mut steel_engine, "lima/import.scm")?;
+                load_cog(&mut steel_engine, "lima/lib/import/cmd.scm")?;
                 return Ok(());
             }
         }
@@ -201,7 +213,7 @@ fn main() -> Result<()> {
 
     // the optional prelude is only auto-loaded for the REPL,
     if !cli.no_prelude {
-        load_cog(&mut steel_engine, "lima/prelude.scm")?;
+        load_cog(&mut steel_engine, "lima/lib/prelude.scm")?;
     }
 
     run_repl(steel_engine)?;

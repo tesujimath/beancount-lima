@@ -1,4 +1,4 @@
-(provide *ledger* *cli-options**)
+(provide *ledger* *cli-options*)
 
 (require "lima/lib/ffi.scm")
 
@@ -11,4 +11,4 @@
 (define *ledger* (ffi-ledger->ledger *ffi-ledger*))
 
 ;; any command line options
-(define *cli-options** (ffi-alist->alist *ffi-cli-options*))
+(define *cli-options* (ffi-alist->alist *ffi-cli-options*))
