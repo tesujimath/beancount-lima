@@ -13,13 +13,25 @@
 ;; default extractors:
 (require (prefix-in ofx1/ (only-in "lima/lib/import/ofx1.scm")))
 
+;; helper for insert-by-date, where we try pairing for all offsets up to pairing-window-days
+;; before falling back to insert as new
+(define (insert-by-date-with-limit h txn j-base offset pairing-window-days)
+  (let* ((j (+ j-base offset))
+         (paired (try-pair txn (or (hash-try-get h j) '()))))
+    (if paired
+      (hash-insert h j paired)
+      (if (> offset 0)
+        (insert-by-date-with-limit h txn j-base (- offset) pairing-window-days)
+        (let ((next-offset (+ 1 (abs offset))))
+          (if (<= next-offset pairing-window-days)
+            (insert-by-date-with-limit h txn j-base next-offset pairing-window-days)
+            (hash-insert h j-base (cons txn (or (hash-try-get h j-base) '())))))))))
+
 ;; insert a transaction into the hash-by-date, trying to pair where we can
-;; TODO check other dates up to pairing-window-days
-(define (insert-by-date h txn)
-  (let* ((j (date-julian (alist-get 'date txn)))
-         (existing-txns-for-date (or (hash-try-get h j) '())))
-    (hash-insert h j (or (try-pair txn existing-txns-for-date)
-                      (cons txn existing-txns-for-date)))))
+(define (make-insert-by-date pairing-window-days)
+  (lambda (h txn)
+    (let* ((j (date-julian (alist-get 'date txn))))
+      (insert-by-date-with-limit h txn j 0 pairing-window-days))))
 
 (define (all-by-date h)
   (transduce (merge-sort (hash-keys->list h))
@@ -44,6 +56,7 @@
       (narration2-key (config-value-or-default '(narration2-key) "narration2" import-config))
       (txn-directive (config-value-or-default '(txn-directive) "txn" import-config))
       (indent (config-value-or-default '(indent) 4 import-config))
+      (pairing-window-days (config-value-or-default '(pairing-window-days) 0 import-config))
       (comment-column (config-value-or-default '(comment-column) 40 import-config))
       (cost-column (config-value-or-default '(cost-column) 76 import-config))
 
@@ -83,7 +96,7 @@
                                      (extending ((alist-get 'bal extractor) accounts-by-id source))
                                      (into-list))))))
                      (flattening)
-                     (into-reducer insert-by-date (hash)))))
+                     (into-reducer (make-insert-by-date pairing-window-days) (hash)))))
     (if standalone
       (display (format-include (import-group-path group))))
     (transduce (all-by-date txns-by-date)
