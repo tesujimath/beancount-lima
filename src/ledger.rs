@@ -10,14 +10,19 @@ use std::{
     iter::once,
     path::Path,
 };
-use steel::steel_vm::{engine::Engine, register_fn::RegisterFn};
+use steel::{
+    rvals::IntoSteelVal,
+    steel_vm::{engine::Engine, register_fn::RegisterFn},
+    SteelVal,
+};
 use steel_derive::Steel;
 
 use crate::{config::LedgerBuilderConfig, types::*};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
-    pub(crate) sources: BeancountSources,
+    pub(crate) sources: WrappedBeancountSources,
+    pub(crate) directives: Vec<Vec<AlistItem>>,
     pub(crate) accounts: HashMap<String, Account>,
     pub(crate) main_currency: String,
     pub(crate) options: Vec<AlistItem>,
@@ -29,7 +34,8 @@ impl Ledger {
     /// Empty ledger
     pub(crate) fn empty() -> Self {
         Ledger {
-            sources: BeancountSources::from(""),
+            sources: BeancountSources::from("").into(),
+            directives: Vec::default(),
             accounts: HashMap::default(),
             main_currency: DEFAULT_CURRENCY.to_string(),
             options: Vec::default(),
@@ -78,6 +84,14 @@ impl Ledger {
         builder.build(sources, error_w)
     }
 
+    fn sources(&self) -> WrappedBeancountSources {
+        self.sources.clone()
+    }
+
+    fn directives(&self) -> Vec<Vec<AlistItem>> {
+        self.directives.clone()
+    }
+
     fn accounts(&self) -> HashMap<String, Account> {
         self.accounts.clone()
     }
@@ -97,8 +111,58 @@ impl Ledger {
     }
 }
 
+fn write_error(sources: WrappedBeancountSources, message: String, span: Wrapped<Span>) {
+    let fake_element = Element::new("fake_element", *span);
+    let sources = sources.lock();
+    sources
+        .write(&std::io::stderr(), vec![fake_element.error(message)])
+        .unwrap();
+}
+
+fn write_errors(sources: WrappedBeancountSources, errors: Vec<Vec<AlistItem>>) {
+    let errors = errors
+        .into_iter()
+        .filter_map(|e| {
+            let mut span: Option<Span> = None;
+            let mut element_type: Option<String> = None;
+            let mut message: Option<String> = None;
+
+            for item in e {
+                if item.key == "element-type" {
+                    element_type = Some(item.value.to_string());
+                } else if item.key == "span" {
+                    if let SteelVal::Custom(v) = item.value {
+                        if let Some(wrapped_span) = v
+                            .read()
+                            .as_any_ref()
+                            .downcast_ref::<Wrapped<Span>>()
+                            .cloned()
+                        {
+                            span = Some(*wrapped_span);
+                        } else {
+                            tracing::warn!("unexpected type for span {:?}", v.read().as_any_ref());
+                        }
+                    }
+                } else if item.key == "message" {
+                    message = Some(item.value.to_string());
+                }
+            }
+            if let (Some(element_type), Some(span), Some(message)) = (element_type, span, message) {
+                // TODO don't leak the string here, somehow pass through a static str
+                Some(Element::new(element_type.leak(), span).error(message))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let sources = sources.lock();
+    sources.write(&std::io::stderr(), errors).unwrap();
+}
+
 #[derive(Debug)]
 struct LedgerBuilder {
+    directives: Vec<Vec<AlistItem>>,
     // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
     open_accounts: hashbrown::HashMap<String, Span>,
     closed_accounts: hashbrown::HashMap<String, Span>,
@@ -113,6 +177,7 @@ struct LedgerBuilder {
 impl LedgerBuilder {
     fn new(options: &parser::Options<'_>, config: LedgerBuilderConfig) -> Self {
         Self {
+            directives: Vec::default(),
             open_accounts: hashbrown::HashMap::default(),
             closed_accounts: hashbrown::HashMap::default(),
             accounts: HashMap::default(),
@@ -139,6 +204,7 @@ impl LedgerBuilder {
         W: Write + Copy,
     {
         let Self {
+            directives,
             accounts,
             currency_usage,
             parser_options,
@@ -154,7 +220,8 @@ impl LedgerBuilder {
                 .unwrap_or(DEFAULT_CURRENCY.to_string());
 
             Ok(Ledger {
-                sources,
+                sources: sources.into(),
+                directives,
                 accounts: accounts
                     .into_iter()
                     .map(|(name, account)| (name, account.build()))
@@ -195,6 +262,7 @@ impl LedgerBuilder {
         let mut residual =
             hashbrown::HashMap::<&parser::Currency<'_>, rust_decimal::Decimal>::default();
         let mut unspecified: Vec<&Spanned<parser::Posting<'_>>> = Vec::default();
+        let date: Date = (*directive.date().item()).into();
 
         for posting in transaction.postings() {
             use hashbrown::hash_map::Entry::*;
@@ -254,7 +322,7 @@ impl LedgerBuilder {
             );
 
             self.post(
-                (*directive.date().item()).into(),
+                date,
                 &posting.account().to_string(),
                 amount,
                 currency.to_string(),
@@ -277,7 +345,7 @@ impl LedgerBuilder {
                 );
 
                 self.post(
-                    (*directive.date().item()).into(),
+                    date,
                     &unspecified.account().to_string(),
                     -number,
                     currency.to_string(),
@@ -315,6 +383,18 @@ impl LedgerBuilder {
                     .into(),
             );
         }
+
+        // TODO extract this for reuse everywhere
+        let date: SteelVal = date.into_steelval().unwrap();
+        let span: SteelVal = Into::<Wrapped<_>>::into(*directive.span())
+            .into_steelval()
+            .unwrap();
+
+        self.directives.push(vec![
+            ("date", date).into(),
+            ("element-type", "transaction".to_string()).into(),
+            ("span", span).into(),
+        ])
     }
 
     // not without guilt, but oh well
@@ -386,7 +466,7 @@ impl LedgerBuilder {
 
                 account
                     .postings
-                    .push(Posting::new(date.clone(), amount.clone(), flag));
+                    .push(Posting::new(date, amount.clone(), flag));
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
                     date,
@@ -538,7 +618,7 @@ impl LedgerBuilder {
                         cur
                     );
                     self.post(
-                        pad.date.clone(),
+                        pad.date,
                         &account_name,
                         *number,
                         cur.clone(),
@@ -924,6 +1004,23 @@ impl parser::ElementType for Pad {
     }
 }
 
+#[derive(Debug)]
+struct Element {
+    element_type: &'static str,
+}
+
+impl Element {
+    fn new(element_type: &'static str, span: Span) -> Spanned<Self> {
+        parser::spanned(Element { element_type }, span)
+    }
+}
+
+impl parser::ElementType for Element {
+    fn element_type(&self) -> &'static str {
+        self.element_type
+    }
+}
+
 /// Convert just those parser options that make sense to expose to Scheme.
 /// TODO incomplete
 fn convert_parser_options(options: &parser::Options<'_>) -> Vec<AlistItem> {
@@ -977,7 +1074,12 @@ fn convert_parser_options(options: &parser::Options<'_>) -> Vec<AlistItem> {
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("ffi-ledger?");
+    steel_engine.register_fn("ffi-ledger-sources", Ledger::sources);
+    steel_engine.register_fn("ffi-ledger-directives", Ledger::directives);
     steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
     steel_engine.register_fn("ffi-ledger-main-currency", Ledger::main_currency);
     steel_engine.register_fn("ffi-ledger-options", Ledger::options);
+
+    steel_engine.register_fn("ffi-beancount-sources-write-error", write_error);
+    steel_engine.register_fn("ffi-beancount-sources-write-errors", write_errors);
 }

@@ -1,10 +1,11 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
-use beancount_parser_lima as parser;
+use beancount_parser_lima::{self as parser, BeancountSources};
 use color_eyre::eyre::Result;
 use std::{
     fmt::Display,
     ops::{Deref, DerefMut},
+    sync::{Arc, Mutex, MutexGuard},
 };
 use steel::{
     rvals::{as_underlying_type, Custom, CustomType},
@@ -12,6 +13,11 @@ use steel::{
     SteelErr, SteelVal,
 };
 use steel_derive::Steel;
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Directive {
+    pub(crate) attrs: Vec<AlistItem>,
+}
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Account {
@@ -43,7 +49,7 @@ impl Posting {
     }
 
     fn date(&self) -> Date {
-        self.date.clone()
+        self.date
     }
 
     fn amount(&self) -> Amount {
@@ -318,6 +324,8 @@ where
     }
 }
 
+impl<T> Copy for Wrapped<T> where T: Clone + Copy {}
+
 impl<T> From<T> for Wrapped<T>
 where
     T: Clone,
@@ -387,8 +395,8 @@ where
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct AlistItem {
-    key: String,
-    value: SteelVal,
+    pub(crate) key: String,
+    pub(crate) value: SteelVal,
 }
 
 impl Display for AlistItem {
@@ -417,6 +425,36 @@ where
             key: value.0.as_ref().to_string(),
             value: value.1.into(),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct MutexWrapper<T>(Arc<Mutex<T>>);
+
+impl<T> MutexWrapper<T> {
+    pub fn new(item: T) -> Self {
+        MutexWrapper(Arc::new(Mutex::new(item)))
+    }
+
+    pub fn lock(&self) -> MutexGuard<T> {
+        self.0.lock().unwrap()
+    }
+}
+
+impl<T> Custom for MutexWrapper<T> where T: Clone + Display + 'static {}
+
+#[derive(Clone, Debug, Steel)]
+pub struct WrappedBeancountSources(Arc<Mutex<BeancountSources>>);
+
+impl From<BeancountSources> for WrappedBeancountSources {
+    fn from(sources: BeancountSources) -> Self {
+        WrappedBeancountSources(Arc::new(Mutex::new(sources)))
+    }
+}
+
+impl WrappedBeancountSources {
+    pub fn lock(&self) -> MutexGuard<BeancountSources> {
+        self.0.lock().unwrap()
     }
 }
 
