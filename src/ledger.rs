@@ -111,12 +111,52 @@ impl Ledger {
     }
 }
 
-fn write_error(sources: WrappedBeancountSources, message: String, span: Wrapped<Span>) {
-    let fake_element = Element::new("fake_element", *span);
-    let sources = sources.lock();
-    sources
-        .write(&std::io::stderr(), vec![fake_element.error(message)])
-        .unwrap();
+fn write_error(sources: WrappedBeancountSources, error: Vec<SteelVal>) {
+    tracing::debug!("write_error");
+
+    let mut span: Option<Span> = None;
+    let mut element_type: Option<String> = None;
+    let mut message: Option<String> = None;
+
+    for a in error {
+        if let SteelVal::Pair(x) = a {
+            tracing::debug!("error pair {:?} {:?}", x.car(), x.cdr());
+
+            if let SteelVal::SymbolV(name) = x.car() {
+                if name.as_str() == "element-type" {
+                    if let SteelVal::StringV(value) = x.cdr() {
+                        element_type = Some(value.to_string());
+                    }
+                } else if name.as_str() == "span" {
+                    if let SteelVal::Custom(v) = x.cdr() {
+                        if let Some(wrapped_span) = v
+                            .read()
+                            .as_any_ref()
+                            .downcast_ref::<Wrapped<Span>>()
+                            .cloned()
+                        {
+                            span = Some(*wrapped_span);
+                        } else {
+                            tracing::warn!("unexpected type for span {:?}", v.read().as_any_ref());
+                        }
+                    }
+                } else if name.as_str() == "message" {
+                    if let SteelVal::StringV(value) = x.cdr() {
+                        message = Some(value.to_string());
+                    }
+                }
+            }
+        } else {
+            tracing::debug!("error something else {:?} of type", a);
+        }
+    }
+
+    if let (Some(element_type), Some(span), Some(message)) = (element_type, span, message) {
+        // TODO don't leak the string here, somehow pass through a static str
+        let error = Element::new(element_type.leak(), span).error(message);
+        let sources = sources.lock();
+        sources.write(&std::io::stderr(), vec![error]).unwrap();
+    }
 }
 
 fn write_errors(sources: WrappedBeancountSources, errors: Vec<Vec<AlistItem>>) {
