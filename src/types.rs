@@ -487,8 +487,42 @@ impl From<(&'static str, Span)> for WrappedSpannedElement {
 }
 
 impl WrappedSpannedElement {
-    fn error(&self, message: String) -> WrappedError {
+    pub(crate) fn error<S>(&self, message: S) -> parser::AnnotatedError
+    where
+        S: Into<String>,
+    {
+        self.0.as_ref().error(message).into()
+    }
+
+    pub(crate) fn annotated_error<S1, S2>(
+        &self,
+        message: S1,
+        annotation: S2,
+    ) -> parser::AnnotatedError
+    where
+        S1: Into<String>,
+        S2: Into<String>,
+    {
+        self.0.as_ref().error(message).with_annotation(annotation)
+    }
+
+    pub(crate) fn error_with_contexts<S: Into<String>>(
+        &self,
+        message: S,
+        contexts: Vec<(String, Span)>,
+    ) -> parser::AnnotatedError {
+        self.0
+            .as_ref()
+            .error_with_contexts(message, contexts)
+            .into()
+    }
+
+    pub(crate) fn ffi_error(&self, message: String) -> WrappedError {
         WrappedError(Arc::new(self.0.as_ref().error(message)))
+    }
+
+    pub(crate) fn span(&self) -> Span {
+        *self.0.as_ref().span()
     }
 }
 
@@ -555,5 +589,5 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("ffi-alistitem-value", AlistItem::value);
 
     steel_engine.register_type::<WrappedError>("error?");
-    steel_engine.register_fn("ffi-error", WrappedSpannedElement::error);
+    steel_engine.register_fn("ffi-error", WrappedSpannedElement::ffi_error);
 }

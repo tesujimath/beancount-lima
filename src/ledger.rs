@@ -1,7 +1,8 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima::{
-    self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
+    self as parser, BeancountParser, BeancountSources, ElementType, ParseError, ParseSuccess, Span,
+    Spanned,
 };
 use color_eyre::eyre::{eyre, Result, WrapErr};
 use std::{
@@ -13,7 +14,6 @@ use std::{
 use steel::{
     rvals::IntoSteelVal,
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelVal,
 };
 use steel_derive::Steel;
 
@@ -213,31 +213,35 @@ impl LedgerBuilder {
     fn directive(&mut self, directive: &Spanned<parser::Directive>) {
         use parser::DirectiveVariant::*;
 
+        let date: Date = (*directive.date().item()).into();
+        let element =
+            Into::<WrappedSpannedElement>::into((directive.element_type(), *directive.span()));
+
         match directive.variant() {
-            Transaction(transaction) => self.transaction(transaction, directive),
-            Price(price) => self.price(price, directive),
-            Balance(balance) => self.balance(balance, directive),
-            Open(open) => self.open(open, directive),
-            Close(close) => self.close(close, directive),
-            Commodity(commodity) => self.commodity(commodity, directive),
-            Pad(pad) => self.pad(pad, directive),
-            Document(document) => self.document(document, directive),
-            Note(note) => self.note(note, directive),
-            Event(event) => self.event(event, directive),
-            Query(query) => self.query(query, directive),
+            Transaction(transaction) => self.transaction(transaction, date, element),
+            Price(price) => self.price(price, date, element),
+            Balance(balance) => self.balance(balance, date, element),
+            Open(open) => self.open(open, date, element),
+            Close(close) => self.close(close, date, element),
+            Commodity(commodity) => self.commodity(commodity, date, element),
+            Pad(pad) => self.pad(pad, date, element),
+            Document(document) => self.document(document, date, element),
+            Note(note) => self.note(note, date, element),
+            Event(event) => self.event(event, date, element),
+            Query(query) => self.query(query, date, element),
         }
     }
 
     fn transaction(
         &mut self,
         transaction: &parser::Transaction,
-        directive: &Spanned<parser::Directive>,
+        date: Date,
+        element: WrappedSpannedElement,
     ) {
         // determine auto-posting for at most one unspecified account
         let mut residual =
             hashbrown::HashMap::<&parser::Currency<'_>, rust_decimal::Decimal>::default();
         let mut unspecified: Vec<&Spanned<parser::Posting<'_>>> = Vec::default();
-        let date: Date = (*directive.date().item()).into();
 
         for posting in transaction.postings() {
             use hashbrown::hash_map::Entry::*;
@@ -336,18 +340,14 @@ impl LedgerBuilder {
 
             if !residual.is_empty() {
                 // check if within tolerance
-                self.errors.push(
-                    directive
-                        .error(format!(
+                self.errors.push(element.error(format!(
                             "unbalanced transaction, residual {}",
                             residual
                                 .iter()
                                 .map(|(cur, number)| format!("{} {}", -number, cur))
                                 .collect::<Vec<String>>()
                                 .join(", ")
-                        ))
-                        .into(),
-                );
+                        )));
             }
         }
         // any other unspecified postings are errors
@@ -359,21 +359,9 @@ impl LedgerBuilder {
             );
         }
 
-        // TODO extract this for reuse everywhere
-        let date: SteelVal = date.into_steelval().unwrap();
-        let span: SteelVal = Into::<Wrapped<_>>::into(*directive.span())
-            .into_steelval()
-            .unwrap();
-
-        let wrapped_spanned_element =
-            Into::<WrappedSpannedElement>::into(("transaction", *directive.span()));
-        let wrapped_spanned_element = wrapped_spanned_element.into_steelval().unwrap();
-
         self.directives.push(vec![
-            ("date", date).into(),
-            ("element-type", "transaction".to_string()).into(),
-            ("element", wrapped_spanned_element).into(),
-            ("span", span).into(),
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
         ])
     }
 
@@ -475,7 +463,7 @@ impl LedgerBuilder {
         }
     }
 
-    fn price(&mut self, price: &parser::Price, directive: &Spanned<parser::Directive>) {}
+    fn price(&mut self, price: &parser::Price, date: Date, element: WrappedSpannedElement) {}
 
     // base account is known
     fn rollup_inventory(
@@ -521,7 +509,7 @@ impl LedgerBuilder {
         }
     }
 
-    fn balance(&mut self, balance: &parser::Balance, directive: &Spanned<parser::Directive>) {
+    fn balance(&mut self, balance: &parser::Balance, date: Date, element: WrappedSpannedElement) {
         let account_name = balance.account().item().to_string();
         let (margin, pad) = if self.open_accounts.contains_key(&account_name) {
             // what's the gap between what we have and what the balance says we should have?
@@ -573,7 +561,8 @@ impl LedgerBuilder {
             // pad can't last beyond balance
             ((!margin.is_empty()).then_some(margin), account.pad.take())
         } else {
-            self.errors.push(directive.error("account not open").into());
+            self.errors
+                .push(element.error("account not open".to_string()));
             (None, None)
         };
 
@@ -656,7 +645,7 @@ impl LedgerBuilder {
                         .join("\n");
 
                 self.errors
-                    .push(directive.error(reason).with_annotation(annotation));
+                    .push(element.annotated_error(reason, annotation));
 
                 tracing::debug!(
                     "adjusting inventory {:?} for {:?}",
@@ -690,40 +679,32 @@ impl LedgerBuilder {
         let account = self.accounts.get_mut(&account_name).unwrap();
         account.balance_diagnostics.clear();
         account.balance_diagnostics.push(BalanceDiagnostic {
-            date: (*directive.date().item()).into(),
+            date,
             description: None,
             amount: None,
             balance: vec![balance.atol().amount().item().into()],
         });
     }
 
-    fn open(&mut self, open: &parser::Open, directive: &Spanned<parser::Directive>) {
+    fn open(&mut self, open: &parser::Open, date: Date, element: WrappedSpannedElement) {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(open.account().item().to_string()) {
             Occupied(open_entry) => {
-                self.errors.push(
-                    directive
-                        .error_with_contexts(
-                            "account already opened",
-                            vec![("open".to_string(), *open_entry.get())],
-                        )
-                        .into(),
-                );
+                self.errors.push(element.error_with_contexts(
+                    "account already opened",
+                    vec![("open".to_string(), *open_entry.get())],
+                ));
             }
             Vacant(open_entry) => {
-                let span = *directive.span();
+                let span = element.span();
                 open_entry.insert(span);
 
                 // cannot reopen a closed account
                 if let Some(closed) = self.closed_accounts.get(&open.account().item().to_string()) {
-                    self.errors.push(
-                        directive
-                            .error_with_contexts(
-                                "account was closed",
-                                vec![("close".to_string(), *closed)],
-                            )
-                            .into(),
-                    );
+                    self.errors.push(element.error_with_contexts(
+                        "account was closed",
+                        vec![("close".to_string(), *closed)],
+                    ));
                 } else {
                     self.accounts.insert(
                         open.account().item().to_string(),
@@ -737,7 +718,7 @@ impl LedgerBuilder {
         }
     }
 
-    fn close(&mut self, close: &parser::Close, directive: &Spanned<parser::Directive>) {
+    fn close(&mut self, close: &parser::Close, date: Date, element: WrappedSpannedElement) {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(close.account().item().to_string()) {
             Occupied(open_entry) => {
@@ -747,37 +728,38 @@ impl LedgerBuilder {
                 {
                     Occupied(closed_entry) => {
                         // cannot reclose a closed account
-                        self.errors.push(
-                            directive
-                                .error_with_contexts(
-                                    "account was already closed",
-                                    vec![("close".to_string(), *closed_entry.get())],
-                                )
-                                .into(),
-                        );
+                        self.errors.push(element.error_with_contexts(
+                            "account was already closed",
+                            vec![("close".to_string(), *closed_entry.get())],
+                        ));
                     }
                     Vacant(closed_entry) => {
                         open_entry.remove_entry();
-                        closed_entry.insert(*directive.span());
+                        closed_entry.insert(element.span());
                     }
                 }
             }
             Vacant(_) => {
-                self.errors.push(directive.error("account not open").into());
+                self.errors.push(element.error("account not open"));
             }
         }
     }
 
-    fn commodity(&mut self, commodity: &parser::Commodity, directive: &Spanned<parser::Directive>) {
+    fn commodity(
+        &mut self,
+        commodity: &parser::Commodity,
+        date: Date,
+        element: WrappedSpannedElement,
+    ) {
     }
 
-    fn pad(&mut self, pad: &parser::Pad, directive: &Spanned<parser::Directive>) {
+    fn pad(&mut self, pad: &parser::Pad, date: Date, element: WrappedSpannedElement) {
         let account_name = pad.account().item().to_string();
         if self.open_accounts.contains_key(&account_name) {
             let account = self.accounts.get_mut(&account_name).unwrap();
             let unused_pad = account.pad.replace(parser::spanned(
-                Pad::new(directive.date().item(), pad.source()),
-                *directive.span(),
+                Pad::new(&date, pad.source()),
+                element.span(),
             ));
 
             // unused pad directives are errors
@@ -786,17 +768,23 @@ impl LedgerBuilder {
                 self.errors.push(unused_pad.error("unused").into());
             }
         } else {
-            self.errors.push(directive.error("account not open").into());
+            self.errors.push(element.error("account not open"));
         }
     }
 
-    fn document(&mut self, document: &parser::Document, directive: &Spanned<parser::Directive>) {}
+    fn document(
+        &mut self,
+        document: &parser::Document,
+        date: Date,
+        element: WrappedSpannedElement,
+    ) {
+    }
 
-    fn note(&mut self, note: &parser::Note, directive: &Spanned<parser::Directive>) {}
+    fn note(&mut self, note: &parser::Note, date: Date, element: WrappedSpannedElement) {}
 
-    fn event(&mut self, event: &parser::Event, directive: &Spanned<parser::Directive>) {}
+    fn event(&mut self, event: &parser::Event, date: Date, element: WrappedSpannedElement) {}
 
-    fn query(&mut self, query: &parser::Query, directive: &Spanned<parser::Directive>) {}
+    fn query(&mut self, query: &parser::Query, date: Date, element: WrappedSpannedElement) {}
 }
 
 #[derive(Debug)]
