@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 abi_stable = "0.11.3"
-beancount-parser-lima = "0.11.0"
+beancount-parser-lima = "0.11.1"
 # beancount-parser-lima = { version = "0.11.0-alpha.1", path = "../beancount-parser-lima" }
 steel-core = "0.7.0"
 steel-repl = "0.7.0"
