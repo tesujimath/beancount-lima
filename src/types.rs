@@ -1,6 +1,6 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
-use beancount_parser_lima::{self as parser, BeancountSources};
+use beancount_parser_lima::{self as parser, BeancountSources, Span, Spanned};
 use color_eyre::eyre::Result;
 use std::{
     fmt::Display,
@@ -458,6 +458,51 @@ impl WrappedBeancountSources {
     }
 }
 
+#[derive(Debug)]
+pub struct Element {
+    element_type: &'static str,
+}
+
+impl Element {
+    pub fn new(element_type: &'static str, span: Span) -> Spanned<Self> {
+        parser::spanned(Element { element_type }, span)
+    }
+}
+
+impl parser::ElementType for Element {
+    fn element_type(&self) -> &'static str {
+        self.element_type
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct WrappedSpannedElement(Arc<Spanned<Element>>);
+
+impl Custom for WrappedSpannedElement {}
+
+impl From<(&'static str, Span)> for WrappedSpannedElement {
+    fn from((element_type, span): (&'static str, Span)) -> Self {
+        WrappedSpannedElement(Arc::new(parser::spanned(Element { element_type }, span)))
+    }
+}
+
+impl WrappedSpannedElement {
+    fn error(&self, message: String) -> WrappedError {
+        WrappedError(Arc::new(self.0.as_ref().error(message)))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct WrappedError(Arc<parser::Error>);
+
+impl Custom for WrappedError {}
+
+impl AsRef<parser::Error> for WrappedError {
+    fn as_ref(&self) -> &parser::Error {
+        self.0.as_ref()
+    }
+}
+
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Account>("ffi-account?");
     steel_engine.register_fn("ffi-account-postings", Account::postings);
@@ -508,4 +553,7 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<AlistItem>("ffi-alistitem?");
     steel_engine.register_fn("ffi-alistitem-key", AlistItem::key);
     steel_engine.register_fn("ffi-alistitem-value", AlistItem::value);
+
+    steel_engine.register_type::<WrappedError>("error?");
+    steel_engine.register_fn("ffi-error", WrappedSpannedElement::error);
 }

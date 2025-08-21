@@ -1,6 +1,6 @@
 (provide error)
 
-(define (error spanned-element message)
-  (list `(message . ,message)
-    (assoc 'element-type spanned-element)
-    (assoc 'span spanned-element)))
+;; create a new error for anything having an element property,
+;; generally directives and postings
+(define (error elemental message)
+  (ffi-error (alist-get 'element elemental) message))

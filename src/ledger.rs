@@ -111,93 +111,28 @@ impl Ledger {
     }
 }
 
-fn write_error(sources: WrappedBeancountSources, error: Vec<SteelVal>) {
-    tracing::debug!("write_error");
-
-    let mut span: Option<Span> = None;
-    let mut element_type: Option<String> = None;
-    let mut message: Option<String> = None;
-
-    for a in error {
-        if let SteelVal::Pair(x) = a {
-            tracing::debug!("error pair {:?} {:?}", x.car(), x.cdr());
-
-            if let SteelVal::SymbolV(name) = x.car() {
-                if name.as_str() == "element-type" {
-                    if let SteelVal::StringV(value) = x.cdr() {
-                        element_type = Some(value.to_string());
-                    }
-                } else if name.as_str() == "span" {
-                    if let SteelVal::Custom(v) = x.cdr() {
-                        if let Some(wrapped_span) = v
-                            .read()
-                            .as_any_ref()
-                            .downcast_ref::<Wrapped<Span>>()
-                            .cloned()
-                        {
-                            span = Some(*wrapped_span);
-                        } else {
-                            tracing::warn!("unexpected type for span {:?}", v.read().as_any_ref());
-                        }
-                    }
-                } else if name.as_str() == "message" {
-                    if let SteelVal::StringV(value) = x.cdr() {
-                        message = Some(value.to_string());
-                    }
-                }
-            }
-        } else {
-            tracing::debug!("error something else {:?} of type", a);
-        }
-    }
-
-    if let (Some(element_type), Some(span), Some(message)) = (element_type, span, message) {
-        // TODO don't leak the string here, somehow pass through a static str
-        let error = Element::new(element_type.leak(), span).error(message);
-        let sources = sources.lock();
-        sources.write(&std::io::stderr(), vec![error]).unwrap();
-    }
-}
-
-fn write_errors(sources: WrappedBeancountSources, errors: Vec<Vec<AlistItem>>) {
-    let errors = errors
-        .into_iter()
-        .filter_map(|e| {
-            let mut span: Option<Span> = None;
-            let mut element_type: Option<String> = None;
-            let mut message: Option<String> = None;
-
-            for item in e {
-                if item.key == "element-type" {
-                    element_type = Some(item.value.to_string());
-                } else if item.key == "span" {
-                    if let SteelVal::Custom(v) = item.value {
-                        if let Some(wrapped_span) = v
-                            .read()
-                            .as_any_ref()
-                            .downcast_ref::<Wrapped<Span>>()
-                            .cloned()
-                        {
-                            span = Some(*wrapped_span);
-                        } else {
-                            tracing::warn!("unexpected type for span {:?}", v.read().as_any_ref());
-                        }
-                    }
-                } else if item.key == "message" {
-                    message = Some(item.value.to_string());
-                }
-            }
-            if let (Some(element_type), Some(span), Some(message)) = (element_type, span, message) {
-                // TODO don't leak the string here, somehow pass through a static str
-                Some(Element::new(element_type.leak(), span).error(message))
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
+fn write_ffi_error(sources: WrappedBeancountSources, error: WrappedError) {
+    tracing::debug!("write_ffi_error");
 
     let sources = sources.lock();
-    sources.write(&std::io::stderr(), errors).unwrap();
+    sources
+        .write(&std::io::stderr(), vec![error.as_ref().clone()])
+        .unwrap();
+}
+
+fn write_ffi_errors(sources: WrappedBeancountSources, errors: Vec<WrappedError>) {
+    tracing::debug!("write_ffi_errors");
+
+    let sources = sources.lock();
+    sources
+        .write(
+            &std::io::stderr(),
+            errors
+                .iter()
+                .map(|e| e.as_ref().clone())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
 }
 
 #[derive(Debug)]
@@ -430,9 +365,14 @@ impl LedgerBuilder {
             .into_steelval()
             .unwrap();
 
+        let wrapped_spanned_element =
+            Into::<WrappedSpannedElement>::into(("transaction", *directive.span()));
+        let wrapped_spanned_element = wrapped_spanned_element.into_steelval().unwrap();
+
         self.directives.push(vec![
             ("date", date).into(),
             ("element-type", "transaction".to_string()).into(),
+            ("element", wrapped_spanned_element).into(),
             ("span", span).into(),
         ])
     }
@@ -1044,23 +984,6 @@ impl parser::ElementType for Pad {
     }
 }
 
-#[derive(Debug)]
-struct Element {
-    element_type: &'static str,
-}
-
-impl Element {
-    fn new(element_type: &'static str, span: Span) -> Spanned<Self> {
-        parser::spanned(Element { element_type }, span)
-    }
-}
-
-impl parser::ElementType for Element {
-    fn element_type(&self) -> &'static str {
-        self.element_type
-    }
-}
-
 /// Convert just those parser options that make sense to expose to Scheme.
 /// TODO incomplete
 fn convert_parser_options(options: &parser::Options<'_>) -> Vec<AlistItem> {
@@ -1120,6 +1043,6 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("ffi-ledger-main-currency", Ledger::main_currency);
     steel_engine.register_fn("ffi-ledger-options", Ledger::options);
 
-    steel_engine.register_fn("ffi-beancount-sources-write-error", write_error);
-    steel_engine.register_fn("ffi-beancount-sources-write-errors", write_errors);
+    steel_engine.register_fn("ffi-beancount-sources-write-ffi-error", write_ffi_error);
+    steel_engine.register_fn("ffi-beancount-sources-write-ffi-errors", write_ffi_errors);
 }
