@@ -1,16 +1,22 @@
 (provide
- alist-remove
- alist-get
- alist-get-or-default
- alist-get-or-empty
- alist-try-get
- alist-contains?
- alist-symbol-keys?
- alist-insert-or-replace
- alist-insert
- alist-merge)
+  alist?
+  alist-remove
+  alist-get
+  alist-get-or-default
+  alist-get-or-empty
+  alist-try-get
+  alist-contains?
+  alist-symbol-keys?
+  alist-insert-or-replace
+  alist-insert
+  alist-merge)
 
 (require (only-in "lima/lib/list.scm" all))
+
+;; is `x` an alist?
+(define (alist? x)
+  (and (list? x)
+    (all pair? x)))
 
 (define (alist-remove key alist)
   (filter (lambda (kv) (not (equal? (car kv) key))) alist))
@@ -36,8 +42,8 @@
 ;; do we have an alist with all keys being symbols?
 (define (alist-symbol-keys? alist)
   (and (list? alist)
-       (all (lambda (item) (and (pair? item) (symbol? (car item))))
-            alist)))
+    (all (lambda (item) (and (pair? item) (symbol? (car item))))
+      alist)))
 
 ;; insert or replace an item in an alist
 (define (alist-insert-or-replace key value alist)

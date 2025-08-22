@@ -463,7 +463,12 @@ impl LedgerBuilder {
         }
     }
 
-    fn price(&mut self, price: &parser::Price, date: Date, element: WrappedSpannedElement) {}
+    fn price(&mut self, price: &parser::Price, date: Date, element: WrappedSpannedElement) {
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
+    }
 
     // base account is known
     fn rollup_inventory(
@@ -684,6 +689,11 @@ impl LedgerBuilder {
             amount: None,
             balance: vec![balance.atol().amount().item().into()],
         });
+
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
     }
 
     fn open(&mut self, open: &parser::Open, date: Date, element: WrappedSpannedElement) {
@@ -716,6 +726,11 @@ impl LedgerBuilder {
                 }
             }
         }
+
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
     }
 
     fn close(&mut self, close: &parser::Close, date: Date, element: WrappedSpannedElement) {
@@ -743,6 +758,11 @@ impl LedgerBuilder {
                 self.errors.push(element.error("account not open"));
             }
         }
+
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
     }
 
     fn commodity(
@@ -751,6 +771,10 @@ impl LedgerBuilder {
         date: Date,
         element: WrappedSpannedElement,
     ) {
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
     }
 
     fn pad(&mut self, pad: &parser::Pad, date: Date, element: WrappedSpannedElement) {
@@ -770,6 +794,11 @@ impl LedgerBuilder {
         } else {
             self.errors.push(element.error("account not open"));
         }
+
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
     }
 
     fn document(
@@ -778,13 +807,32 @@ impl LedgerBuilder {
         date: Date,
         element: WrappedSpannedElement,
     ) {
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
     }
 
-    fn note(&mut self, note: &parser::Note, date: Date, element: WrappedSpannedElement) {}
+    fn note(&mut self, note: &parser::Note, date: Date, element: WrappedSpannedElement) {
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
+    }
 
-    fn event(&mut self, event: &parser::Event, date: Date, element: WrappedSpannedElement) {}
+    fn event(&mut self, event: &parser::Event, date: Date, element: WrappedSpannedElement) {
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
+    }
 
-    fn query(&mut self, query: &parser::Query, date: Date, element: WrappedSpannedElement) {}
+    fn query(&mut self, query: &parser::Query, date: Date, element: WrappedSpannedElement) {
+        self.directives.push(vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.into_steelval().unwrap()).into(),
+        ])
+    }
 }
 
 #[derive(Debug)]

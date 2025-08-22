@@ -1,6 +1,6 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
-use beancount_parser_lima::{self as parser, BeancountSources, Span, Spanned};
+use beancount_parser_lima::{self as parser, BeancountSources, ElementType, Span, Spanned};
 use color_eyre::eyre::Result;
 use std::{
     fmt::Display,
@@ -464,7 +464,7 @@ pub struct Element {
 }
 
 impl Element {
-    pub fn new(element_type: &'static str, span: Span) -> Spanned<Self> {
+    pub(crate) fn new(element_type: &'static str, span: Span) -> Spanned<Self> {
         parser::spanned(Element { element_type }, span)
     }
 }
@@ -478,7 +478,11 @@ impl parser::ElementType for Element {
 #[derive(Clone, Debug)]
 pub struct WrappedSpannedElement(Arc<Spanned<Element>>);
 
-impl Custom for WrappedSpannedElement {}
+impl Custom for WrappedSpannedElement {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(format!("Element::{}", self.0.as_ref().element_type())))
+    }
+}
 
 impl From<(&'static str, Span)> for WrappedSpannedElement {
     fn from((element_type, span): (&'static str, Span)) -> Self {
@@ -524,12 +528,53 @@ impl WrappedSpannedElement {
     pub(crate) fn span(&self) -> Span {
         *self.0.as_ref().span()
     }
+
+    pub(crate) fn is_transaction(&self) -> bool {
+        self.0.as_ref().element_type == "transaction"
+    }
+    pub(crate) fn is_price(&self) -> bool {
+        self.0.as_ref().element_type == "price"
+    }
+    pub(crate) fn is_balance(&self) -> bool {
+        self.0.as_ref().element_type == "balance"
+    }
+    pub(crate) fn is_open(&self) -> bool {
+        self.0.as_ref().element_type == "open"
+    }
+    pub(crate) fn is_close(&self) -> bool {
+        self.0.as_ref().element_type == "close"
+    }
+    pub(crate) fn is_commodity(&self) -> bool {
+        self.0.as_ref().element_type == "commodity"
+    }
+    pub(crate) fn is_pad(&self) -> bool {
+        self.0.as_ref().element_type == "pad"
+    }
+    pub(crate) fn is_document(&self) -> bool {
+        self.0.as_ref().element_type == "document"
+    }
+    pub(crate) fn is_note(&self) -> bool {
+        self.0.as_ref().element_type == "note"
+    }
+    pub(crate) fn is_event(&self) -> bool {
+        self.0.as_ref().element_type == "event"
+    }
+    pub(crate) fn is_query(&self) -> bool {
+        self.0.as_ref().element_type == "query"
+    }
+    pub(crate) fn is_posting(&self) -> bool {
+        self.0.as_ref().element_type == "posting"
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct WrappedError(Arc<parser::Error>);
 
-impl Custom for WrappedError {}
+impl Custom for WrappedError {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.0.as_ref().to_string()))
+    }
+}
 
 impl AsRef<parser::Error> for WrappedError {
     fn as_ref(&self) -> &parser::Error {
@@ -590,4 +635,23 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
 
     steel_engine.register_type::<WrappedError>("error?");
     steel_engine.register_fn("ffi-error", WrappedSpannedElement::ffi_error);
+
+    steel_engine.register_fn(
+        "ffi-element-transaction?",
+        WrappedSpannedElement::is_transaction,
+    );
+    steel_engine.register_fn("ffi-element-price?", WrappedSpannedElement::is_price);
+    steel_engine.register_fn("ffi-element-balance?", WrappedSpannedElement::is_balance);
+    steel_engine.register_fn("ffi-element-open?", WrappedSpannedElement::is_open);
+    steel_engine.register_fn("ffi-element-close?", WrappedSpannedElement::is_close);
+    steel_engine.register_fn(
+        "ffi-element-commodity?",
+        WrappedSpannedElement::is_commodity,
+    );
+    steel_engine.register_fn("ffi-element-pad?", WrappedSpannedElement::is_pad);
+    steel_engine.register_fn("ffi-element-document?", WrappedSpannedElement::is_document);
+    steel_engine.register_fn("ffi-element-note?", WrappedSpannedElement::is_note);
+    steel_engine.register_fn("ffi-element-event?", WrappedSpannedElement::is_event);
+    steel_engine.register_fn("ffi-element-query?", WrappedSpannedElement::is_query);
+    steel_engine.register_fn("ffi-element-posting?", WrappedSpannedElement::is_posting);
 }
