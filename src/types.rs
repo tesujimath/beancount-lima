@@ -393,10 +393,16 @@ where
     }
 }
 
-#[derive(Clone, Steel, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct AlistItem {
     pub(crate) key: String,
     pub(crate) value: SteelVal,
+}
+
+impl Custom for AlistItem {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(format!("AlistItem({} . {})", &self.key, &self.value)))
+    }
 }
 
 impl Display for AlistItem {
@@ -484,9 +490,17 @@ impl Custom for WrappedSpannedElement {
     }
 }
 
-impl From<(&'static str, Span)> for WrappedSpannedElement {
-    fn from((element_type, span): (&'static str, Span)) -> Self {
-        WrappedSpannedElement(Arc::new(parser::spanned(Element { element_type }, span)))
+impl<T> From<&Spanned<T>> for WrappedSpannedElement
+where
+    T: parser::ElementType,
+{
+    fn from(spanned_element: &Spanned<T>) -> Self {
+        WrappedSpannedElement(Arc::new(parser::spanned(
+            Element {
+                element_type: spanned_element.element_type(),
+            },
+            *spanned_element.span(),
+        )))
     }
 }
 

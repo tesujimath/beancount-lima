@@ -7,6 +7,7 @@
   ledger-main-currency
   ledger-account-names
   ledger-accounts
+  ledger-directives
   ledger-options
   account
   account?

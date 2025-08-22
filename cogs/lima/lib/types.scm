@@ -6,6 +6,7 @@
   ledger-main-currency
   ledger-account-names
   ledger-accounts
+  ledger-directives
   ledger-options
   account
   account?
@@ -73,7 +74,7 @@
 
 (struct account (inventory postings) #:transparent)
 
-(struct ledger (currencies main-currency account-names accounts options) #:transparent)
+(struct ledger (currencies main-currency account-names accounts directives options) #:transparent)
 
 ;; tests for elements
 (define (specified-element? element-f x)

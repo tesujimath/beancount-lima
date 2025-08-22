@@ -1,8 +1,7 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima::{
-    self as parser, BeancountParser, BeancountSources, ElementType, ParseError, ParseSuccess, Span,
-    Spanned,
+    self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
 use color_eyre::eyre::{eyre, Result, WrapErr};
 use std::{
@@ -214,13 +213,16 @@ impl LedgerBuilder {
         use parser::DirectiveVariant::*;
 
         let date: Date = (*directive.date().item()).into();
-        let element =
-            Into::<WrappedSpannedElement>::into((directive.element_type(), *directive.span()));
+        let element = Into::<WrappedSpannedElement>::into(directive);
 
+        let mut attrs = vec![
+            ("date", date.into_steelval().unwrap()).into(),
+            ("element", element.clone().into_steelval().unwrap()).into(),
+        ];
         match directive.variant() {
-            Transaction(transaction) => self.transaction(transaction, date, element),
+            Transaction(transaction) => self.transaction(transaction, date, element, &mut attrs),
             Price(price) => self.price(price, date, element),
-            Balance(balance) => self.balance(balance, date, element),
+            Balance(balance) => self.balance(balance, date, element, &mut attrs),
             Open(open) => self.open(open, date, element),
             Close(close) => self.close(close, date, element),
             Commodity(commodity) => self.commodity(commodity, date, element),
@@ -229,7 +231,9 @@ impl LedgerBuilder {
             Note(note) => self.note(note, date, element),
             Event(event) => self.event(event, date, element),
             Query(query) => self.query(query, date, element),
-        }
+        };
+
+        self.directives.push(attrs)
     }
 
     fn transaction(
@@ -237,7 +241,10 @@ impl LedgerBuilder {
         transaction: &parser::Transaction,
         date: Date,
         element: WrappedSpannedElement,
+        attrs: &mut Vec<AlistItem>,
     ) {
+        let mut postings = Vec::default();
+
         // determine auto-posting for at most one unspecified account
         let mut residual =
             hashbrown::HashMap::<&parser::Currency<'_>, rust_decimal::Decimal>::default();
@@ -300,15 +307,17 @@ impl LedgerBuilder {
                 |payee| payee.item(),
             );
 
-            self.post(
+            if let Some(posting) = self.post(
+                posting.into(),
                 date,
                 &posting.account().to_string(),
                 amount,
                 currency.to_string(),
                 posting.flag().map(|flag| flag.item().to_string()),
                 description,
-                posting,
-            );
+            ) {
+                postings.push(posting);
+            }
         }
 
         // auto-post if required
@@ -323,15 +332,17 @@ impl LedgerBuilder {
                     |payee| payee.item(),
                 );
 
-                self.post(
+                if let Some(posting) = self.post(
+                    unspecified.into(),
                     date,
                     &unspecified.account().to_string(),
                     -number,
                     currency.to_string(),
                     unspecified.flag().map(|flag| flag.item().to_string()),
                     description,
-                    unspecified,
-                );
+                ) {
+                    postings.push(posting);
+                }
             }
         } else {
             let residual = self
@@ -359,26 +370,24 @@ impl LedgerBuilder {
             );
         }
 
-        self.directives.push(vec![
-            ("date", date.into_steelval().unwrap()).into(),
-            ("element", element.into_steelval().unwrap()).into(),
-        ])
+        attrs.push(("postings", postings.into_steelval().unwrap()).into());
     }
 
     // not without guilt, but oh well
     #[allow(clippy::too_many_arguments)]
-    fn post<D, E>(
+    // accumulate the post and return its alist attrs, or record error and return None
+    fn post<D>(
         &mut self,
+        element: WrappedSpannedElement,
         date: Date,
         account_name: &str,
         amount: rust_decimal::Decimal,
         currency: String,
         flag: Option<String>,
         description: D,
-        source: &Spanned<E>,
-    ) where
+    ) -> Option<Vec<AlistItem>>
+    where
         D: Into<String>,
-        E: parser::ElementType,
     {
         if self.open_accounts.contains_key(account_name) {
             let account = self.accounts.get_mut(account_name).unwrap();
@@ -439,27 +448,32 @@ impl LedgerBuilder {
                 account.balance_diagnostics.push(BalanceDiagnostic {
                     date,
                     description: Some(description.into()),
-                    amount: Some(amount),
+                    amount: Some(amount.clone()),
                     balance,
-                })
+                });
+
+                Some(posting_attrs(element, account_name.to_string(), amount))
             } else {
-                self.errors.push(
-                    source
-                        .error_with_contexts(
-                            "invalid currency for account",
-                            vec![("open".to_string(), account.opened)],
-                        )
-                        .into(),
-                );
+                self.errors.push(element.error_with_contexts(
+                    "invalid currency for account",
+                    vec![("open".to_string(), account.opened)],
+                ));
+
+                None
             }
         } else if let Some(closed) = self.closed_accounts.get(account_name) {
             self.errors.push(
-                source
-                    .error_with_contexts("account was closed", vec![("close".to_string(), *closed)])
-                    .into(),
+                element.error_with_contexts(
+                    "account was closed",
+                    vec![("close".to_string(), *closed)],
+                ),
             );
+
+            None
         } else {
-            self.errors.push(source.error("account not open").into());
+            self.errors.push(element.error("account not open"));
+
+            None
         }
     }
 
@@ -514,7 +528,14 @@ impl LedgerBuilder {
         }
     }
 
-    fn balance(&mut self, balance: &parser::Balance, date: Date, element: WrappedSpannedElement) {
+    fn balance(
+        &mut self,
+        balance: &parser::Balance,
+        date: Date,
+        element: WrappedSpannedElement,
+        attrs: &mut Vec<AlistItem>,
+    ) {
+        let mut pad_postings = Vec::default();
         let account_name = balance.account().item().to_string();
         let (margin, pad) = if self.open_accounts.contains_key(&account_name) {
             // what's the gap between what we have and what the balance says we should have?
@@ -591,15 +612,17 @@ impl LedgerBuilder {
                         number,
                         cur
                     );
-                    self.post(
+                    if let Some(posting) = self.post(
+                        (&pad).into(),
                         pad.date,
                         &account_name,
                         *number,
                         cur.clone(),
                         pad_flag,
                         "pad",
-                        &pad,
-                    );
+                    ) {
+                        pad_postings.push(posting);
+                    }
                 }
             }
             (Some(margin), None) => {
@@ -690,10 +713,7 @@ impl LedgerBuilder {
             balance: vec![balance.atol().amount().item().into()],
         });
 
-        self.directives.push(vec![
-            ("date", date.into_steelval().unwrap()).into(),
-            ("element", element.into_steelval().unwrap()).into(),
-        ])
+        attrs.push(("postings", pad_postings.into_steelval().unwrap()).into());
     }
 
     fn open(&mut self, open: &parser::Open, date: Date, element: WrappedSpannedElement) {
@@ -833,6 +853,15 @@ impl LedgerBuilder {
             ("element", element.into_steelval().unwrap()).into(),
         ])
     }
+}
+
+// TODO cost-or-costspec, price, flag, metadata
+fn posting_attrs(element: WrappedSpannedElement, account: String, units: Amount) -> Vec<AlistItem> {
+    vec![
+        ("element", element.into_steelval().unwrap()).into(),
+        ("account", account).into(),
+        ("units", units.into_steelval().unwrap()).into(),
+    ]
 }
 
 #[derive(Debug)]
