@@ -371,6 +371,13 @@ impl LedgerBuilder {
         }
 
         attrs.push(("postings", postings.into_steelval().unwrap()).into());
+        attrs.push(("flag", transaction.flag().to_string()).into());
+        if let Some(payee) = transaction.payee() {
+            attrs.push(("payee", payee.to_string()).into());
+        }
+        if let Some(narration) = transaction.narration() {
+            attrs.push(("narration", narration.to_string()).into());
+        }
     }
 
     // not without guilt, but oh well
