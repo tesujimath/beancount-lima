@@ -1,8 +1,5 @@
 (provide
-  ffi-alist->alist
-  ffi-ledger->ledger)
-
-(require "lima/lib/ledger.scm")
+  ffi-alist->alist)
 
 ;; TODO eliminate this
 ;; recursively convert ffi-alist to alist,
@@ -18,6 +15,3 @@
             [else x]))
       xs)
     xs))
-
-(define (ffi-ledger->ledger ldg)
-  (directives->ledger (ffi-ledger-directives ldg) (ffi-ledger-options ldg)))

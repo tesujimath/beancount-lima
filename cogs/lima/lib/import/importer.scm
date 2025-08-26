@@ -44,7 +44,7 @@
 ; accounts - alist of account-id to account-name
 ; txnid-key - metadata key used for transaction IDs
 ; txn-directive - the directive written out for a transaction
-(define (import config options group)
+(define (import config args group)
   (let*
     (
       ; config
@@ -60,8 +60,8 @@
       (comment-column (config-value-or-default '(comment-column) 40 import-config))
       (cost-column (config-value-or-default '(cost-column) 76 import-config))
 
-      ; options
-      (standalone (alist-get-or-default 'standalone #f options))
+      ; args
+      (standalone (hash-try-get args 'standalone))
 
       ; defaults
       (extractors-by-format `(("ofx1" . ((txn . ,ofx1/make-extract-txn)

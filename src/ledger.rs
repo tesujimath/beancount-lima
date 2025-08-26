@@ -12,7 +12,7 @@ use std::{
 };
 use steel::{
     gc::Gc,
-    rvals::{IntoSteelVal, SteelVector},
+    rvals::{IntoSteelVal, SteelHashMap, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelVal, Vector,
 };
@@ -24,7 +24,7 @@ use crate::{config::LedgerBuilderConfig, types::*};
 pub(crate) struct Ledger {
     pub(crate) sources: WrappedBeancountSources,
     pub(crate) directives: SteelVector,
-    pub(crate) options: Vec<AlistItem>, // TODO
+    pub(crate) options: SteelHashMap,
 }
 
 impl Ledger {
@@ -33,7 +33,7 @@ impl Ledger {
         Ledger {
             sources: BeancountSources::from("").into(),
             directives: Gc::new(Vector::default()).into(),
-            options: Vec::default(),
+            options: Gc::new(steel::HashMap::default()).into(),
         }
     }
 
@@ -87,13 +87,19 @@ impl Ledger {
         SteelVal::VectorV(self.directives.clone())
     }
 
-    fn options(&self) -> Vec<AlistItem> {
-        self.options.clone()
+    fn options(&self) -> SteelVal {
+        SteelVal::HashMapV(self.options.clone())
     }
 
     pub(crate) fn register(self, steel_engine: &mut Engine) {
         steel_engine
-            .register_external_value("*ffi-ledger*", self)
+            .register_external_value("*sources*", self.sources())
+            .unwrap(); // can't fail
+        steel_engine
+            .register_external_value("*directives*", self.directives())
+            .unwrap(); // can't fail
+        steel_engine
+            .register_external_value("*options*", self.options())
             .unwrap(); // can't fail
     }
 }
@@ -131,13 +137,17 @@ struct LedgerBuilder {
     accounts: HashMap<String, AccountBuilder>,
     currency_usage: hashbrown::HashMap<String, i32>,
     inferred_tolerance: InferredTolerance,
-    parser_options: Vec<AlistItem>,
+    parser_options: SteelHashMap,
     config: LedgerBuilderConfig,
     errors: Vec<parser::AnnotatedError>,
 }
 
 impl LedgerBuilder {
     fn new(options: &parser::Options<'_>, config: LedgerBuilderConfig) -> Self {
+        let parser_options = convert_parser_options(options)
+            .map(|(k, v)| (SteelVal::SymbolV(k.to_string().into()), v))
+            .collect::<steel::HashMap<SteelVal, SteelVal>>();
+        let parser_options = Gc::new(parser_options).into();
         Self {
             directives: Vec::default(),
             open_accounts: hashbrown::HashMap::default(),
@@ -145,7 +155,7 @@ impl LedgerBuilder {
             accounts: HashMap::default(),
             currency_usage: hashbrown::HashMap::default(),
             inferred_tolerance: InferredTolerance::new(options),
-            parser_options: convert_parser_options(options),
+            parser_options,
             config,
             errors: Vec::default(),
         }
@@ -1015,53 +1025,49 @@ impl AccountBuilder {
 
 /// Convert just those parser options that make sense to expose to Scheme.
 /// TODO incomplete
-fn convert_parser_options(options: &parser::Options<'_>) -> Vec<AlistItem> {
-    once(
-        (
-            "name_assets",
-            options
-                .account_type_name(parser::AccountType::Assets)
-                .to_string(),
-        )
-            .into(),
-    )
-    .chain(once(
-        (
-            "name_liabilities",
-            options
-                .account_type_name(parser::AccountType::Liabilities)
-                .to_string(),
-        )
-            .into(),
+fn convert_parser_options(
+    options: &parser::Options<'_>,
+) -> impl Iterator<Item = (&'static str, SteelVal)> {
+    once((
+        "name_assets",
+        options
+            .account_type_name(parser::AccountType::Assets)
+            .to_string()
+            .into_steelval()
+            .unwrap(),
     ))
-    .chain(once(
-        (
-            "name_equity",
-            options
-                .account_type_name(parser::AccountType::Equity)
-                .to_string(),
-        )
-            .into(),
-    ))
-    .chain(once(
-        (
-            "name_income",
-            options
-                .account_type_name(parser::AccountType::Income)
-                .to_string(),
-        )
-            .into(),
-    ))
-    .chain(once(
-        (
-            "name_expenses",
-            options
-                .account_type_name(parser::AccountType::Expenses)
-                .to_string(),
-        )
-            .into(),
-    ))
-    .collect::<Vec<AlistItem>>()
+    .chain(once((
+        "name_liabilities",
+        options
+            .account_type_name(parser::AccountType::Liabilities)
+            .to_string()
+            .into_steelval()
+            .unwrap(),
+    )))
+    .chain(once((
+        "name_equity",
+        options
+            .account_type_name(parser::AccountType::Equity)
+            .to_string()
+            .into_steelval()
+            .unwrap(),
+    )))
+    .chain(once((
+        "name_income",
+        options
+            .account_type_name(parser::AccountType::Income)
+            .to_string()
+            .into_steelval()
+            .unwrap(),
+    )))
+    .chain(once((
+        "name_expenses",
+        options
+            .account_type_name(parser::AccountType::Expenses)
+            .to_string()
+            .into_steelval()
+            .unwrap(),
+    )))
 }
 
 const PAD_FLAG: &str = "P";

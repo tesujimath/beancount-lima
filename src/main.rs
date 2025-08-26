@@ -1,5 +1,5 @@
 use crate::{
-    cli_options::register_cli_options,
+    args::register_args,
     config::{get_config_string, LedgerBuilderConfig},
     import::{Context, Group},
     ledger::Ledger,
@@ -140,7 +140,7 @@ fn main() -> Result<()> {
     load_cog(&mut steel_engine, "lima/config.scm")?;
 
     let cli = Cli::parse();
-    register_cli_options(&mut steel_engine, cli.options);
+    register_args(&mut steel_engine, cli.options);
 
     let ledger_path = cli
         .ledger
@@ -304,7 +304,7 @@ fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<
     )
 }
 
-pub(crate) mod cli_options;
+pub(crate) mod args;
 pub(crate) mod config;
 pub(crate) mod import;
 pub(crate) mod inventory;

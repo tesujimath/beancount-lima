@@ -7,8 +7,6 @@
   ledger-main-currency
   ledger-account-names
   ledger-accounts
-  ledger-directives
-  ledger-options
   period
   period?
   period-within?
@@ -43,4 +41,4 @@
   alist-contains?)
 
 (require "lima/lib/globals.scm")
-(provide *ledger* *cli-options*)
+(provide *ledger*)

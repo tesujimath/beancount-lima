@@ -8,7 +8,7 @@
 (require "lima/lib/account.scm")
 (require "steel/sorting/merge-sort.scm")
 
-(define (directives->ledger directives opts)
+(define (directives->ledger directives)
   (let ((inv-accum (inventory-accumulator)))
     (transduce directives
       (filtering transaction?)
@@ -24,9 +24,7 @@
       (ledger (merge-sort currencies #:comparator string<?)
         main-currency
         account-names
-        inv
-        directives
-        opts))))
+        inv))))
 
 ;; return a new ledger filtered by account name `predicate`
 (define (ledger-filter-accounts-by-name predicate ldg)
@@ -36,10 +34,9 @@
                     (into-hashmap))))
     (ledger
       (ledger-currencies ldg)
+      (ledger-main-currency ldg)
       account-names
-      accounts
-      (ledger-directives ldg)
-      (ledger-options ldg))))
+      accounts)))
 
 ;; transducer to extract the combined predicate from a predicates alist
 ;; example:
@@ -83,5 +80,4 @@
       (ledger-currencies ldg)
       (ledger-main-currency ldg)
       filtered-account-names
-      filtered-accounts
-      (ledger-options ldg))))
+      filtered-accounts)))

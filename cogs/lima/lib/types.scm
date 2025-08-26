@@ -6,8 +6,6 @@
   ledger-main-currency
   ledger-account-names
   ledger-accounts
-  ledger-directives
-  ledger-options
   period
   period?
   period-within?
@@ -39,4 +37,4 @@
 ;; create optional with flag
 (define (optional-flag flg) `((flag . ,flg)))
 
-(struct ledger (currencies main-currency account-names accounts directives options) #:transparent)
+(struct ledger (currencies main-currency account-names accounts) #:transparent)
