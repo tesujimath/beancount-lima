@@ -11,8 +11,10 @@ use std::{
     path::Path,
 };
 use steel::{
-    rvals::IntoSteelVal,
+    gc::Gc,
+    rvals::{IntoSteelVal, SteelString, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
+    SteelVal, Vector,
 };
 use steel_derive::Steel;
 
@@ -21,10 +23,10 @@ use crate::{config::LedgerBuilderConfig, types::*};
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
     pub(crate) sources: WrappedBeancountSources,
-    pub(crate) directives: Vec<Vec<AlistItem>>,
-    pub(crate) accounts: HashMap<String, Account>,
-    pub(crate) main_currency: String,
-    pub(crate) options: Vec<AlistItem>,
+    pub(crate) directives: SteelVector,
+    pub(crate) accounts: HashMap<SteelString, Account>, // TODO
+    pub(crate) main_currency: SteelString,
+    pub(crate) options: Vec<AlistItem>, // TODO
 }
 
 const DEFAULT_CURRENCY: &str = "USD"; // ugh
@@ -34,9 +36,9 @@ impl Ledger {
     pub(crate) fn empty() -> Self {
         Ledger {
             sources: BeancountSources::from("").into(),
-            directives: Vec::default(),
+            directives: Gc::new(Vector::default()).into(),
             accounts: HashMap::default(),
-            main_currency: DEFAULT_CURRENCY.to_string(),
+            main_currency: DEFAULT_CURRENCY.to_string().into(),
             options: Vec::default(),
         }
     }
@@ -87,15 +89,15 @@ impl Ledger {
         self.sources.clone()
     }
 
-    fn directives(&self) -> Vec<Vec<AlistItem>> {
-        self.directives.clone()
+    fn directives(&self) -> SteelVal {
+        SteelVal::VectorV(self.directives.clone())
     }
 
-    fn accounts(&self) -> HashMap<String, Account> {
+    fn accounts(&self) -> HashMap<SteelString, Account> {
         self.accounts.clone()
     }
 
-    fn main_currency(&self) -> String {
+    fn main_currency(&self) -> SteelString {
         self.main_currency.clone()
     }
 
@@ -136,7 +138,7 @@ fn write_ffi_errors(sources: WrappedBeancountSources, errors: Vec<WrappedError>)
 
 #[derive(Debug)]
 struct LedgerBuilder {
-    directives: Vec<Vec<AlistItem>>,
+    directives: Vec<Directive>,
     // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
     open_accounts: hashbrown::HashMap<String, Span>,
     closed_accounts: hashbrown::HashMap<String, Span>,
@@ -167,8 +169,9 @@ impl LedgerBuilder {
     fn validate(&mut self) {
         // check for unused pad directives
         for account in self.accounts.values() {
-            if let Some(pad) = &account.pad {
-                self.errors.push(pad.error("unused").into())
+            if let Some(pad_idx) = &account.pad_idx {
+                self.errors
+                    .push(self.directives[*pad_idx].element.error("unused"))
             }
         }
     }
@@ -195,12 +198,18 @@ impl LedgerBuilder {
 
             Ok(Ledger {
                 sources: sources.into(),
-                directives,
+                directives: Gc::new(
+                    directives
+                        .into_iter()
+                        .map(|directive| directive.into_steelval().unwrap())
+                        .collect::<Vector<SteelVal>>(),
+                )
+                .into(),
                 accounts: accounts
                     .into_iter()
-                    .map(|(name, account)| (name, account.build()))
+                    .map(|(name, account)| (name.into(), account.build()))
                     .collect(),
-                main_currency,
+                main_currency: main_currency.into(),
                 options: parser_options,
             })
         } else {
@@ -215,14 +224,10 @@ impl LedgerBuilder {
         let date: Date = (*directive.date().item()).into();
         let element = Into::<WrappedSpannedElement>::into(directive);
 
-        let mut attrs = vec![
-            ("date", date.into_steelval().unwrap()).into(),
-            ("element", element.clone().into_steelval().unwrap()).into(),
-        ];
         match directive.variant() {
-            Transaction(transaction) => self.transaction(transaction, date, element, &mut attrs),
+            Transaction(transaction) => self.transaction(transaction, date, element),
             Price(price) => self.price(price, date, element),
-            Balance(balance) => self.balance(balance, date, element, &mut attrs),
+            Balance(balance) => self.balance(balance, date, element),
             Open(open) => self.open(open, date, element),
             Close(close) => self.close(close, date, element),
             Commodity(commodity) => self.commodity(commodity, date, element),
@@ -232,8 +237,6 @@ impl LedgerBuilder {
             Event(event) => self.event(event, date, element),
             Query(query) => self.query(query, date, element),
         };
-
-        self.directives.push(attrs)
     }
 
     fn transaction(
@@ -241,7 +244,6 @@ impl LedgerBuilder {
         transaction: &parser::Transaction,
         date: Date,
         element: WrappedSpannedElement,
-        attrs: &mut Vec<AlistItem>,
     ) {
         let mut postings = Vec::default();
 
@@ -370,14 +372,20 @@ impl LedgerBuilder {
             );
         }
 
-        attrs.push(("postings", postings.into_steelval().unwrap()).into());
-        attrs.push(("flag", transaction.flag().to_string()).into());
-        if let Some(payee) = transaction.payee() {
-            attrs.push(("payee", payee.to_string()).into());
-        }
-        if let Some(narration) = transaction.narration() {
-            attrs.push(("narration", narration.to_string()).into());
-        }
+        let transaction = Transaction {
+            postings,
+            flag: transaction.flag().to_string().into(),
+            payee: transaction.payee().map(|payee| payee.to_string().into()),
+            narration: transaction
+                .narration()
+                .map(|narration| narration.to_string().into()),
+        };
+
+        self.directives.push(Directive {
+            date,
+            element,
+            variant: DirectiveVariant::Transaction(transaction),
+        })
     }
 
     // not without guilt, but oh well
@@ -392,7 +400,7 @@ impl LedgerBuilder {
         currency: String,
         flag: Option<String>,
         description: D,
-    ) -> Option<Vec<AlistItem>>
+    ) -> Option<Posting>
     where
         D: Into<String>,
     {
@@ -448,9 +456,8 @@ impl LedgerBuilder {
                     })
                     .collect::<Vec<Amount>>();
 
-                account
-                    .postings
-                    .push(Posting::new(date, amount.clone(), flag));
+                let posting = Posting::new(date, amount.clone(), flag);
+                account.postings.push(posting.clone());
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
                     date,
@@ -459,7 +466,17 @@ impl LedgerBuilder {
                     balance,
                 });
 
-                Some(posting_attrs(element, account_name.to_string(), amount))
+                Some(posting)
+            // TODO cost-or-costspec, price, flag, metadata
+            // fn posting_attrs(element: WrappedSpannedElement, account: String, units: Amount) -> Vec<AlistItem> {
+            //     vec![
+            //         ("element", element.into_steelval().unwrap()).into(),
+            //         ("account", account).into(),
+            //         ("units", units.into_steelval().unwrap()).into(),
+            //     ]
+            // }
+
+            //                 Some(posting_attrs(element, account_name.to_string(), amount))
             } else {
                 self.errors.push(element.error_with_contexts(
                     "invalid currency for account",
@@ -530,16 +547,9 @@ impl LedgerBuilder {
         }
     }
 
-    fn balance(
-        &mut self,
-        balance: &parser::Balance,
-        date: Date,
-        element: WrappedSpannedElement,
-        attrs: &mut Vec<AlistItem>,
-    ) {
-        let mut pad_postings = Vec::default();
+    fn balance(&mut self, balance: &parser::Balance, date: Date, element: WrappedSpannedElement) {
         let account_name = balance.account().item().to_string();
-        let (margin, pad) = if self.open_accounts.contains_key(&account_name) {
+        let (margin, pad_idx) = if self.open_accounts.contains_key(&account_name) {
             // what's the gap between what we have and what the balance says we should have?
             let mut inventory_has_balance_currency = false;
             let mut margin = self
@@ -587,15 +597,18 @@ impl LedgerBuilder {
             }
 
             // pad can't last beyond balance
-            ((!margin.is_empty()).then_some(margin), account.pad.take())
+            (
+                (!margin.is_empty()).then_some(margin),
+                account.pad_idx.take(),
+            )
         } else {
             self.errors
                 .push(element.error("account not open".to_string()));
             (None, None)
         };
 
-        match (margin, pad) {
-            (Some(margin), Some(pad)) => {
+        match (margin, pad_idx) {
+            (Some(margin), Some(pad_idx)) => {
                 tracing::debug!(
                     "margin {}",
                     margin
@@ -605,18 +618,23 @@ impl LedgerBuilder {
                         .join(", ")
                 );
 
+                let pad = &self.directives[pad_idx];
+                let pad_element = pad.element.clone();
+                let pad_date = pad.date;
+                let mut pad_postings = Vec::default();
+
                 for (cur, number) in &margin {
-                    let pad_flag = Some("P".to_string());
+                    let pad_flag = Some(PAD_FLAG.to_string());
                     tracing::debug!(
-                        "pad {} {} {} {}",
-                        pad.date.clone(),
+                        "back-filling pad at {} {} {} {}",
+                        pad_idx,
                         &account_name,
                         number,
                         cur
                     );
                     if let Some(posting) = self.post(
-                        (&pad).into(),
-                        pad.date,
+                        pad_element.clone(),
+                        pad_date,
                         &account_name,
                         *number,
                         cur.clone(),
@@ -625,6 +643,14 @@ impl LedgerBuilder {
                     ) {
                         pad_postings.push(posting);
                     }
+                }
+
+                if let DirectiveVariant::Transaction(pad_transaction) =
+                    &mut self.directives[pad_idx + 1].variant
+                {
+                    pad_transaction.postings.append(&mut pad_postings);
+                } else {
+                    panic!("directive at {} is not a transaction", pad_idx + 1);
                 }
             }
             (Some(margin), None) => {
@@ -715,22 +741,23 @@ impl LedgerBuilder {
             balance: vec![balance.atol().amount().item().into()],
         });
 
-        attrs.push(("account", account_name.to_string()).into());
-        attrs.push(
-            (
-                "amount",
-                Into::<Amount>::into((
-                    balance.atol().amount().number().value(),
-                    balance.atol().amount().currency().to_string(),
-                ))
-                .into_steelval()
-                .unwrap(),
+        let balance = Balance {
+            account: account_name.into(),
+            amount: (
+                balance.atol().amount().number().value(),
+                balance.atol().amount().currency(),
             )
                 .into(),
-        );
-
-        attrs.push(("postings", pad_postings.into_steelval().unwrap()).into());
-        // TODO tolerance
+            tolerance: balance
+                .atol()
+                .tolerance()
+                .map(|tolerance| (*tolerance.item()).into()),
+        };
+        self.directives.push(Directive {
+            date,
+            element,
+            variant: DirectiveVariant::Balance(balance),
+        })
     }
 
     fn open(&mut self, open: &parser::Open, date: Date, element: WrappedSpannedElement) {
@@ -804,16 +831,34 @@ impl LedgerBuilder {
         let account_name = pad.account().item().to_string();
         if self.open_accounts.contains_key(&account_name) {
             let account = self.accounts.get_mut(&account_name).unwrap();
-            let unused_pad = account.pad.replace(parser::spanned(
-                Pad::new(&date, pad.source()),
-                element.span(),
-            ));
+            let source = pad.source().to_string().into();
+
+            let unused_pad_idx = account.pad_idx.replace(self.directives.len());
 
             // unused pad directives are errors
             // https://beancount.github.io/docs/beancount_language_syntax.html#unused-pad-directives
-            if let Some(unused_pad) = unused_pad {
-                self.errors.push(unused_pad.error("unused").into());
+            if let Some(unused_pad_idx) = unused_pad_idx {
+                self.errors
+                    .push(self.directives[unused_pad_idx].element.error("unused"));
             }
+
+            self.directives.push(Directive {
+                date,
+                element: element.clone(),
+                variant: DirectiveVariant::Pad(Pad { source }),
+            });
+
+            // also need a transaction to be back-filled later with whatever got padded
+            self.directives.push(Directive {
+                date,
+                element,
+                variant: DirectiveVariant::Transaction(Transaction {
+                    postings: Vec::default(),
+                    flag: PAD_FLAG.into(),
+                    payee: None,
+                    narration: None,
+                }),
+            });
         } else {
             self.errors.push(element.error("account not open"));
         }
@@ -832,15 +877,6 @@ impl LedgerBuilder {
     fn event(&mut self, event: &parser::Event, date: Date, element: WrappedSpannedElement) {}
 
     fn query(&mut self, query: &parser::Query, date: Date, element: WrappedSpannedElement) {}
-}
-
-// TODO cost-or-costspec, price, flag, metadata
-fn posting_attrs(element: WrappedSpannedElement, account: String, units: Amount) -> Vec<AlistItem> {
-    vec![
-        ("element", element.into_steelval().unwrap()).into(),
-        ("account", account).into(),
-        ("units", units.into_steelval().unwrap()).into(),
-    ]
 }
 
 #[derive(Debug)]
@@ -973,7 +1009,7 @@ struct AccountBuilder {
     // TODO
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
     postings: Vec<Posting>,
-    pad: Option<parser::Spanned<Pad>>, // the string is the pad account
+    pad_idx: Option<usize>, // index in directives in LedgerBuilder
     balance_diagnostics: Vec<BalanceDiagnostic>,
 }
 
@@ -996,7 +1032,7 @@ impl AccountBuilder {
             inventory: hashbrown::HashMap::default(),
             opened,
             postings: Vec::default(),
-            pad: None,
+            pad_idx: None,
             balance_diagnostics: Vec::default(),
         }
     }
@@ -1004,27 +1040,6 @@ impl AccountBuilder {
     /// all currencies are valid unless any were specified during open
     fn is_currency_valid(&self, currency: &String) -> bool {
         self.currencies.is_empty() || self.currencies.contains(currency)
-    }
-}
-
-#[derive(Debug)]
-struct Pad {
-    date: Date,
-    source: String,
-}
-
-impl Pad {
-    fn new(date: &time::Date, source: &parser::Account) -> Self {
-        Pad {
-            date: (*date).into(),
-            source: source.to_string(),
-        }
-    }
-}
-
-impl parser::ElementType for Pad {
-    fn element_type(&self) -> &'static str {
-        "pad"
     }
 }
 
@@ -1078,6 +1093,8 @@ fn convert_parser_options(options: &parser::Options<'_>) -> Vec<AlistItem> {
     ))
     .collect::<Vec<AlistItem>>()
 }
+
+const PAD_FLAG: &str = "P";
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("ffi-ledger?");

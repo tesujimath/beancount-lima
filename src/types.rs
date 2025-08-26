@@ -8,21 +8,108 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 use steel::{
-    rvals::{as_underlying_type, Custom, CustomType},
+    rvals::{as_underlying_type, Custom, CustomType, SteelString},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelErr, SteelVal,
 };
 use steel_derive::Steel;
 
-#[derive(Clone, Steel, Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Directive {
-    pub(crate) attrs: Vec<AlistItem>,
+    pub(crate) date: Date,
+    pub(crate) element: WrappedSpannedElement,
+    pub(crate) variant: DirectiveVariant,
+}
+
+impl Display for Directive {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {:?})", &self.date, &self.variant,)
+    }
+}
+
+impl Custom for Directive {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
+    }
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) enum DirectiveVariant {
+    Transaction(Transaction),
+    Price(Price),
+    Balance(Balance),
+    Open(Open),
+    Close(Close),
+    Commodity(Commodity),
+    Pad(Pad),
+    Document(Document),
+    Note(Note),
+    Event(Event),
+    Query(Query),
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Transaction {
+    pub(crate) postings: Vec<Posting>,
+    pub(crate) flag: SteelString,
+    pub(crate) payee: Option<SteelString>,
+    pub(crate) narration: Option<SteelString>,
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Price {}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Balance {
+    pub(crate) account: SteelString,
+    pub(crate) amount: Amount,
+    pub(crate) tolerance: Option<Decimal>,
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Open {
+    // TODO
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Close {
+    // TODO
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Commodity {
+    // TODO
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Pad {
+    pub(crate) source: SteelString,
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Document {
+    // TODO
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Note {
+    // TODO
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Event {
+    // TODO
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Query {
+    // TODO
 }
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Account {
     // TODO
-    // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive
+    // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive, or maybe don't store ahead of time
     pub(crate) postings: Vec<Posting>,
 }
 
@@ -36,7 +123,7 @@ impl Account {
 pub(crate) struct Posting {
     pub(crate) date: Date,
     pub(crate) amount: Amount,
-    pub(crate) flag: Option<String>,
+    pub(crate) flag: Option<SteelString>,
     // TODO:
     // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
     // pub(crate) price_annotation: Option<Spanned<PriceSpec<'a>>>,
@@ -44,8 +131,15 @@ pub(crate) struct Posting {
 }
 
 impl Posting {
-    pub(crate) fn new(date: Date, amount: Amount, flag: Option<String>) -> Self {
-        Posting { date, amount, flag }
+    pub(crate) fn new<S>(date: Date, amount: Amount, flag: Option<S>) -> Self
+    where
+        S: Display,
+    {
+        Posting {
+            date,
+            amount,
+            flag: flag.map(|flag| flag.to_string().into()),
+        }
     }
 
     fn date(&self) -> Date {
@@ -56,7 +150,7 @@ impl Posting {
         self.amount.clone()
     }
 
-    fn flag(&self) -> Option<String> {
+    fn flag(&self) -> Option<SteelString> {
         self.flag.clone()
     }
 }
@@ -76,7 +170,7 @@ impl Custom for Posting {
 #[derive(Clone, Debug)]
 pub(crate) struct Amount {
     pub(crate) number: Decimal,
-    pub(crate) currency: String,
+    pub(crate) currency: SteelString,
 }
 
 // https://github.com/mattwparas/steel/issues/365
@@ -85,7 +179,7 @@ impl Amount {
         self.number
     }
 
-    fn currency(&self) -> String {
+    fn currency(&self) -> SteelString {
         self.currency.clone()
     }
 }
@@ -102,21 +196,21 @@ impl Custom for Amount {
     }
 }
 
-impl From<(rust_decimal::Decimal, String)> for Amount {
-    fn from(value: (rust_decimal::Decimal, String)) -> Self {
+impl<S> From<(rust_decimal::Decimal, S)> for Amount
+where
+    S: Display,
+{
+    fn from(value: (rust_decimal::Decimal, S)) -> Self {
         Amount {
             number: value.0.into(),
-            currency: value.1,
+            currency: value.1.to_string().into(),
         }
     }
 }
 
 impl From<&parser::Amount<'_>> for Amount {
     fn from(value: &parser::Amount) -> Self {
-        Amount {
-            number: value.number().value().into(),
-            currency: value.currency().to_string(),
-        }
+        (value.number().value(), value.currency()).into()
     }
 }
 
@@ -395,7 +489,7 @@ where
 
 #[derive(Clone, Debug)]
 pub(crate) struct AlistItem {
-    pub(crate) key: String,
+    pub(crate) key: SteelString,
     pub(crate) value: SteelVal,
 }
 
@@ -412,7 +506,7 @@ impl Display for AlistItem {
 }
 
 impl AlistItem {
-    fn key(&self) -> String {
+    fn key(&self) -> SteelString {
         self.key.clone()
     }
 
@@ -428,7 +522,7 @@ where
 {
     fn from(value: (K, V)) -> Self {
         AlistItem {
-            key: value.0.as_ref().to_string(),
+            key: value.0.as_ref().to_string().into(),
             value: value.1.into(),
         }
     }
@@ -464,7 +558,7 @@ impl WrappedBeancountSources {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Element {
     element_type: &'static str,
 }
@@ -501,6 +595,12 @@ where
             },
             *spanned_element.span(),
         )))
+    }
+}
+
+impl AsRef<Element> for WrappedSpannedElement {
+    fn as_ref(&self) -> &Element {
+        self.0.as_ref()
     }
 }
 
