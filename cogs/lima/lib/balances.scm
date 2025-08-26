@@ -1,12 +1,11 @@
 (provide display-balances)
 
 (require "lima/lib/types.scm")
-(require "lima/lib/alist.scm")
 (require "lima/lib/tabulate.scm")
 
 (define (inventory-for-currencies inv currencies)
   (map (lambda (cur)
-         (alist-get-or-default cur "" inv))
+         (or (hash-try-get inv cur) ""))
        currencies))
 
 ;; collate means build a list of rows with columns ready for tabulation
@@ -17,10 +16,9 @@
      (transduce (ledger-account-names ldg)
                 (compose
                  (mapping (lambda (account-name)
-                            (let* ((account (hash-get (ledger-accounts ldg) account-name))
-                                   (inv (account-inventory account)))
+                            (let* ((inv (hash-get (ledger-accounts ldg) account-name)))
                               (cons account-name inv))))
-                 (filtering (lambda (pair) (not (empty? (cdr pair)))))
+                 (filtering (lambda (pair) (not (hash-empty? (cdr pair)))))
                  (mapping (lambda (pair)
                             (let* ((account-name (car pair))
                                    (inv (cdr pair)))

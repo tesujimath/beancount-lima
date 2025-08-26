@@ -30,7 +30,7 @@
          (depth-rollup (foldl (lambda (accname0 depth-rollup)
                                 (let* ((depth (first depth-rollup))
                                        (rollup0 (second depth-rollup))
-                                       (acc0 (hash-get accounts accname0))
+                                       (inv0 (hash-get accounts accname0))
                                        (subacns (split-many accname0 ":"))
                                        (parent-accnames0 (foldl (lambda (sub accs)
                                                                  (let* ((last-parent (car accs))
@@ -38,7 +38,7 @@
                                                                    (cons next-parent accs)))
                                                                (list (car subacns))
                                                                (cdr subacns)))
-                                       (bal0 (alist-get-or-default cur (decimal-zero) (account-inventory acc0)))
+                                       (bal0 (or (hash-try-get inv0 cur) (decimal-zero)))
                                        (rollup1 (if (decimal-zero? bal0)
                                                     rollup0
                                                     (foldl (lambda (accname1 rollup)
@@ -67,8 +67,8 @@
                                                       (rollup-bal-merged (hash-get rollup accname0))
                                                       (rollup-bal (first rollup-bal-merged))
                                                       (rollup-merged (second rollup-bal-merged))
-                                                      (bal (let ((acc (hash-try-get accounts accname0)))
-                                                             (if acc (alist-get-or-default cur (decimal-zero) (account-inventory acc))
+                                                      (bal (let ((inv (hash-try-get accounts accname0)))
+                                                             (if inv (or (hash-try-get inv cur) (decimal-zero))
                                                                  (decimal-zero)))))
                                                   (rollup-row accname0
                                                               rollup-bal

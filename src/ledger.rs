@@ -12,7 +12,7 @@ use std::{
 };
 use steel::{
     gc::Gc,
-    rvals::{IntoSteelVal, SteelString, SteelVector},
+    rvals::{IntoSteelVal, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelVal, Vector,
 };
@@ -24,12 +24,8 @@ use crate::{config::LedgerBuilderConfig, types::*};
 pub(crate) struct Ledger {
     pub(crate) sources: WrappedBeancountSources,
     pub(crate) directives: SteelVector,
-    pub(crate) accounts: HashMap<SteelString, Account>, // TODO
-    pub(crate) main_currency: SteelString,
     pub(crate) options: Vec<AlistItem>, // TODO
 }
-
-const DEFAULT_CURRENCY: &str = "USD"; // ugh
 
 impl Ledger {
     /// Empty ledger
@@ -37,8 +33,6 @@ impl Ledger {
         Ledger {
             sources: BeancountSources::from("").into(),
             directives: Gc::new(Vector::default()).into(),
-            accounts: HashMap::default(),
-            main_currency: DEFAULT_CURRENCY.to_string().into(),
             options: Vec::default(),
         }
     }
@@ -91,14 +85,6 @@ impl Ledger {
 
     fn directives(&self) -> SteelVal {
         SteelVal::VectorV(self.directives.clone())
-    }
-
-    fn accounts(&self) -> HashMap<SteelString, Account> {
-        self.accounts.clone()
-    }
-
-    fn main_currency(&self) -> SteelString {
-        self.main_currency.clone()
     }
 
     fn options(&self) -> Vec<AlistItem> {
@@ -190,12 +176,6 @@ impl LedgerBuilder {
         } = self;
 
         if errors.is_empty() {
-            let main_currency = currency_usage
-                .iter()
-                .max_by_key(|(_, n)| **n)
-                .map(|(cur, _)| cur.clone())
-                .unwrap_or(DEFAULT_CURRENCY.to_string());
-
             Ok(Ledger {
                 sources: sources.into(),
                 directives: Gc::new(
@@ -205,11 +185,6 @@ impl LedgerBuilder {
                         .collect::<Vector<SteelVal>>(),
                 )
                 .into(),
-                accounts: accounts
-                    .into_iter()
-                    .map(|(name, account)| (name.into(), account.build()))
-                    .collect(),
-                main_currency: main_currency.into(),
                 options: parser_options,
             })
         } else {
@@ -373,7 +348,13 @@ impl LedgerBuilder {
         }
 
         let transaction = Transaction {
-            postings,
+            postings: Gc::new(
+                postings
+                    .into_iter()
+                    .map(|posting| posting.into_steelval().unwrap())
+                    .collect::<Vector<SteelVal>>(),
+            )
+            .into(),
             flag: transaction.flag().to_string().into(),
             payee: transaction.payee().map(|payee| payee.to_string().into()),
             narration: transaction
@@ -415,14 +396,6 @@ impl LedgerBuilder {
                         let value = position.get_mut();
                         *value += amount;
 
-                        // tracing::debug!(
-                        //     "post {} {} value for {} is now {}",
-                        //     &date,
-                        //     &amount,
-                        //     &account_name,
-                        //     value,
-                        // );
-
                         if value.is_zero() {
                             position.remove_entry();
                         }
@@ -456,7 +429,7 @@ impl LedgerBuilder {
                     })
                     .collect::<Vec<Amount>>();
 
-                let posting = Posting::new(date, amount.clone(), flag);
+                let posting = Posting::new(account_name, amount.clone(), flag);
                 account.postings.push(posting.clone());
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
@@ -648,7 +621,13 @@ impl LedgerBuilder {
                 if let DirectiveVariant::Transaction(pad_transaction) =
                     &mut self.directives[pad_idx + 1].variant
                 {
-                    pad_transaction.postings.append(&mut pad_postings);
+                    pad_transaction.postings = Gc::new(
+                        pad_postings
+                            .into_iter()
+                            .map(|posting| posting.into_steelval().unwrap())
+                            .collect::<Vector<SteelVal>>(),
+                    )
+                    .into();
                 } else {
                     panic!("directive at {} is not a transaction", pad_idx + 1);
                 }
@@ -853,7 +832,7 @@ impl LedgerBuilder {
                 date,
                 element,
                 variant: DirectiveVariant::Transaction(Transaction {
-                    postings: Vec::default(),
+                    postings: Gc::new(Vector::default()).into(),
                     flag: PAD_FLAG.into(),
                     payee: None,
                     narration: None,
@@ -1014,15 +993,6 @@ struct AccountBuilder {
 }
 
 impl AccountBuilder {
-    fn build(self) -> Account {
-        // sort posting by date because pad posts were inserted at the balance directive not the pad
-        let mut postings = self.postings;
-        postings.sort_by_key(|post| post.date.julian());
-        Account {
-            postings: postings.into_iter().collect(),
-        }
-    }
-
     fn with_currencies<I>(currencies: I, opened: Span) -> Self
     where
         I: Iterator<Item = String>,
@@ -1100,8 +1070,6 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Ledger>("ffi-ledger?");
     steel_engine.register_fn("ffi-ledger-sources", Ledger::sources);
     steel_engine.register_fn("ffi-ledger-directives", Ledger::directives);
-    steel_engine.register_fn("ffi-ledger-accounts", Ledger::accounts);
-    steel_engine.register_fn("ffi-ledger-main-currency", Ledger::main_currency);
     steel_engine.register_fn("ffi-ledger-options", Ledger::options);
 
     steel_engine.register_fn("ffi-beancount-sources-write-ffi-error", write_ffi_error);

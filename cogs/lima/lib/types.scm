@@ -8,37 +8,15 @@
   ledger-accounts
   ledger-directives
   ledger-options
-  account
-  account?
-  account-inventory
-  account-postings
   period
   period?
   period-within?
   make-period-within?
   optional-flag
-  posting
-  posting?
-  posting-date
-  posting-amount
-  posting-has-flag
-  posting-flag
-  make-posting-flagged-with?
   amount
   amount?
   amount-number
-  amount-currency
-  transaction?
-  price?
-  balance?
-  open?
-  close?
-  commodity?
-  pad?
-  document?
-  note?
-  event?
-  query? #| TODO reinstate posting?|#)
+  amount-currency)
 
 (require "lima/lib/alist.scm")
 
@@ -61,36 +39,4 @@
 ;; create optional with flag
 (define (optional-flag flg) `((flag . ,flg)))
 
-(struct posting (date amount optional) #:transparent)
-(define (posting-has-flag pst)
-  (alist-contains? 'flag (posting-optional pst)))
-(define (posting-flag pst)
-  (alist-get 'flag (posting-optional pst)))
-
-;; return a predicate which selects postings with given flag
-(define (make-posting-flagged-with? flag)
-  (lambda (pst) (and (posting-has-flag pst)
-                 (equal? (posting-flag pst) flag))))
-
-(struct account (inventory postings) #:transparent)
-
 (struct ledger (currencies main-currency account-names accounts directives options) #:transparent)
-
-;; tests for elements
-(define (specified-element? element-f x)
-  (and (alist? x)
-    (let ((element (alist-try-get 'element x)))
-      (and element (element-f element)))))
-(define (transaction? x) (specified-element? ffi-element-transaction? x))
-(define (price? x) (specified-element? ffi-element-price? x))
-(define (balance? x) (specified-element? ffi-element-balance? x))
-(define (open? x) (specified-element? ffi-element-open? x))
-(define (close? x) (specified-element? ffi-element-close? x))
-(define (commodity? x) (specified-element? ffi-element-commodity? x))
-(define (pad? x) (specified-element? ffi-element-pad? x))
-(define (document? x) (specified-element? ffi-element-document? x))
-(define (note? x) (specified-element? ffi-element-note? x))
-(define (event? x) (specified-element? ffi-element-event? x))
-(define (query? x) (specified-element? ffi-element-query? x))
-
-; TODO reinstate when posting struct removed (define (posting? x) (specified-element? ffi-element-posting? x))

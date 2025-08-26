@@ -2339,7 +2339,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "steel-core"
 version = "0.7.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#2704c24901d819a3ab22c34b7ab678dcc3ff2ec7"
+source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
 dependencies = [
  "abi_stable",
  "arc-swap",
@@ -2394,7 +2394,7 @@ dependencies = [
 [[package]]
 name = "steel-derive"
 version = "0.6.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#2704c24901d819a3ab22c34b7ab678dcc3ff2ec7"
+source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
 dependencies = [
  "proc-macro2 1.0.95",
  "quote 1.0.40",
@@ -2404,7 +2404,7 @@ dependencies = [
 [[package]]
 name = "steel-gen"
 version = "0.3.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#2704c24901d819a3ab22c34b7ab678dcc3ff2ec7"
+source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
 dependencies = [
  "codegen",
  "serde",
@@ -2413,7 +2413,7 @@ dependencies = [
 [[package]]
 name = "steel-parser"
 version = "0.7.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#2704c24901d819a3ab22c34b7ab678dcc3ff2ec7"
+source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
 dependencies = [
  "compact_str",
  "fxhash",
@@ -2430,7 +2430,7 @@ dependencies = [
 [[package]]
 name = "steel-repl"
 version = "0.7.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#2704c24901d819a3ab22c34b7ab678dcc3ff2ec7"
+source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
 dependencies = [
  "colored",
  "crossbeam-utils",

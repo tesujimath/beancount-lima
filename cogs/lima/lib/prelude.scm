@@ -9,37 +9,15 @@
   ledger-accounts
   ledger-directives
   ledger-options
-  account
-  account?
-  account-inventory
-  account-postings
   period
   period?
   period-within?
   make-period-within?
   optional-flag
-  posting
-  posting?
-  posting-date
-  posting-amount
-  posting-has-flag
-  posting-flag
-  make-posting-flagged-with?
   amount
   amount?
   amount-number
-  amount-currency
-  transaction?
-  price?
-  balance?
-  open?
-  close?
-  commodity?
-  pad?
-  document?
-  note?
-  event?
-  query? #| TODO reinstate posting?|#)
+  amount-currency)
 
 (require "lima/lib/fiscal-year.scm")
 (provide fy make-fy?)

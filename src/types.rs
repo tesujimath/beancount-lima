@@ -8,7 +8,7 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 use steel::{
-    rvals::{as_underlying_type, Custom, CustomType, SteelString},
+    rvals::{as_underlying_type, Custom, CustomType, SteelString, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelErr, SteelVal,
 };
@@ -48,9 +48,61 @@ pub(crate) enum DirectiveVariant {
     Query(Query),
 }
 
+// Scheme is not statically typed, so we don't force the user to unpack the directive variants, but rather support direct access
+impl Directive {
+    fn is_transaction(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Transaction(_))
+    }
+    fn transaction_postings(&self) -> steel::rvals::Result<SteelVal> {
+        if let DirectiveVariant::Transaction(x) = &self.variant {
+            Ok(SteelVal::VectorV(x.postings.clone()))
+        } else {
+            Err(SteelErr::new(
+                steel::rerrs::ErrorKind::TypeMismatch,
+                format!(
+                    "can't call transaction_postings on {}",
+                    self.element.element_type()
+                ),
+            ))
+        }
+    }
+    // TODO other accessors
+
+    fn is_price(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Price(_))
+    }
+    fn is_balance(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Balance(_))
+    }
+    fn is_open(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Open(_))
+    }
+    fn is_close(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Close(_))
+    }
+    fn is_commodity(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Commodity(_))
+    }
+    fn is_pad(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Pad(_))
+    }
+    fn is_document(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Document(_))
+    }
+    fn is_note(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Note(_))
+    }
+    fn is_event(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Event(_))
+    }
+    fn is_query(&self) -> bool {
+        matches!(self.variant, DirectiveVariant::Query(_))
+    }
+}
+
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Transaction {
-    pub(crate) postings: Vec<Posting>,
+    pub(crate) postings: SteelVector,
     pub(crate) flag: SteelString,
     pub(crate) payee: Option<SteelString>,
     pub(crate) narration: Option<SteelString>,
@@ -106,24 +158,11 @@ pub(crate) struct Query {
     // TODO
 }
 
-#[derive(Clone, Steel, Debug)]
-pub(crate) struct Account {
-    // TODO
-    // pub(crate) booking: Symbol, // defaulted correctly from options if omitted from Open directive, or maybe don't store ahead of time
-    pub(crate) postings: Vec<Posting>,
-}
-
-impl Account {
-    fn postings(&self) -> Vec<Posting> {
-        self.postings.clone()
-    }
-}
-
 #[derive(Clone, Debug)]
 pub(crate) struct Posting {
-    pub(crate) date: Date,
-    pub(crate) amount: Amount,
     pub(crate) flag: Option<SteelString>,
+    pub(crate) account: SteelString,
+    pub(crate) amount: Amount,
     // TODO:
     // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
     // pub(crate) price_annotation: Option<Spanned<PriceSpec<'a>>>,
@@ -131,19 +170,20 @@ pub(crate) struct Posting {
 }
 
 impl Posting {
-    pub(crate) fn new<S>(date: Date, amount: Amount, flag: Option<S>) -> Self
+    pub(crate) fn new<S1, S2>(account: S1, amount: Amount, flag: Option<S2>) -> Self
     where
-        S: Display,
+        S1: Display,
+        S2: Display,
     {
         Posting {
-            date,
+            account: account.to_string().into(),
             amount,
             flag: flag.map(|flag| flag.to_string().into()),
         }
     }
 
-    fn date(&self) -> Date {
-        self.date
+    fn account(&self) -> SteelString {
+        self.account.clone()
     }
 
     fn amount(&self) -> Amount {
@@ -157,7 +197,7 @@ impl Posting {
 
 impl Display for Posting {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", &self.date, &self.amount)
+        write!(f, "{} {}", &self.account, &self.amount)
     }
 }
 
@@ -598,9 +638,9 @@ where
     }
 }
 
-impl AsRef<Element> for WrappedSpannedElement {
-    fn as_ref(&self) -> &Element {
-        self.0.as_ref()
+impl parser::ElementType for WrappedSpannedElement {
+    fn element_type(&self) -> &'static str {
+        self.0.element_type
     }
 }
 
@@ -697,12 +737,24 @@ impl AsRef<parser::Error> for WrappedError {
 }
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
-    steel_engine.register_type::<Account>("ffi-account?");
-    steel_engine.register_fn("ffi-account-postings", Account::postings);
+    steel_engine.register_type::<Directive>("directive?");
+    steel_engine.register_fn("transaction?", Directive::is_transaction);
+    steel_engine.register_fn("price?", Directive::is_price);
+    steel_engine.register_fn("balance?", Directive::is_balance);
+    steel_engine.register_fn("open?", Directive::is_open);
+    steel_engine.register_fn("close?", Directive::is_close);
+    steel_engine.register_fn("commodity?", Directive::is_commodity);
+    steel_engine.register_fn("pad?", Directive::is_pad);
+    steel_engine.register_fn("document?", Directive::is_document);
+    steel_engine.register_fn("note?", Directive::is_note);
+    steel_engine.register_fn("event?", Directive::is_event);
+    steel_engine.register_fn("query?", Directive::is_query);
+
+    steel_engine.register_fn("transaction-postings", Directive::transaction_postings);
 
     steel_engine.register_type::<Posting>("ffi-posting?");
     steel_engine.register_fn("ffi-posting->string", Posting::to_string);
-    steel_engine.register_fn("ffi-posting-date", Posting::date);
+    steel_engine.register_fn("ffi-posting-account", Posting::account);
     steel_engine.register_fn("ffi-posting-amount", Posting::amount);
     steel_engine.register_fn("ffi-posting-flag", Posting::flag);
 

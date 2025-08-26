@@ -288,6 +288,7 @@ fn register_types(steel_engine: &mut Engine) {
     types::register_types(steel_engine);
     ledger::register_types(steel_engine);
     import::register_types(steel_engine);
+    inventory::register_types(steel_engine);
 }
 
 fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<()> {
@@ -306,6 +307,7 @@ fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<
 pub(crate) mod cli_options;
 pub(crate) mod config;
 pub(crate) mod import;
+pub(crate) mod inventory;
 pub(crate) mod ledger;
 pub(crate) mod tabulate;
 pub(crate) mod types;
