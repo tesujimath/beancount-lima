@@ -451,15 +451,6 @@ impl LedgerBuilder {
 
                 Some(posting)
             // TODO cost-or-costspec, price, flag, metadata
-            // fn posting_attrs(element: WrappedSpannedElement, account: String, units: Amount) -> Vec<AlistItem> {
-            //     vec![
-            //         ("element", element.into_steelval().unwrap()).into(),
-            //         ("account", account).into(),
-            //         ("units", units.into_steelval().unwrap()).into(),
-            //     ]
-            // }
-
-            //                 Some(posting_attrs(element, account_name.to_string(), amount))
             } else {
                 self.errors.push(element.error_with_contexts(
                     "invalid currency for account",
@@ -1073,11 +1064,6 @@ fn convert_parser_options(
 const PAD_FLAG: &str = "P";
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
-    steel_engine.register_type::<Ledger>("ffi-ledger?");
-    steel_engine.register_fn("ffi-ledger-sources", Ledger::sources);
-    steel_engine.register_fn("ffi-ledger-directives", Ledger::directives);
-    steel_engine.register_fn("ffi-ledger-options", Ledger::options);
-
-    steel_engine.register_fn("ffi-beancount-sources-write-ffi-error", write_ffi_error);
-    steel_engine.register_fn("ffi-beancount-sources-write-ffi-errors", write_ffi_errors);
+    steel_engine.register_fn("sources-write-ffi-error", write_ffi_error);
+    steel_engine.register_fn("sources-write-ffi-errors", write_ffi_errors);
 }

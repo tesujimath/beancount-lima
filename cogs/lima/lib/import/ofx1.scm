@@ -2,20 +2,18 @@
 
 (require "srfi/srfi-28/format.scm")
 (require "lima/lib/types.scm")
-(require "lima/lib/list.scm")
 (require "lima/lib/alist.scm")
 (require "lima/lib/stdlib.scm")
 (require "lima/lib/import/extract.scm")
-(require "lima/lib/import/types.scm")
 
 ;; extract balance from header if we can find the fields we need, otherwise return empty
 (define (extract-balance accounts-by-id source)
   (let* ((hdr (import-source-header source))
-         (cur (alist-get 'curdef hdr))
-         (acctid (alist-get-or-default 'acctid "unknown-acctid" hdr))
+         (cur (hash-get hdr 'curdef))
+         (acctid (or (hash-try-get hdr 'acctid) "unknown-acctid"))
          (account (alist-get-or-default acctid "Assets:Unknown" accounts-by-id))
-         (balamt (alist-get-or-empty 'balamt hdr))
-         (dtasof (alist-get-or-empty 'dtasof hdr)))
+         (balamt (or (hash-try-get hdr 'balamt) '()))
+         (dtasof (or (hash-try-get hdr 'dtasof) '())))
     (if (or (empty? balamt) (empty? dtasof))
       '()
       ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
@@ -28,8 +26,8 @@
 ;; extract imported OFX1 transactions into an intermediate representation
 (define (make-extract-txn accounts-by-id source)
   (let* ((hdr (import-source-header source))
-         (cur (alist-get 'curdef hdr))
-         (acctid (alist-get-or-default 'acctid "unknown-acctid" hdr))
+         (cur (hash-get hdr 'curdef))
+         (acctid (or (hash-try-get hdr 'acctid) "unknown-acctid"))
          (primary-account (alist-get-or-default acctid "Assets:Unknown" accounts-by-id))
          (field-names (import-source-fields source))
          (get-dtposted (make-field-getter field-names "dtposted" (lambda (x) (parse-date x "%Y%m%d"))))

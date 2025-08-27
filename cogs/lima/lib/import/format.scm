@@ -5,7 +5,6 @@
 (require "lima/lib/string.scm")
 (require "lima/lib/alist.scm")
 (require (only-in "lima/lib/tabulate.scm" spaces))
-(require "lima/lib/import/types.scm")
 (require "lima/lib/import/account-inference.scm")
 
 (define (quoted space value)

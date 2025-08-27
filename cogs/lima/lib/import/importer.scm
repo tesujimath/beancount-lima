@@ -4,7 +4,6 @@
 (require "lima/lib/list.scm")
 (require "lima/lib/alist.scm")
 (require "lima/lib/base-config.scm")
-(require "lima/lib/import/types.scm")
 (require "lima/lib/import/dedupe.scm")
 (require "lima/lib/import/account-inference.scm")
 (require "lima/lib/import/pairing.scm")
@@ -40,11 +39,11 @@
     ;; TODO can we do better than into-list here?
     (into-list)))
 
-;; import a group, using the supplied config, which is an alist with the following optional keys:
+;; import using the supplied config, which is an alist with the following optional keys:
 ; accounts - alist of account-id to account-name
 ; txnid-key - metadata key used for transaction IDs
 ; txn-directive - the directive written out for a transaction
-(define (import config args group)
+(define (import config args imp)
   (let*
     (
       ; config
@@ -67,15 +66,19 @@
       (extractors-by-format `(("ofx1" . ((txn . ,ofx1/make-extract-txn)
                                          (bal . ,ofx1/extract-balance)))))
 
-      ; group
-      (payees (import-group-payees group))
-      (narrations (import-group-narrations group))
-      (existing-txnids (import-group-txnids group))
-      (txns-by-date (transduce (import-group-sources group)
+      ; context
+      (context (import-context imp))
+      (payees (import-context-payees context))
+      (narrations (import-context-narrations context))
+      (existing-txnids (import-context-txnids context))
+
+      ; sources
+      (sources (import-sources imp))
+      (txns-by-date (transduce sources
                      (mapping (lambda (source)
                                (let* ((hdr (import-source-header source))
-                                      (path (alist-get 'path hdr))
-                                      (format (alist-get 'format hdr))
+                                      (path (hash-get hdr 'path))
+                                      (format (hash-get hdr 'format))
                                       (extractor-by-path (find-and-map-or-default
                                                           (lambda (extractor-lookup) (string-contains? path (car extractor-lookup)))
                                                           extractors-by-path
@@ -98,7 +101,7 @@
                      (flattening)
                      (into-reducer (make-insert-by-date pairing-window-days) (hash)))))
     (if standalone
-      (display (format-include (import-group-path group))))
+      (display (format-include (import-context-path context))))
     (transduce (all-by-date txns-by-date)
       (into-for-each (lambda (directive) (display
                                           (if (alist-contains? 'primary-account directive)

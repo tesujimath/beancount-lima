@@ -2,32 +2,22 @@ use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Spanned,
 };
 use color_eyre::eyre::{eyre, Result};
-use std::{
-    collections::{HashMap, HashSet},
-    io::Write,
-    path::Path,
+use std::{collections::HashSet, io::Write, path::Path};
+use steel::{
+    gc::Gc,
+    rvals::{IntoSteelVal, SteelHashMap, SteelHashSet, SteelString},
+    steel_vm::{engine::Engine, register_fn::RegisterFn},
+    SteelVal,
 };
 use steel_derive::Steel;
 
 // context for import, i.e. ledger
-#[derive(Clone, Default, Debug, Steel)]
+#[derive(Clone, Debug, Steel)]
 pub(crate) struct Context {
-    pub(crate) path: String,
-    pub(crate) txnids: HashSet<String>,
-    pub(crate) payees: HashMap<String, HashMap<String, isize>>,
-    pub(crate) narrations: HashMap<String, HashMap<String, isize>>,
-}
-
-#[derive(Default, Debug)]
-struct ImportContextBuilder<'a> {
-    path: String,
-    txnid_keys: Vec<String>,
-    payee2_key: String,
-    narration2_key: String,
-    txnids: HashSet<String>,
-    payees: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
-    narrations: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
-    errors: Vec<parser::Error>,
+    pub(crate) path: SteelString,
+    pub(crate) txnids: SteelHashSet, // HashSet<SteelVal::StringV>,
+    pub(crate) payees: SteelHashMap, // HashMap<SteelVal::StringV, HashMap<SteelVal::StringV, SteelVal::IntV>>,
+    pub(crate) narrations: SteelHashMap, // HashMap<SteelVal::StringV, HashMap<SteelVal::StringV, SteelVal::IntV>>,
 }
 
 impl Context {
@@ -79,21 +69,33 @@ impl Context {
         }
     }
 
-    pub(crate) fn path(&self) -> String {
-        self.path.clone()
+    pub(crate) fn path(&self) -> SteelVal {
+        SteelVal::StringV(self.path.clone())
     }
 
-    pub(crate) fn txnids(&self) -> Vec<String> {
-        self.txnids.iter().cloned().collect::<Vec<_>>()
+    pub(crate) fn txnids(&self) -> SteelVal {
+        SteelVal::HashSetV(self.txnids.clone())
     }
 
-    pub(crate) fn payees(&self) -> HashMap<String, HashMap<String, isize>> {
-        self.payees.clone()
+    pub(crate) fn payees(&self) -> SteelVal {
+        SteelVal::HashMapV(self.payees.clone())
     }
 
-    pub(crate) fn narrations(&self) -> HashMap<String, HashMap<String, isize>> {
-        self.narrations.clone()
+    pub(crate) fn narrations(&self) -> SteelVal {
+        SteelVal::HashMapV(self.narrations.clone())
     }
+}
+
+#[derive(Default, Debug)]
+struct ImportContextBuilder<'a> {
+    path: String,
+    txnid_keys: Vec<String>,
+    payee2_key: String,
+    narration2_key: String,
+    txnids: HashSet<String>,
+    payees: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
+    narrations: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
+    errors: Vec<parser::Error>,
 }
 
 impl<'a> ImportContextBuilder<'a> {
@@ -120,35 +122,27 @@ impl<'a> ImportContextBuilder<'a> {
         W: Write + Copy,
     {
         if self.errors.is_empty() {
+            let Self {
+                path,
+                txnids,
+                payees,
+                narrations,
+                ..
+            } = self;
+
+            let txnids = Gc::new(
+                txnids
+                    .into_iter()
+                    .map(|s| s.into_steelval().unwrap())
+                    .collect::<steel::HashSet<_>>(),
+            )
+            .into();
+
             Ok(Context {
-                path: self.path,
-                txnids: self.txnids,
-                payees: self
-                    .payees
-                    .into_iter()
-                    .map(|(name, accounts)| {
-                        (
-                            name.to_string(),
-                            accounts
-                                .into_iter()
-                                .map(|(k, v)| (k.to_string(), v))
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-                narrations: self
-                    .narrations
-                    .into_iter()
-                    .map(|(name, accounts)| {
-                        (
-                            name.to_string(),
-                            accounts
-                                .into_iter()
-                                .map(|(k, v)| (k.to_string(), v))
-                                .collect(),
-                        )
-                    })
-                    .collect(),
+                path: path.into(),
+                txnids,
+                payees: payees_or_narrations_to_steel_hashmap(payees),
+                narrations: payees_or_narrations_to_steel_hashmap(narrations),
             })
         } else {
             sources.write(error_w, self.errors)?;
@@ -254,6 +248,28 @@ impl<'a> ImportContextBuilder<'a> {
     }
 }
 
+fn payees_or_narrations_to_steel_hashmap(
+    payees_or_narrations: hashbrown::HashMap<&str, hashbrown::HashMap<&str, isize>>,
+) -> SteelHashMap {
+    let payees_or_narrations = payees_or_narrations
+        .into_iter()
+        .map(|(name, accounts)| {
+            let accounts = accounts
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        k.to_string().into_steelval().unwrap(),
+                        v.into_steelval().unwrap(),
+                    )
+                })
+                .collect::<steel::HashMap<_, _>>();
+            let accounts = SteelVal::HashMapV(Gc::new(accounts).into());
+            (name.to_string().into_steelval().unwrap(), accounts)
+        })
+        .collect::<steel::HashMap<_, _>>();
+    Gc::new(payees_or_narrations).into()
+}
+
 /// Accumulate the counts for the inferred accounts
 fn count_accounts<'a, I>(
     buckets: &mut hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
@@ -286,4 +302,12 @@ fn count_accounts<'a, I>(
             );
         }
     }
+}
+
+pub(crate) fn register_types(steel_engine: &mut Engine) {
+    steel_engine.register_type::<Context>("import-context?");
+    steel_engine.register_fn("import-context-path", Context::path);
+    steel_engine.register_fn("import-context-txnids", Context::txnids);
+    steel_engine.register_fn("import-context-payees", Context::payees);
+    steel_engine.register_fn("import-context-narrations", Context::narrations);
 }

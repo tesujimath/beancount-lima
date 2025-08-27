@@ -528,47 +528,6 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct AlistItem {
-    pub(crate) key: SteelString,
-    pub(crate) value: SteelVal,
-}
-
-impl Custom for AlistItem {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(format!("AlistItem({} . {})", &self.key, &self.value)))
-    }
-}
-
-impl Display for AlistItem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} . {})", &self.key, &self.value)
-    }
-}
-
-impl AlistItem {
-    fn key(&self) -> SteelString {
-        self.key.clone()
-    }
-
-    fn value(&self) -> SteelVal {
-        self.value.clone()
-    }
-}
-
-impl<K, V> From<(K, V)> for AlistItem
-where
-    K: AsRef<str>,
-    V: Into<SteelVal>,
-{
-    fn from(value: (K, V)) -> Self {
-        AlistItem {
-            key: value.0.as_ref().to_string().into(),
-            value: value.1.into(),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
 pub struct MutexWrapper<T>(Arc<Mutex<T>>);
 
 impl<T> MutexWrapper<T> {
@@ -752,11 +711,11 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
 
     steel_engine.register_fn("transaction-postings", Directive::transaction_postings);
 
-    steel_engine.register_type::<Posting>("ffi-posting?");
-    steel_engine.register_fn("ffi-posting->string", Posting::to_string);
-    steel_engine.register_fn("ffi-posting-account", Posting::account);
-    steel_engine.register_fn("ffi-posting-amount", Posting::amount);
-    steel_engine.register_fn("ffi-posting-flag", Posting::flag);
+    steel_engine.register_type::<Posting>("posting?");
+    steel_engine.register_fn("posting->string", Posting::to_string);
+    steel_engine.register_fn("posting-account", Posting::account);
+    steel_engine.register_fn("posting-amount", Posting::amount);
+    steel_engine.register_fn("posting-flag", Posting::flag);
 
     steel_engine.register_type::<Amount>("ffi-amount?");
     steel_engine.register_fn("ffi-amount->string", Amount::to_string);
@@ -794,10 +753,6 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("decimal-width-right", Decimal::width_right);
     steel_engine.register_fn("parse-decimal", Decimal::parse);
     steel_engine.register_fn("parse-decimal-cents", Decimal::parse_cents);
-
-    steel_engine.register_type::<AlistItem>("ffi-alistitem?");
-    steel_engine.register_fn("ffi-alistitem-key", AlistItem::key);
-    steel_engine.register_fn("ffi-alistitem-value", AlistItem::value);
 
     steel_engine.register_type::<WrappedError>("error?");
     steel_engine.register_fn("ffi-error", WrappedSpannedElement::ffi_error);

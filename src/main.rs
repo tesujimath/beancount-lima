@@ -1,7 +1,7 @@
 use crate::{
     args::register_args,
     config::{get_config_string, LedgerBuilderConfig},
-    import::{Context, Group},
+    import::{Context, Import},
     ledger::Ledger,
 };
 use color_eyre::eyre::{eyre, Result};
@@ -176,18 +176,18 @@ fn main() -> Result<()> {
                     .unwrap_or("narration2".to_string());
 
             let context = if let Some(ledger) = ledger_path.as_ref() {
-                Context::parse_from(
+                Some(Context::parse_from(
                     ledger,
                     vec![txnid_key, txnid2_key],
                     payee2_key,
                     narration2_key,
                     error_w,
-                )?
+                )?)
             } else {
-                Context::default()
+                None
             };
 
-            let import = Group::parse_from(import_files.as_slice(), context, error_w)?;
+            let import = Import::parse_from(import_files.as_slice(), context, error_w)?;
             import.register(&mut steel_engine);
 
             if *repl {
@@ -311,6 +311,6 @@ pub(crate) mod inventory;
 pub(crate) mod ledger;
 pub(crate) mod tabulate;
 pub(crate) mod types;
-pub(crate) use types::*;
+
 #[cfg(test)]
 mod tests;

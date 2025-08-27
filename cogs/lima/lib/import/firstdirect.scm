@@ -5,13 +5,12 @@
 (require "lima/lib/alist.scm")
 (require "lima/lib/stdlib.scm")
 (require "lima/lib/import/extract.scm")
-(require "lima/lib/import/types.scm")
 (require "lima/lib/import/importer.scm")
 
 (define (extract-balance cur)
   (lambda (accounts-by-id source)
     (let* ((hdr (import-source-header source))
-           (path (alist-get 'path hdr))
+           (path (hash-get hdr 'path))
            (account (find-and-map-or-default
                      (lambda (account-lookup) (string-contains? path (car account-lookup)))
                      accounts-by-id
@@ -39,7 +38,7 @@
 (define (make-extract-txn cur)
   (lambda (accounts-by-id source)
     (let* ((hdr (import-source-header source))
-           (path (alist-get 'path hdr))
+           (path (hash-get hdr 'path))
            (primary-account (find-and-map-or-default
                              (lambda (account-lookup) (string-contains? path (car account-lookup)))
                              accounts-by-id

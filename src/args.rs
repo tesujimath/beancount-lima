@@ -13,7 +13,7 @@ pub(crate) fn register_args(steel_engine: &mut Engine, args: Vec<String>) {
                 (arg, true.into_steelval())
             }
         })
-        .map(|(k, v)| (k.into_steelval().unwrap(), v.unwrap()))
+        .map(|(k, v)| (SteelVal::SymbolV(k.into()), v.unwrap()))
         .collect::<steel::HashMap<SteelVal, SteelVal>>();
 
     steel_engine
