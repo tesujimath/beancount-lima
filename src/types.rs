@@ -215,6 +215,10 @@ pub(crate) struct Amount {
 
 // https://github.com/mattwparas/steel/issues/365
 impl Amount {
+    fn new(number: Decimal, currency: SteelString) -> Self {
+        Self { number, currency }
+    }
+
     fn number(&self) -> Decimal {
         self.number
     }
@@ -641,43 +645,6 @@ impl WrappedSpannedElement {
     pub(crate) fn span(&self) -> Span {
         *self.0.as_ref().span()
     }
-
-    pub(crate) fn is_transaction(&self) -> bool {
-        self.0.as_ref().element_type == "transaction"
-    }
-    pub(crate) fn is_price(&self) -> bool {
-        self.0.as_ref().element_type == "price"
-    }
-    pub(crate) fn is_balance(&self) -> bool {
-        self.0.as_ref().element_type == "balance"
-    }
-    pub(crate) fn is_open(&self) -> bool {
-        self.0.as_ref().element_type == "open"
-    }
-    pub(crate) fn is_close(&self) -> bool {
-        self.0.as_ref().element_type == "close"
-    }
-    pub(crate) fn is_commodity(&self) -> bool {
-        self.0.as_ref().element_type == "commodity"
-    }
-    pub(crate) fn is_pad(&self) -> bool {
-        self.0.as_ref().element_type == "pad"
-    }
-    pub(crate) fn is_document(&self) -> bool {
-        self.0.as_ref().element_type == "document"
-    }
-    pub(crate) fn is_note(&self) -> bool {
-        self.0.as_ref().element_type == "note"
-    }
-    pub(crate) fn is_event(&self) -> bool {
-        self.0.as_ref().element_type == "event"
-    }
-    pub(crate) fn is_query(&self) -> bool {
-        self.0.as_ref().element_type == "query"
-    }
-    pub(crate) fn is_posting(&self) -> bool {
-        self.0.as_ref().element_type == "posting"
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -717,10 +684,11 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("posting-amount", Posting::amount);
     steel_engine.register_fn("posting-flag", Posting::flag);
 
-    steel_engine.register_type::<Amount>("ffi-amount?");
-    steel_engine.register_fn("ffi-amount->string", Amount::to_string);
-    steel_engine.register_fn("ffi-amount-number", Amount::number);
-    steel_engine.register_fn("ffi-amount-currency", Amount::currency);
+    steel_engine.register_type::<Amount>("amount?");
+    steel_engine.register_fn("amount", Amount::new);
+    steel_engine.register_fn("amount->string", Amount::to_string);
+    steel_engine.register_fn("amount-number", Amount::number);
+    steel_engine.register_fn("amount-currency", Amount::currency);
 
     steel_engine.register_type::<Date>("date?");
     steel_engine.register_fn("date", Date::new);
@@ -756,23 +724,4 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
 
     steel_engine.register_type::<WrappedError>("error?");
     steel_engine.register_fn("ffi-error", WrappedSpannedElement::ffi_error);
-
-    steel_engine.register_fn(
-        "ffi-element-transaction?",
-        WrappedSpannedElement::is_transaction,
-    );
-    steel_engine.register_fn("ffi-element-price?", WrappedSpannedElement::is_price);
-    steel_engine.register_fn("ffi-element-balance?", WrappedSpannedElement::is_balance);
-    steel_engine.register_fn("ffi-element-open?", WrappedSpannedElement::is_open);
-    steel_engine.register_fn("ffi-element-close?", WrappedSpannedElement::is_close);
-    steel_engine.register_fn(
-        "ffi-element-commodity?",
-        WrappedSpannedElement::is_commodity,
-    );
-    steel_engine.register_fn("ffi-element-pad?", WrappedSpannedElement::is_pad);
-    steel_engine.register_fn("ffi-element-document?", WrappedSpannedElement::is_document);
-    steel_engine.register_fn("ffi-element-note?", WrappedSpannedElement::is_note);
-    steel_engine.register_fn("ffi-element-event?", WrappedSpannedElement::is_event);
-    steel_engine.register_fn("ffi-element-query?", WrappedSpannedElement::is_query);
-    steel_engine.register_fn("ffi-element-posting?", WrappedSpannedElement::is_posting);
 }

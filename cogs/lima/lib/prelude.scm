@@ -1,6 +1,5 @@
 (require "lima/lib/types.scm")
 (provide
-  decimal->rational
   ledger
   ledger?
   ledger-currencies
@@ -11,11 +10,7 @@
   period?
   period-within?
   make-period-within?
-  optional-flag
-  amount
-  amount?
-  amount-number
-  amount-currency)
+  optional-flag)
 
 (require "lima/lib/fiscal-year.scm")
 (provide fy make-fy?)
