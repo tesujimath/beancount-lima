@@ -32,7 +32,7 @@ pub(crate) fn get_config_val(steel_engine: &mut Engine, path: &[&str]) -> Result
         "get_config_value",
         format!(
             r#"
-    (config-value-or-empty '({}) *config*)
+    (config-value-or-default '({}) '() *config*)
     "#,
             path.join(" "),
         ),

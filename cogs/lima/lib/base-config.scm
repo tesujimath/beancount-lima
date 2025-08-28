@@ -1,4 +1,4 @@
-(provide *base-config* config-value-or-default config-value-or-empty merge-config)
+(provide *base-config* config-value-or-default merge-config)
 
 (define *base-config*
   (hash
@@ -16,9 +16,6 @@
   (if (empty? key-path) cfg
     (let ((subcfg (hash-try-get cfg (car key-path))))
       (if subcfg (config-value-or-default (cdr key-path) default subcfg) default))))
-
-(define (config-value-or-empty key-path cfg)
-  (config-value-or-default key-path '() cfg))
 
 ;; example
 ;; (config-value-or-default '(import txnid-key) "default-key" *base-config*)
