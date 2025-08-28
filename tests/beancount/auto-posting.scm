@@ -1,5 +1,4 @@
 (require "lima/lib/prelude.scm")
-(require "lima/lib/alist.scm")
 (require (for-syntax "steel/tests/unit-test.scm"))
 
 (let ((current-nzd (or (hash-try-get (hash-get (ledger-accounts *ledger*) "Assets:Bank:Current") "NZD") (decimal-zero))))

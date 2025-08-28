@@ -5,9 +5,9 @@
 
 (test-module
   "base-config tests"
-  (let ((config0 '((import . ((txnid-key . "txnid")
-                              (other-import-config . "woohoo")))
-                   (count . ((something-else . "booyah!"))))))
+  (let ((config0 (hash 'import (hash 'txnid-key "txnid"
+                                     'other-import-config "woohoo")
+                       'count (hash 'something-else "booyah!"))))
     (check-equal? "config-value-or-default key path exists"
       (config-value-or-default '(import txnid-key) "default-key" config0)
       "txnid")

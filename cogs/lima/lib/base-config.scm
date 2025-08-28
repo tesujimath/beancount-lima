@@ -1,19 +1,21 @@
 (provide *base-config* config-value-or-default config-value-or-empty merge-config)
-(require "lima/lib/alist.scm")
 
 (define *base-config*
-  '((import . ((txn-directive . "txn")
-               (txnid-key . "txnid")
-               (txnid2-key . "txnid2")
-               (pairing-window-days . 3)
-               (comment-column . 40)
-               (indent . 2)
-               (cost-column . 76)))))
+  (hash
+    'import
+    (hash
+      'txn-directive "txn"
+      'txnid-key "txnid"
+      'txnid2-key "txnid2"
+      'pairing-window-days 3
+      'comment-column 40
+      'indent 2
+      'cost-column 76)))
 
 (define (config-value-or-default key-path default cfg)
   (if (empty? key-path) cfg
-    (let ((subcfg (assoc (car key-path) cfg)))
-      (if subcfg (config-value-or-default (cdr key-path) default (cdr subcfg)) default))))
+    (let ((subcfg (hash-try-get cfg (car key-path))))
+      (if subcfg (config-value-or-default (cdr key-path) default subcfg) default))))
 
 (define (config-value-or-empty key-path cfg)
   (config-value-or-default key-path '() cfg))
@@ -23,16 +25,16 @@
 
 ;; merge configs by key, preferring `cfg1`
 (define (merge-config cfg0 cfg1)
-  (cond [(empty? cfg0) cfg1]
-    [(empty? cfg1) cfg0]
-    [(and (alist-symbol-keys? cfg0) (alist-symbol-keys? cfg1))
-      (let* ((keys0 (transduce cfg0 (mapping car) (into-hashset)))
-             (keys1 (transduce cfg1 (mapping car) (into-hashset)))
-             (all-keys (hashset->list (transduce cfg0 (extending cfg1) (mapping car) (into-hashset))))
+  (cond [(hash-empty? cfg0) cfg1]
+    [(hash-empty? cfg1) cfg0]
+    [else
+      (let* ((keys0 (transduce (hash-keys->list cfg0) (into-hashset)))
+             (keys1 (transduce (hash-keys->list cfg1) (into-hashset)))
+             (all-keys (hashset->list (transduce (hash-keys->list cfg0) (extending (hash-keys->list cfg1)) (into-hashset))))
              (common? (lambda (key) (and (hashset-contains? keys0 key) (hashset-contains? keys1 key)))))
-        (map (lambda (k)
-              (cond [(common? k) (cons k (merge-config (cdr (assoc k cfg0)) (cdr (assoc k cfg1))))]
-                [(hashset-contains? keys0 k) (assoc k cfg0)]
-                [else (assoc k cfg1)]))
-          all-keys))]
-    [else cfg1]))
+        (transduce all-keys
+          (mapping (lambda (k)
+              (cond [(common? k) (cons k (merge-config (hash-get cfg0 k) (hash-get cfg1 k)))]
+                [(hashset-contains? keys0 k) (cons k (hash-get cfg0 k))]
+                [else (cons k (hash-get cfg1 k))])))
+          (into-hashmap)))]))

@@ -11,8 +11,6 @@
   make-period-within?
   optional-flag)
 
-(require "lima/lib/alist.scm")
-
 ;; a half-open date range, including start, not including end
 (struct period (start end) #:transparent)
 ; TODO:

@@ -2,7 +2,6 @@
 
 (require "steel/sorting/merge-sort.scm")
 (require "lima/lib/list.scm")
-(require "lima/lib/alist.scm")
 (require "lima/lib/base-config.scm")
 (require "lima/lib/import/dedupe.scm")
 (require "lima/lib/import/account-inference.scm")
@@ -29,7 +28,7 @@
 ;; insert a transaction into the hash-by-date, trying to pair where we can
 (define (make-insert-by-date pairing-window-days)
   (lambda (h txn)
-    (let* ((j (date-julian (alist-get 'date txn))))
+    (let* ((j (date-julian (hash-get txn 'date))))
       (insert-by-date-with-limit h txn j 0 pairing-window-days))))
 
 (define (all-by-date h)
@@ -39,8 +38,8 @@
     ;; TODO can we do better than into-list here?
     (into-list)))
 
-;; import using the supplied config, which is an alist with the following optional keys:
-; accounts - alist of account-id to account-name
+;; import using the supplied config, which is a hashmap with the following optional keys:
+; accounts - hashmap of account-id to account-name
 ; txnid-key - metadata key used for transaction IDs
 ; txn-directive - the directive written out for a transaction
 (define (import config args imp)
@@ -63,8 +62,8 @@
       (standalone (hash-try-get args 'standalone))
 
       ; defaults
-      (extractors-by-format `(("ofx1" . ((txn . ,ofx1/make-extract-txn)
-                                         (bal . ,ofx1/extract-balance)))))
+      (extractors-by-format (hash "ofx1" (hash 'txn ofx1/make-extract-txn
+                                               'bal ofx1/extract-balance)))
 
       ; context
       (context (import-context imp))
@@ -84,19 +83,17 @@
                                                           extractors-by-path
                                                           cdr
                                                           #f))
-                                      (extractor (cond
-                                                  [extractor-by-path extractor-by-path]
-                                                  [(alist-contains? format extractors-by-format)
-                                                    (alist-get format extractors-by-format)]
-                                                  [else (error! "no extractor defined for" format)]))
+                                      (extractor (or extractor-by-path
+                                                     (or (hash-try-get extractors-by-format format)
+                                                            (error! "no extractor defined for" format))))
                                       (txns (import-source-transactions source)))
                                  (with-handler (lambda (err)
                                                 (error! err "when importing" path))
                                    (transduce txns
-                                     (mapping ((alist-get 'txn extractor) accounts-by-id source))
+                                     (mapping ((hash-get extractor 'txn) accounts-by-id source))
                                      (filtering (make-dedupe-transactions existing-txnids))
                                      (mapping (make-infer-secondary-accounts-from-payees-and-narrations payees narrations))
-                                     (extending ((alist-get 'bal extractor) accounts-by-id source))
+                                     (extending ((hash-get extractor 'bal) accounts-by-id source))
                                      (into-list))))))
                      (flattening)
                      (into-reducer (make-insert-by-date pairing-window-days) (hash)))))
@@ -104,7 +101,7 @@
       (display (format-include (import-context-path context))))
     (transduce (all-by-date txns-by-date)
       (into-for-each (lambda (directive) (display
-                                          (if (alist-contains? 'primary-account directive)
+                                          (if (hash-contains? directive 'primary-account)
                                             (format-transaction
                                               directive
                                               txn-directive

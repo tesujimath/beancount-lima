@@ -3,7 +3,6 @@
 (require "srfi/srfi-28/format.scm")
 (require "lima/lib/types.scm")
 (require "lima/lib/string.scm")
-(require "lima/lib/alist.scm")
 (require (only-in "lima/lib/tabulate.scm" spaces))
 (require "lima/lib/import/account-inference.scm")
 
@@ -27,9 +26,9 @@
 
 ;; format the inferred secondary account name with a comment about where it came from
 (define (format-secondary-account prefix comment-column acc suffix)
-  (let* ((name (alist-get 'name acc))
-         (count (alist-get-or-empty 'infer-count acc))
-         (category (alist-get-or-empty 'infer-category acc))
+  (let* ((name (hash-get acc 'name))
+         (count (or (hash-try-get acc 'infer-count) '())
+         (category (or (hash-try-get acc 'infer-category) '())
          (no-inference (or (empty? count) (empty? category))))
     (format "~a~a~a"
       prefix
@@ -62,17 +61,17 @@
          #:cost-column
          [cost-column 76])
   (let* ((space " ")
-         (date (alist-get 'date txn))
-         (payee (alist-get-or-default 'payee "" txn))
-         (narration (alist-get-or-default 'narration "" txn))
-         (comment (alist-get-or-empty 'comment txn))
-         (txnid (alist-get-or-empty 'txnid txn))
-         (txnid2 (alist-get-or-empty 'txnid2 txn))
-         (payee2 (alist-get-or-empty 'payee2 txn))
-         (narration2 (alist-get-or-empty 'narration2 txn))
-         (primary-account (alist-get 'primary-account txn))
-         (amt (alist-get 'amount txn))
-         (secondary-accounts (alist-get-or-empty 'secondary-accounts txn)))
+         (date (hash-get  txn'date))
+         (payee (or (hash-try-get txn 'payee) ""))
+         (narration (or (hash-try-get txn 'narration) ""))
+         (comment (or (hash-try-get txn 'comment) '())
+         (txnid (or (hash-try-get txn 'txnid) '())
+         (txnid2 (or (hash-try-get txn 'txnid2) '())
+         (payee2 (or (hash-try-get txn 'payee2) '())
+         (narration2 (or (hash-try-get txn 'narration2) '())
+         (primary-account (hash-get txn 'primary-account))
+         (amt (hash-get txn 'amount))
+         (secondary-accounts (or (hash-try-get txn 'secondary-accounts) '()))
     (format "~a~a~a~a\n~a~a~a~a~a~a\n~a\n"
       date
       space
@@ -104,9 +103,9 @@
          #:cost-column
          [cost-column 76])
   (let ((space " ")
-        (date (alist-get 'date bln))
-        (account (alist-get 'account bln))
-        (amt (alist-get 'amount bln)))
+        (date (hash-get bln 'date))
+        (account (hash-get bln 'account))
+        (amt (hash-get bln 'amount)))
     (format-amount-in-column
       (format "~a~abalance~a~a"
         date
