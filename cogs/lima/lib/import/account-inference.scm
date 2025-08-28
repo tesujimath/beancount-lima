@@ -36,7 +36,7 @@
                (cond
                  [found-payee (order-accounts found-payee "payee")]
                  [found-narration (order-accounts found-narration "narration")]
-                 [(decimal>? amount (decimal-zero)) (list (list (cons 'name "Income:Unknown")))]
-                 [(decimal<? amount (decimal-zero)) (list (list (cons 'name "Expenses:Unknown")))]
+                 [(decimal>? amount (decimal-zero)) (list (hash 'name "Income:Unknown"))]
+                 [(decimal<? amount (decimal-zero)) (list (hash 'name "Expenses:Unknown"))]
                  [else '()]))))
-      (cons (cons 'secondary-accounts secondary-accounts) txn))))
+      (hash-insert txn 'secondary-accounts secondary-accounts))))

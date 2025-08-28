@@ -41,6 +41,7 @@ regex = "1.11.1"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 color-eyre = "0.6.5"
+lazy_format = "2.0.3"
 
 [dev-dependencies]
 test-generator = "0.3.1"

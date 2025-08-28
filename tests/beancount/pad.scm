@@ -1,7 +1,15 @@
 (require "lima/lib/prelude.scm")
 (require (for-syntax "steel/tests/unit-test.scm"))
 
-(let* ((current-psts (account-postings (hash-get (ledger-accounts *ledger*) "Assets:Bank:Current")))
-       (pad-psts (filter (make-posting-flagged-with? "P") current-psts)))
-  (check-equal? "pad-postings" pad-psts
-    (list (posting (date 2024 1 1) (amount (decimal -22 2) "NZD") (optional-flag "P")))))
+(let* ((current-pad-psts
+       (transduce
+         *directives*
+         (filtering transaction?)
+         (mapping transaction-postings)
+         (flattening)
+         (filtering (lambda (pst)
+                            (and (equal? (posting-account pst) "Assets:Bank:Current")
+                                 (equal? (posting-flag pst) "P"))))
+         (into-list))))
+  (check-equal? "pad-postings" current-pad-psts
+    (list (posting "P" "Assets:Bank:Current" (amount (decimal -22 2) "NZD")))))

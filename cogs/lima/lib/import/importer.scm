@@ -46,9 +46,9 @@
   (let*
     (
       ; config
-      (import-config (config-value-or-default '(import) '() config))
+      (import-config (config-value-or-default '(import) (hash) config))
       (extractors-by-path (config-value-or-default '(extractors) '() import-config))
-      (accounts-by-id (config-value-or-default '(accounts) '() import-config))
+      (accounts-by-id (config-value-or-default '(accounts) (hash) import-config))
       (txnid-key (config-value-or-default '(txnid-key) "txnid" import-config))
       (payee2-key (config-value-or-default '(payee2-key) "payee2" import-config))
       (narration2-key (config-value-or-default '(narration2-key) "narration2" import-config))
@@ -79,9 +79,9 @@
                                       (path (hash-get hdr 'path))
                                       (format (hash-get hdr 'format))
                                       (extractor-by-path (find-and-map-or-default
-                                                          (lambda (extractor-lookup) (string-contains? path (car extractor-lookup)))
-                                                          extractors-by-path
-                                                          cdr
+                                                          (lambda (k) (string-contains? path k))
+                                                          (hash-keys->list extractors-by-path)
+                                                          (lambda (k) (hash-get extractors-by-path k))
                                                           #f))
                                       (extractor (or extractor-by-path
                                                      (or (hash-try-get extractors-by-format format)

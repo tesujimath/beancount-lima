@@ -306,6 +306,7 @@ fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<
 
 pub(crate) mod args;
 pub(crate) mod config;
+pub(crate) mod format;
 pub(crate) mod import;
 pub(crate) mod inventory;
 pub(crate) mod ledger;

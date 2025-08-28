@@ -18,9 +18,9 @@
       ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
       (let ((date (date-after (parse-date dtasof "%Y%m%d") 1))
             (amt (parse-decimal-cents balamt)))
-        (hash 'date date
-              'account account
-              'amount (amount amt cur))))))
+        (list (hash 'date date
+                    'account account
+                    'amount (amount amt cur)))))))
 
 ;; extract imported OFX1 transactions into an intermediate representation
 (define (make-extract-txn accounts-by-id source)

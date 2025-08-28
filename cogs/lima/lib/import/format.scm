@@ -27,8 +27,8 @@
 ;; format the inferred secondary account name with a comment about where it came from
 (define (format-secondary-account prefix comment-column acc suffix)
   (let* ((name (hash-get acc 'name))
-         (count (or (hash-try-get acc 'infer-count) '())
-         (category (or (hash-try-get acc 'infer-category) '())
+         (count (or (hash-try-get acc 'infer-count) '()))
+         (category (or (hash-try-get acc 'infer-category) '()))
          (no-inference (or (empty? count) (empty? category))))
     (format "~a~a~a"
       prefix
@@ -64,14 +64,14 @@
          (date (hash-get  txn'date))
          (payee (or (hash-try-get txn 'payee) ""))
          (narration (or (hash-try-get txn 'narration) ""))
-         (comment (or (hash-try-get txn 'comment) '())
-         (txnid (or (hash-try-get txn 'txnid) '())
-         (txnid2 (or (hash-try-get txn 'txnid2) '())
-         (payee2 (or (hash-try-get txn 'payee2) '())
-         (narration2 (or (hash-try-get txn 'narration2) '())
+         (comment (or (hash-try-get txn 'comment) '()))
+         (txnid (or (hash-try-get txn 'txnid) '()))
+         (txnid2 (or (hash-try-get txn 'txnid2) '()))
+         (payee2 (or (hash-try-get txn 'payee2) '()))
+         (narration2 (or (hash-try-get txn 'narration2) '()))
          (primary-account (hash-get txn 'primary-account))
          (amt (hash-get txn 'amount))
-         (secondary-accounts (or (hash-try-get txn 'secondary-accounts) '()))
+         (secondary-accounts (or (hash-try-get txn 'secondary-accounts) '())))
     (format "~a~a~a~a\n~a~a~a~a~a~a\n~a\n"
       date
       space

@@ -9,8 +9,7 @@
   period
   period?
   period-within?
-  make-period-within?
-  optional-flag)
+  make-period-within?)
 
 (require "lima/lib/fiscal-year.scm")
 (provide fy make-fy?)

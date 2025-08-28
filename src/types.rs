@@ -158,7 +158,7 @@ pub(crate) struct Query {
     // TODO
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Posting {
     pub(crate) flag: Option<SteelString>,
     pub(crate) account: SteelString,
@@ -182,6 +182,14 @@ impl Posting {
         }
     }
 
+    pub(crate) fn create(flag: Option<SteelString>, account: SteelString, amount: Amount) -> Self {
+        Posting {
+            account,
+            amount,
+            flag,
+        }
+    }
+
     fn account(&self) -> SteelString {
         self.account.clone()
     }
@@ -195,19 +203,21 @@ impl Posting {
     }
 }
 
-impl Display for Posting {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", &self.account, &self.amount)
-    }
-}
-
 impl Custom for Posting {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
     }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<Posting>(other) {
+            self == other
+        } else {
+            false
+        }
+    }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Amount {
     pub(crate) number: Decimal,
     pub(crate) currency: SteelString,
@@ -237,6 +247,14 @@ impl Display for Amount {
 impl Custom for Amount {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
+    }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<Amount>(other) {
+            self == other
+        } else {
+            false
+        }
     }
 }
 
@@ -679,6 +697,7 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("transaction-postings", Directive::transaction_postings);
 
     steel_engine.register_type::<Posting>("posting?");
+    steel_engine.register_fn("posting", Posting::create);
     steel_engine.register_fn("posting->string", Posting::to_string);
     steel_engine.register_fn("posting-account", Posting::account);
     steel_engine.register_fn("posting-amount", Posting::amount);

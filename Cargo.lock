@@ -264,6 +264,7 @@ dependencies = [
  "color-eyre",
  "csv",
  "hashbrown 0.15.4",
+ "lazy_format",
  "regex",
  "rust_decimal",
  "serde",
