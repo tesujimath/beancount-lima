@@ -149,11 +149,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1754431259,
-        "narHash": "sha256-e1LqKQWRrTPOQvbinx3jpmW8qSRVDdoeuQu5Z2hwbvo=",
+        "lastModified": 1756440666,
+        "narHash": "sha256-Tpzsna8jZbsmNeFK/VoqTQTti82bXF6ugqHnd4bGZm0=",
         "owner": "mattwparas",
         "repo": "steel",
-        "rev": "d935b51f4580135a30f3667920e065f83f3666b7",
+        "rev": "9668db4eb00b25b6f5cfddc27a4d1aed63ecce75",
         "type": "github"
       },
       "original": {

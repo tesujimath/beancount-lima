@@ -19,12 +19,12 @@ beancount-parser-lima = "0.11.1"
 # steel-core = "0.7.0"
 # steel-repl = "0.7.0"
 # steel-derive = "0.6.0"
-# steel-core = { git = "https://github.com/mattwparas/steel" }
-# steel-repl = { git = "https://github.com/mattwparas/steel" }
-# steel-derive = { git = "https://github.com/mattwparas/steel" }
-steel-core = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
-steel-repl = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
-steel-derive = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
+steel-core = { git = "https://github.com/mattwparas/steel" }
+steel-repl = { git = "https://github.com/mattwparas/steel" }
+steel-derive = { git = "https://github.com/mattwparas/steel" }
+# steel-core = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
+# steel-repl = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
+# steel-derive = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
 # steel-core = { path = "../../third-party/steel/crates/steel-core" }
 # steel-repl = { path = "../../third-party/steel/crates/steel-repl" }
 # steel-derive = { path = "../../third-party/steel/crates/steel-derive" }

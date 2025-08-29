@@ -60,6 +60,12 @@
 
                 cargoDeps = pkgs.rustPlatform.importCargoLock {
                   lockFile = ./Cargo.lock;
+
+                  # when using a Steel directly from git:
+                  outputHashes =
+                    {
+                      "steel-core-0.7.0" = "sha256-Tpzsna8jZbsmNeFK/VoqTQTti82bXF6ugqHnd4bGZm0=";
+                    };
                 };
 
                 # skip tests which require environment

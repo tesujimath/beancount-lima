@@ -175,6 +175,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
+name = "anymap3"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "170433209e817da6aae2c51aa0dd443009a613425dd041ebfb2492d1c4c11a25"
+
+[[package]]
 name = "arc-swap"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1060,6 +1066,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "generic_singleton"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b2d5de0fc83987dac514f3b910c5d08392b220efe8cf72086c660029a197bf73"
+dependencies = [
+ "anymap3",
+ "lazy_static",
+ "parking_lot",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1195,10 +1212,11 @@ dependencies = [
 
 [[package]]
 name = "im-lists"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "442c94fa6c19a6cb6f987f7aec67b6f74bcfa08c6bc3a65e4fd07f50f7679223"
+checksum = "952b35313cb20214b270aa12e6d144270cc1c44d29caf207565f2cbeb926db9d"
 dependencies = [
+ "generic_singleton",
  "smallvec",
 ]
 
@@ -2340,7 +2358,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "steel-core"
 version = "0.7.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
+source = "git+https://github.com/mattwparas/steel#9668db4eb00b25b6f5cfddc27a4d1aed63ecce75"
 dependencies = [
  "abi_stable",
  "arc-swap",
@@ -2351,6 +2369,7 @@ dependencies = [
  "codespan-reporting",
  "compact_str",
  "crossbeam-channel",
+ "crossbeam-queue",
  "crossbeam-utils",
  "env_home",
  "futures-executor",
@@ -2395,7 +2414,7 @@ dependencies = [
 [[package]]
 name = "steel-derive"
 version = "0.6.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
+source = "git+https://github.com/mattwparas/steel#9668db4eb00b25b6f5cfddc27a4d1aed63ecce75"
 dependencies = [
  "proc-macro2 1.0.95",
  "quote 1.0.40",
@@ -2405,7 +2424,7 @@ dependencies = [
 [[package]]
 name = "steel-gen"
 version = "0.3.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
+source = "git+https://github.com/mattwparas/steel#9668db4eb00b25b6f5cfddc27a4d1aed63ecce75"
 dependencies = [
  "codegen",
  "serde",
@@ -2414,7 +2433,7 @@ dependencies = [
 [[package]]
 name = "steel-parser"
 version = "0.7.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
+source = "git+https://github.com/mattwparas/steel#9668db4eb00b25b6f5cfddc27a4d1aed63ecce75"
 dependencies = [
  "compact_str",
  "fxhash",
@@ -2431,7 +2450,7 @@ dependencies = [
 [[package]]
 name = "steel-repl"
 version = "0.7.0"
-source = "git+https://github.com/tesujimath/steel?branch=vector-derive-debug#f3291fbe2b5b881caf107fb9106ab335fd35ce5c"
+source = "git+https://github.com/mattwparas/steel#9668db4eb00b25b6f5cfddc27a4d1aed63ecce75"
 dependencies = [
  "colored",
  "crossbeam-utils",
