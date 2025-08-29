@@ -45,7 +45,7 @@ pushtag #essential
 
 pushmeta price: "expensive"
 
-2017-11-18 pad Assets:US:TD:Checking Equity:Opening-Balances
+2017-11-17 pad Assets:US:TD:Checking Equity:Opening-Balances
 2017-11-18 balance Assets:US:TD:Checking                               23954.04 USD
 
 2012-01-09 * "VISA DDA PUR 444500     WHOLEFDS -- VISA DDA PUR 444500     WHOLEFDS HOU 10236          NEW YORK      * NY"
@@ -55,6 +55,7 @@ pushmeta price: "expensive"
 ; Martin
 2013-01-01 * "Buy CRA shares" ^old-transactions-008
   Assets:CA:RBC-Investing:Taxable-CAD:Cash                             -1395.43 CAD @ 1/1.4576 USD
+  Assets:US:TD:Checking
 
 2023-05-29 * "New World Gardens North East Va ;" ^newworld.co.nz
   Assets:Bank:Current                        -30 -9.65 NZD
@@ -65,7 +66,7 @@ popmeta price:
 
 poptag #essential
 
-2023-05-30 pad Assets:Bank:Current Equity:Opening-Balances #fudge
+2023-05-29 pad Assets:Bank:Current Equity:Opening-Balances #fudge
   evil: "unseen"
 
 2023-05-30 balance Assets:Bank:Current          1000 ~ 0.01 NZD #richman
@@ -110,8 +111,8 @@ popmeta drink:
   Expenses:Car:Fuel
 
 2023-05-31 'Z "Z Energy ;" "Rather expensive" #petrol
-'B Assets:Bank:Current                           -130.00 NZD
-! Expenses:Car:Fuel
+  'B Assets:Bank:Current                           -130.00 NZD
+  ! Expenses:Car:Fuel
 
 2028-01-01 query "fictional SQL" "SELECT money FROM accounts;" #for-testing
   status: "bogus"
