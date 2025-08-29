@@ -47,7 +47,7 @@
     (
       ; config
       (import-config (config-value-or-default '(import) (hash) config))
-      (extractors-by-path (config-value-or-default '(extractors) '() import-config))
+      (extractors-by-path (config-value-or-default '(extractors) (hash) import-config))
       (accounts-by-id (config-value-or-default '(accounts) (hash) import-config))
       (txnid-key (config-value-or-default '(txnid-key) "txnid" import-config))
       (payee2-key (config-value-or-default '(payee2-key) "payee2" import-config))
