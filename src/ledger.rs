@@ -1061,7 +1061,7 @@ fn convert_parser_options(
     )))
 }
 
-const PAD_FLAG: &str = "P";
+const PAD_FLAG: &str = "'P";
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("sources-write-ffi-error", write_ffi_error);

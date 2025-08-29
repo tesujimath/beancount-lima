@@ -21,12 +21,6 @@ pub(crate) struct Directive {
     pub(crate) variant: DirectiveVariant,
 }
 
-impl Display for Directive {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {:?})", &self.date, &self.variant,)
-    }
-}
-
 impl Custom for Directive {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
@@ -102,10 +96,10 @@ impl Directive {
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Transaction {
-    pub(crate) postings: SteelVector,
     pub(crate) flag: SteelString,
     pub(crate) payee: Option<SteelString>,
     pub(crate) narration: Option<SteelString>,
+    pub(crate) postings: SteelVector,
 }
 
 #[derive(Clone, Steel, Debug)]
