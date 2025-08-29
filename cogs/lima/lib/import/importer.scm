@@ -26,6 +26,7 @@
             (hash-insert h j-base (cons txn (or (hash-try-get h j-base) '())))))))))
 
 ;; insert a transaction into the hash-by-date, trying to pair where we can
+;; transactions are prepended for their date, so to preserve the order, reverse on extraction
 (define (make-insert-by-date pairing-window-days)
   (lambda (h txn)
     (let* ((j (date-julian (hash-get txn 'date))))
@@ -33,7 +34,7 @@
 
 (define (all-by-date h)
   (transduce (merge-sort (hash-keys->list h))
-    (mapping (lambda (j) (hash-get h j)))
+    (mapping (lambda (j) (reverse (hash-get h j))))
     (flattening)
     ;; TODO can we do better than into-list here?
     (into-list)))
