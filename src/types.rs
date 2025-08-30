@@ -176,14 +176,6 @@ impl Posting {
         }
     }
 
-    pub(crate) fn create(flag: Option<SteelString>, account: SteelString, amount: Amount) -> Self {
-        Posting {
-            account,
-            amount,
-            flag,
-        }
-    }
-
     fn account(&self) -> SteelString {
         self.account.clone()
     }
@@ -691,7 +683,6 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("transaction-postings", Directive::transaction_postings);
 
     steel_engine.register_type::<Posting>("posting?");
-    steel_engine.register_fn("posting", Posting::create);
     steel_engine.register_fn("posting->string", Posting::to_string);
     steel_engine.register_fn("posting-account", Posting::account);
     steel_engine.register_fn("posting-amount", Posting::amount);

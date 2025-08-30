@@ -14,8 +14,8 @@
       (filtering transaction?)
       (mapping transaction-postings)
       (flattening)
-      (into-for-each(lambda (post)
-                     (inventory-accumulator-post inv-accum post))))
+      (into-for-each (lambda (post)
+                      (inventory-accumulator-post inv-accum post))))
     (let*
       ((currencies (inventory-accumulator-currencies inv-accum))
         (main-currency (inventory-accumulator-main-currency inv-accum))

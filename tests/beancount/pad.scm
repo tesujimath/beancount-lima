@@ -11,5 +11,12 @@
                             (and (equal? (posting-account pst) "Assets:Bank:Current")
                                  (equal? (posting-flag pst) "'P"))))
          (into-list))))
-  (check-equal? "pad-postings" current-pad-psts
-    (list (posting "'P" "Assets:Bank:Current" (amount (decimal -22 2) "NZD")))))
+  (check-equal? "pad-postings length" (length current-pad-psts) 1)
+  (let ((pad-pst (car current-pad-psts)))
+  ;; check each field matches what we expect
+    (transduce (list (cons posting-flag "'P")
+                   (cons posting-account "Assets:Bank:Current")
+                   (cons posting-amount (amount (decimal -22 2) "NZD")))
+             (into-for-each (lambda (x) (let ((f (car x))
+                                              (expected (cdr x)))
+                                    (check-equal? "pad-postings value" (f pad-pst) expected)))))))
