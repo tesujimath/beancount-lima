@@ -1,5 +1,10 @@
 include "pairing.beancount"
 
+2024-10-05 txn "BURGERFUEL NORTH" "BURGERFUEL NORTH ;"
+  txnid: "99-1234-0123456-07.05Oct2024.1"
+  Assets:Bank:Current                                                    -23.90 NZD
+  Expenses:Take-Aways                   ; inferred from 1 payee
+
 2024-10-05 txn "TRANSFER FROM S J GUEST - 21" "TRANSFER FROM S J GUEST - 21 ;"
   txnid: "99-1234-0123456-07.05Oct2024.2"
   txnid2: "99-1234-0123456-21.05Oct2024.1"
@@ -7,11 +12,6 @@ include "pairing.beancount"
   narration2: "TRANSFER TO S J GUEST - 07 ;"
   Assets:Bank:Current                                                   1000.00 NZD
   Assets:Bank:Savings                   ; inferred from 1 payee
-
-2024-10-05 txn "BURGERFUEL NORTH" "BURGERFUEL NORTH ;"
-  txnid: "99-1234-0123456-07.05Oct2024.1"
-  Assets:Bank:Current                                                    -23.90 NZD
-  Expenses:Take-Aways                   ; inferred from 1 payee
 
 2024-10-09 txn "New World" "New World ;"
   txnid: "99-1234-0123456-07.09Oct2024.1"
@@ -26,15 +26,15 @@ include "pairing.beancount"
   Assets:Bank:Current                                                  -8000.00 NZD
   Assets:Bank:Savings                   ; inferred from 1 payee
 
-2024-10-31 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
-  txnid: "99-1234-0123456-21.31Oct2024.2"
-  Assets:Bank:Savings                                                    -60.39 NZD
-  Expenses:Tax                          ; inferred from 1 payee
-
 2024-10-31 txn "INTEREST EARNED" "INTEREST EARNED ;"
   txnid: "99-1234-0123456-21.31Oct2024.1"
   Assets:Bank:Savings                                                    215.67 NZD
   Income:Interest                       ; inferred from 1 payee
+
+2024-10-31 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
+  txnid: "99-1234-0123456-21.31Oct2024.2"
+  Assets:Bank:Savings                                                    -60.39 NZD
+  Expenses:Tax                          ; inferred from 1 payee
 
 2024-11-20 txn "TRANSFER TO S J GUEST - 21" "TRANSFER TO S J GUEST - 21 ;"
   txnid: "99-1234-0123456-07.20Nov2024.4"
@@ -44,15 +44,15 @@ include "pairing.beancount"
   Assets:Bank:Current                                                  -9000.00 NZD
   Assets:Bank:Savings                   ; inferred from 1 payee
 
-2024-11-30 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
-  txnid: "99-1234-0123456-21.30Nov2024.2"
-  Assets:Bank:Savings                                                    -61.24 NZD
-  Expenses:Tax                          ; inferred from 1 payee
-
 2024-11-30 txn "INTEREST EARNED" "INTEREST EARNED ;"
   txnid: "99-1234-0123456-21.30Nov2024.1"
   Assets:Bank:Savings                                                    218.71 NZD
   Income:Interest                       ; inferred from 1 payee
+
+2024-11-30 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
+  txnid: "99-1234-0123456-21.30Nov2024.2"
+  Assets:Bank:Savings                                                    -61.24 NZD
+  Expenses:Tax                          ; inferred from 1 payee
 
 2024-12-10 txn "TRANSFER TO S J GUEST - 21" "TRANSFER TO S J GUEST - 21 ;"
   txnid: "99-1234-0123456-07.10Dec2024.6"
@@ -62,15 +62,15 @@ include "pairing.beancount"
   Assets:Bank:Current                                                  -6700.00 NZD
   Assets:Bank:Savings                   ; inferred from 1 payee
 
-2024-12-31 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
-  txnid: "99-1234-0123456-21.31Dec2024.2"
-  Assets:Bank:Savings                                                    -63.70 NZD
-  Expenses:Tax                          ; inferred from 1 payee
-
 2024-12-31 txn "INTEREST EARNED" "INTEREST EARNED ;"
   txnid: "99-1234-0123456-21.31Dec2024.1"
   Assets:Bank:Savings                                                    227.51 NZD
   Income:Interest                       ; inferred from 1 payee
+
+2024-12-31 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
+  txnid: "99-1234-0123456-21.31Dec2024.2"
+  Assets:Bank:Savings                                                    -63.70 NZD
+  Expenses:Tax                          ; inferred from 1 payee
 
 2025-01-10 txn "TRANSFER TO S J GUEST - 21" "TRANSFER TO S J GUEST - 21 ;"
   txnid: "99-1234-0123456-07.10Jan2025.5"
@@ -85,15 +85,15 @@ include "pairing.beancount"
   Assets:Bank:Current                                                    -10.99 NZD
   Expenses:TV                           ; inferred from 1 payee
 
-2025-01-31 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
-  txnid: "99-1234-0123456-21.31Jan2025.2"
-  Assets:Bank:Savings                                                    -65.96 NZD
-  Expenses:Tax                          ; inferred from 1 payee
-
 2025-01-31 txn "INTEREST EARNED" "INTEREST EARNED ;"
   txnid: "99-1234-0123456-21.31Jan2025.1"
   Assets:Bank:Savings                                                    235.56 NZD
   Income:Interest                       ; inferred from 1 payee
+
+2025-01-31 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
+  txnid: "99-1234-0123456-21.31Jan2025.2"
+  Assets:Bank:Savings                                                    -65.96 NZD
+  Expenses:Tax                          ; inferred from 1 payee
 
 2025-02-27 txn "TRANSFER FROM S J GUEST - 21" "TRANSFER FROM S J GUEST - 21 ;"
   txnid: "99-1234-0123456-07.27Feb2025.3"
@@ -103,15 +103,15 @@ include "pairing.beancount"
   Assets:Bank:Current                                                   2000.00 NZD
   Assets:Bank:Savings                   ; inferred from 1 payee
 
-2025-02-28 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
-  txnid: "99-1234-0123456-21.28Feb2025.2"
-  Assets:Bank:Savings                                                    -58.78 NZD
-  Expenses:Tax                          ; inferred from 1 payee
-
 2025-02-28 txn "INTEREST EARNED" "INTEREST EARNED ;"
   txnid: "99-1234-0123456-21.28Feb2025.1"
   Assets:Bank:Savings                                                    209.92 NZD
   Income:Interest                       ; inferred from 1 payee
+
+2025-02-28 txn "PIE TAX 28.000%" "PIE TAX 28.000% ;"
+  txnid: "99-1234-0123456-21.28Feb2025.2"
+  Assets:Bank:Savings                                                    -58.78 NZD
+  Expenses:Tax                          ; inferred from 1 payee
 
 2025-03-01 txn "New World" "New World ;"
   txnid: "99-1234-0123456-07.01Mar2025.1"
@@ -131,7 +131,7 @@ include "pairing.beancount"
   Assets:Bank:Current                                                     -3.99 NZD
   Expenses:Groceries                    ; inferred from 1 payee
 
-2025-03-30 balance Assets:Bank:Savings                                 28652.58 NZD
-
 2025-03-30 balance Assets:Bank:Current                                -27944.35 NZD
+
+2025-03-30 balance Assets:Bank:Savings                                 28652.58 NZD
 

@@ -48,15 +48,15 @@ include "firstdirect.beancount"
   Assets:Bank:Uk:Current                                                   0.88 GBP
   Income:Unknown
 
+2025-02-10 txn "TESCO" "GROCERIES"
+  Assets:Bank:Uk:Current                                                 -17.84 GBP
+  Expenses:Unknown
+
 2025-02-10 txn "TRANSFER TO SAVINGS" ""
   ; paired with "TRANSFER FROM CURRENT" ""
   payee2: "TRANSFER FROM CURRENT"
   Assets:Bank:Uk:Current                                                 -34.28 GBP
   Assets:Bank:Uk:Savings                ; inferred from 1 payee
-
-2025-02-10 txn "TESCO" "GROCERIES"
-  Assets:Bank:Uk:Current                                                 -17.84 GBP
-  Expenses:Unknown
 
 2025-02-11 balance Assets:Bank:Uk:Savings                                134.28 GBP
 
