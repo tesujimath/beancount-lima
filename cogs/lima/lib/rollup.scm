@@ -32,11 +32,11 @@
                                        (inv0 (hash-get accounts accname0))
                                        (subacns (split-many accname0 ":"))
                                        (parent-accnames0 (foldl (lambda (sub accs)
-                                                                 (let* ((last-parent (car accs))
-                                                                        (next-parent (format "~a:~a" last-parent sub)))
-                                                                   (cons next-parent accs)))
-                                                               (list (car subacns))
-                                                               (cdr subacns)))
+                                                                  (let* ((last-parent (car accs))
+                                                                         (next-parent (format "~a:~a" last-parent sub)))
+                                                                    (cons next-parent accs)))
+                                                                (list (car subacns))
+                                                                (cdr subacns)))
                                        (bal0 (or (hash-try-get inv0 cur) (decimal-zero)))
                                        (rollup1 (if (decimal-zero? bal0)
                                                     rollup0
@@ -63,12 +63,12 @@
          (rollup-combined (transduce rollup-account-names
                                      (mapping (lambda (accname0)
                                                 (let* ((depth (length (split-many accname0 ":")))
-                                                      (rollup-bal-merged (hash-get rollup accname0))
-                                                      (rollup-bal (first rollup-bal-merged))
-                                                      (rollup-merged (second rollup-bal-merged))
-                                                      (bal (let ((inv (hash-try-get accounts accname0)))
-                                                             (if inv (or (hash-try-get inv cur) (decimal-zero))
-                                                                 (decimal-zero)))))
+                                                       (rollup-bal-merged (hash-get rollup accname0))
+                                                       (rollup-bal (first rollup-bal-merged))
+                                                       (rollup-merged (second rollup-bal-merged))
+                                                       (bal (let ((inv (hash-try-get accounts accname0)))
+                                                              (if inv (or (hash-try-get inv cur) (decimal-zero))
+                                                                  (decimal-zero)))))
                                                   (rollup-row accname0
                                                               rollup-bal
                                                               rollup-merged

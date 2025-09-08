@@ -1,4 +1,4 @@
-(provide display-balances)
+(provide display-balance-sheet)
 
 (require "lima/lib/types.scm")
 (require "lima/lib/tabulate.scm")
@@ -9,7 +9,7 @@
        currencies))
 
 ;; collate means build a list of rows with columns ready for tabulation
-(define (collate-balances ldg)
+(define (collate-balance-sheet ldg)
   (let ((all-currencies (ledger-currencies ldg)))
     (cons
      (cons "" all-currencies)
@@ -25,5 +25,5 @@
                               (cons account-name (inventory-for-currencies inv all-currencies))))))
                 (into-list)))))
 
-(define (display-balances ldg)
-  (display (tabulate (collate-balances ldg) 'left 'centre)))
+(define (display-balance-sheet ldg)
+  (display (tabulate (collate-balance-sheet ldg) 'left 'centre)))

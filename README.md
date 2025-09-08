@@ -20,7 +20,7 @@ aya> lima
    ___/ / /_/  __/  __/ /            :? for help
   /____/\__/\___/\___/_/
 
-λ > (display-balances *ledger*)
+λ > (display-balance-sheet *ledger* *options*)
                                            GBP     NZD
 Assets:Bank:Current                              -100.78
 Assets:Bank:UK                            -5.00

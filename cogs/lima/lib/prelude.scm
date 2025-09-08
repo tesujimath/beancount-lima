@@ -21,7 +21,7 @@
 (provide tabulate)
 
 (require "lima/lib/balances.scm")
-(provide display-balances)
+(provide display-balance-sheet)
 
 (require "lima/lib/rollup.scm")
 (provide display-rollup)
