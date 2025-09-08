@@ -310,6 +310,7 @@ pub(crate) mod format;
 pub(crate) mod import;
 pub(crate) mod inventory;
 pub(crate) mod ledger;
+pub(crate) mod steely;
 pub(crate) mod tabulate;
 pub(crate) mod types;
 

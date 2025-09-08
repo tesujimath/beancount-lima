@@ -1,10 +1,10 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
+use crate::steely::Steely;
 use beancount_parser_lima::{self as parser, BeancountSources, ElementType, Span, Spanned};
 use color_eyre::eyre::Result;
 use std::{
     fmt::Display,
-    ops::{Deref, DerefMut},
     sync::{Arc, Mutex, MutexGuard},
 };
 use steel::{
@@ -262,7 +262,7 @@ impl From<&parser::Amount<'_>> for Amount {
     }
 }
 
-pub(crate) type Date = Wrapped<time::Date>;
+pub(crate) type Date = Steely<time::Date>;
 
 impl Date {
     fn new(y: i32, m: i32, d: i32) -> steel::rvals::Result<Self> {
@@ -293,7 +293,7 @@ impl Date {
                     format!("bad date: {e}"),
                 )
             })
-            .map(Self)
+            .map(Into::<Steely<_>>::into)
     }
 
     // beginning of time
@@ -309,9 +309,9 @@ impl Date {
     // positive or negative offset in days
     fn after(&self, d: isize) -> steel::rvals::Result<Self> {
         if d >= 0 {
-            self.0.checked_add(time::Duration::days(d as i64))
+            self.checked_add(time::Duration::days(d as i64))
         } else {
-            self.0.checked_sub(time::Duration::days(-d as i64))
+            self.checked_sub(time::Duration::days(-d as i64))
         }
         .map_or(
             Err(SteelErr::new(
@@ -329,7 +329,7 @@ impl Date {
 
     // Julian day
     pub(crate) fn julian(&self) -> i32 {
-        self.0.to_julian_day()
+        self.to_julian_day()
     }
 }
 
@@ -449,89 +449,6 @@ impl Custom for Decimal {
         } else {
             false
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct Wrapped<T>(T)
-where
-    T: Clone;
-
-impl<T> Custom for Wrapped<T>
-where
-    T: Clone + Display + 'static,
-{
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.0.to_string()))
-    }
-}
-
-impl<T> Copy for Wrapped<T> where T: Clone + Copy {}
-
-impl<T> From<T> for Wrapped<T>
-where
-    T: Clone,
-{
-    fn from(value: T) -> Self {
-        Wrapped(value)
-    }
-}
-
-impl<T> PartialEq for Wrapped<T>
-where
-    T: Clone + PartialEq,
-{
-    fn eq(&self, other: &Self) -> bool {
-        self.0.eq(&other.0)
-    }
-}
-
-impl<T> PartialOrd for Wrapped<T>
-where
-    T: Clone + PartialOrd,
-{
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.partial_cmp(&other.0)
-    }
-}
-
-impl<T> Eq for Wrapped<T> where T: Clone + Eq {}
-
-impl<T> Ord for Wrapped<T>
-where
-    T: Clone + Ord,
-{
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl<T> Display for Wrapped<T>
-where
-    T: Clone + Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl<T> Deref for Wrapped<T>
-where
-    T: Clone,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> DerefMut for Wrapped<T>
-where
-    T: Clone,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
