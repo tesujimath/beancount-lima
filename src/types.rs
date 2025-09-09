@@ -1,12 +1,9 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use crate::{steel_decimal::SteelDecimal, steely::Steely};
-use beancount_parser_lima::{self as parser, BeancountSources, ElementType, Span, Spanned};
+use beancount_parser_lima::{self as parser, ElementType, Span, Spanned};
 use color_eyre::eyre::Result;
-use std::{
-    fmt::Display,
-    sync::{Arc, Mutex, MutexGuard},
-};
+use std::{fmt::Display, sync::Arc};
 use steel::{
     rvals::{as_underlying_type, Custom, CustomType, SteelString, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
@@ -330,36 +327,6 @@ impl Date {
     // Julian day
     pub(crate) fn julian(&self) -> i32 {
         self.to_julian_day()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct MutexWrapper<T>(Arc<Mutex<T>>);
-
-impl<T> MutexWrapper<T> {
-    pub fn new(item: T) -> Self {
-        MutexWrapper(Arc::new(Mutex::new(item)))
-    }
-
-    pub fn lock(&self) -> MutexGuard<T> {
-        self.0.lock().unwrap()
-    }
-}
-
-impl<T> Custom for MutexWrapper<T> where T: Clone + Display + 'static {}
-
-#[derive(Clone, Debug, Steel)]
-pub struct WrappedBeancountSources(Arc<Mutex<BeancountSources>>);
-
-impl From<BeancountSources> for WrappedBeancountSources {
-    fn from(sources: BeancountSources) -> Self {
-        WrappedBeancountSources(Arc::new(Mutex::new(sources)))
-    }
-}
-
-impl WrappedBeancountSources {
-    pub fn lock(&self) -> MutexGuard<BeancountSources> {
-        self.0.lock().unwrap()
     }
 }
 

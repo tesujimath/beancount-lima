@@ -1,17 +1,32 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use steel::{
     gc::Gc,
-    rvals::{as_underlying_type, Custom, IntoSteelVal, SteelString},
+    rvals::{as_underlying_type, Custom, IntoSteelVal, SteelHashMap, SteelString},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelVal,
 };
 use steel_derive::Steel;
 
-use crate::steel_decimal::SteelDecimal;
 use crate::types::*;
+use crate::{shared::Shared, steel_decimal::SteelDecimal};
+
+// TODO include commodities held at cost
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Inventory {
+    positions: SteelHashMap, // of number indexed by currency
+}
+
+impl Inventory {
+    pub(crate) fn positions(&self) -> SteelVal {
+        SteelVal::HashMapV(self.positions.clone())
+    }
+}
 
 // TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
@@ -139,6 +154,8 @@ impl InventoryAccumulator {
 const DEFAULT_CURRENCY: &str = "USD"; // ugh
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
+    steel_engine.register_type::<Shared<Inventory>>("inventory?");
+
     steel_engine.register_type::<InventoryAccumulator>("inventory-accumulator?");
     steel_engine.register_fn("inventory-accumulator", InventoryAccumulator::default);
     steel_engine.register_fn("inventory-accumulator-post", InventoryAccumulator::post);
