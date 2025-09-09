@@ -10,23 +10,24 @@ use steel::{
 };
 use steel_derive::Steel;
 
+use crate::steel_decimal::SteelDecimal;
 use crate::types::*;
 
 // TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
 pub(crate) struct InventoryBuilder {
-    positions: HashMap<String, rust_decimal::Decimal>, // indexed by currency
+    positions: HashMap<String, SteelDecimal>, // indexed by currency
 }
 
 impl InventoryBuilder {
-    fn with_initial_balance(units: rust_decimal::Decimal, currency: &str) -> InventoryBuilder {
+    fn with_initial_balance(units: SteelDecimal, currency: &str) -> InventoryBuilder {
         let mut positions = HashMap::default();
         positions.insert(currency.to_string(), units);
 
         Self { positions }
     }
 
-    fn post(&mut self, units: rust_decimal::Decimal, currency: &str) {
+    fn post(&mut self, units: SteelDecimal, currency: &str) {
         match self.positions.get_mut(currency) {
             Some(bal) => *bal += units,
             None => {
@@ -46,7 +47,7 @@ impl InventoryBuilder {
                     .filter_map(|(k, v)| {
                         (!v.is_zero()).then_some((
                             k.into(),
-                            Into::<Decimal>::into(v).into_steelval().unwrap(),
+                            Into::<SteelDecimal>::into(v).into_steelval().unwrap(),
                         ))
                     })
                     .collect::<steel::HashMap<SteelVal, SteelVal>>(),
@@ -73,7 +74,7 @@ impl InventoryAccumulator {
         if let SteelVal::Custom(posting) = posting {
             if let Some(posting) = as_underlying_type::<Posting>(posting.read().as_ref()) {
                 let account_name = posting.account.as_str();
-                let units = posting.amount.number.into();
+                let units = posting.amount.number;
                 let currency = posting.amount.currency.as_str();
 
                 match self.accounts.get_mut(account_name) {

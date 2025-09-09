@@ -1,6 +1,6 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
-use crate::steely::Steely;
+use crate::{steel_decimal::SteelDecimal, steely::Steely};
 use beancount_parser_lima::{self as parser, BeancountSources, ElementType, Span, Spanned};
 use color_eyre::eyre::Result;
 use std::{
@@ -109,7 +109,7 @@ pub(crate) struct Price {}
 pub(crate) struct Balance {
     pub(crate) account: SteelString,
     pub(crate) amount: Amount,
-    pub(crate) tolerance: Option<Decimal>,
+    pub(crate) tolerance: Option<SteelDecimal>,
 }
 
 #[derive(Clone, Steel, Debug)]
@@ -205,17 +205,17 @@ impl Custom for Posting {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Amount {
-    pub(crate) number: Decimal,
+    pub(crate) number: SteelDecimal,
     pub(crate) currency: SteelString,
 }
 
 // https://github.com/mattwparas/steel/issues/365
 impl Amount {
-    fn new(number: Decimal, currency: SteelString) -> Self {
+    fn new(number: SteelDecimal, currency: SteelString) -> Self {
         Self { number, currency }
     }
 
-    fn number(&self) -> Decimal {
+    fn number(&self) -> SteelDecimal {
         self.number
     }
 
@@ -293,7 +293,7 @@ impl Date {
                     format!("bad date: {e}"),
                 )
             })
-            .map(Into::<Steely<_>>::into)
+            .map(Into::into)
     }
 
     // beginning of time
@@ -330,125 +330,6 @@ impl Date {
     // Julian day
     pub(crate) fn julian(&self) -> i32 {
         self.to_julian_day()
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub(crate) struct Decimal(rust_decimal::Decimal);
-
-impl Decimal {
-    pub(crate) fn add(&self, other: Decimal) -> Decimal {
-        (self.0 + other.0).into()
-    }
-
-    fn numerator(&self) -> isize {
-        self.0.mantissa() as isize
-    }
-
-    fn denominator(&self) -> isize {
-        10isize.pow(self.0.scale())
-    }
-
-    fn new(m: i64, e: u32) -> Self {
-        rust_decimal::Decimal::new(m, e).into()
-    }
-
-    fn zero() -> Self {
-        rust_decimal::Decimal::ZERO.into()
-    }
-
-    pub(crate) fn is_zero(&self) -> bool {
-        self.0 == rust_decimal::Decimal::ZERO
-    }
-
-    // width of digits and/or sign to left of decimal point
-    fn width_left(&self) -> u32 {
-        let sign_width = if self.0.is_sign_negative() { 1u32 } else { 0 };
-        let mut mantissa_width = 0u32;
-        let mut abs_mantissa = self.0.mantissa().abs();
-        while abs_mantissa > 0 {
-            abs_mantissa /= 10;
-            mantissa_width += 1;
-        }
-
-        if sign_width + mantissa_width > self.0.scale() {
-            sign_width + mantissa_width - self.0.scale()
-        } else {
-            1
-        }
-    }
-
-    // width of digits  to right of decimal point
-    fn width_right(&self) -> u32 {
-        self.0.scale()
-    }
-
-    fn parse(raw: String) -> steel::rvals::Result<Self> {
-        rust_decimal::Decimal::from_str_exact(&raw)
-            .map_err(|e| SteelErr::new(steel::rerrs::ErrorKind::ConversionError, e.to_string()))
-            .map(Self)
-    }
-
-    /// parse a decimal forcing at least 2 decimal places
-    fn parse_cents(raw: String) -> steel::rvals::Result<Self> {
-        Self::parse(raw).map(|Self(mut d)| {
-            if d.scale() < 2 {
-                d.rescale(2);
-            }
-            Self(d)
-        })
-    }
-}
-
-impl From<rust_decimal::Decimal> for Decimal {
-    fn from(value: rust_decimal::Decimal) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Decimal> for rust_decimal::Decimal {
-    fn from(value: Decimal) -> Self {
-        value.0
-    }
-}
-
-impl PartialEq for Decimal {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.eq(&other.0)
-    }
-}
-
-impl Eq for Decimal {}
-
-impl PartialOrd for Decimal {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.0.cmp(&other.0))
-    }
-}
-
-impl Ord for Decimal {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl Display for Decimal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl Custom for Decimal {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.0.to_string()))
-    }
-
-    fn equality_hint(&self, other: &dyn CustomType) -> bool {
-        if let Some(other) = as_underlying_type::<Decimal>(other) {
-            self == other
-        } else {
-            false
-        }
     }
 }
 
@@ -625,23 +506,22 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("date-before", Date::before);
     steel_engine.register_fn("date-julian", Date::julian);
 
-    steel_engine.register_type::<Decimal>("decimal?");
-    steel_engine.register_fn("decimal", Decimal::new);
-    steel_engine.register_fn("decimal=?", Decimal::eq);
-    steel_engine.register_fn("decimal>?", Decimal::gt);
-    steel_engine.register_fn("decimal<?", Decimal::lt);
-    steel_engine.register_fn("decimal>=?", Decimal::ge);
-    steel_engine.register_fn("decimal<=?", Decimal::le);
-    steel_engine.register_fn("decimal-zero", Decimal::zero);
-    steel_engine.register_fn("decimal-zero?", Decimal::is_zero);
-    steel_engine.register_fn("decimal-add", Decimal::add);
-    steel_engine.register_fn("decimal->string", Decimal::to_string);
-    steel_engine.register_fn("decimal-numerator", Decimal::numerator);
-    steel_engine.register_fn("decimal-denominator", Decimal::denominator);
-    steel_engine.register_fn("decimal-width-left", Decimal::width_left);
-    steel_engine.register_fn("decimal-width-right", Decimal::width_right);
-    steel_engine.register_fn("parse-decimal", Decimal::parse);
-    steel_engine.register_fn("parse-decimal-cents", Decimal::parse_cents);
+    steel_engine.register_type::<SteelDecimal>("decimal?");
+    steel_engine.register_fn("decimal", SteelDecimal::new);
+    steel_engine.register_fn("decimal=?", SteelDecimal::eq);
+    steel_engine.register_fn("decimal>?", SteelDecimal::gt);
+    steel_engine.register_fn("decimal<?", SteelDecimal::lt);
+    steel_engine.register_fn("decimal>=?", SteelDecimal::ge);
+    steel_engine.register_fn("decimal<=?", SteelDecimal::le);
+    steel_engine.register_fn("decimal-zero", SteelDecimal::zero);
+    steel_engine.register_fn("decimal-zero?", SteelDecimal::is_zero);
+    steel_engine.register_fn("decimal-add", SteelDecimal::add);
+    steel_engine.register_fn("decimal->string", SteelDecimal::to_string);
+    steel_engine.register_fn("decimal->rational", SteelDecimal::to_rational);
+    steel_engine.register_fn("decimal-width-left", SteelDecimal::width_left);
+    steel_engine.register_fn("decimal-width-right", SteelDecimal::width_right);
+    steel_engine.register_fn("parse-decimal", SteelDecimal::parse);
+    steel_engine.register_fn("parse-decimal-cents", SteelDecimal::parse_cents);
 
     steel_engine.register_type::<WrappedError>("error?");
     steel_engine.register_fn("ffi-error", WrappedSpannedElement::ffi_error);

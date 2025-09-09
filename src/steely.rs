@@ -4,11 +4,12 @@
 use color_eyre::eyre::Result;
 use std::{
     fmt::Display,
-    ops::{Deref, DerefMut},
+    ops::{AddAssign, Deref, DerefMut},
 };
-use steel::rvals::Custom;
+use steel::rvals::{as_underlying_type, Custom, CustomType};
 
 // a wrapper for any type implementing clone to make it compatiable with Steel
+// PartialEq requirement is a bit crass, and is here for now to support SteelDecimal
 #[derive(Clone, Debug)]
 pub(crate) struct Steely<T>(T)
 where
@@ -16,10 +17,18 @@ where
 
 impl<T> Custom for Steely<T>
 where
-    T: Clone + Display + 'static,
+    T: Clone + Display + PartialEq + 'static,
 {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.0.to_string()))
+    }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<Steely<T>>(other) {
+            self == other
+        } else {
+            false
+        }
     }
 }
 
@@ -89,5 +98,32 @@ where
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+impl<T> AsRef<T> for Steely<T>
+where
+    T: Clone,
+{
+    fn as_ref(&self) -> &T {
+        &self.0
+    }
+}
+
+impl<T> AsMut<T> for Steely<T>
+where
+    T: Clone,
+{
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
+}
+
+impl<T> AddAssign<Steely<T>> for Steely<T>
+where
+    T: Clone + AddAssign,
+{
+    fn add_assign(&mut self, rhs: Steely<T>) {
+        self.as_mut().add_assign(rhs.as_ref().clone());
     }
 }
