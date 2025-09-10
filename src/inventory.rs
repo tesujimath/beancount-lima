@@ -1,16 +1,110 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use rust_decimal::Decimal;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 use steel::{
     gc::Gc,
-    rvals::{as_underlying_type, Custom, IntoSteelVal, SteelString},
+    rvals::{as_underlying_type, Custom, CustomType, IntoSteelVal, SteelString},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelVal,
 };
 use steel_derive::Steel;
 
-use crate::{steel_decimal::SteelDecimal, types::*};
+use crate::{steel_date::SteelDate, steel_decimal::SteelDecimal, types::*};
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(crate) struct Cost {
+    amount: Amount,
+    date: SteelDate,
+    label: Option<SteelString>,
+}
+
+impl Display for Cost {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", &self.amount, &self.date)?;
+        if let Some(label) = &self.label {
+            write!(f, " {label}")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Custom for Cost {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
+    }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<Cost>(other) {
+            self == other
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(crate) struct Position {
+    units: Amount,
+    cost: Option<Cost>,
+}
+
+impl Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.units)?;
+        if let Some(cost) = &self.cost {
+            write!(f, " {{ {cost} }}")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Custom for Position {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
+    }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<Position>(other) {
+            self == other
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(crate) struct Inventory {
+    units: Amount,
+    cost: Option<Cost>,
+}
+
+impl Display for Inventory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.units)?;
+        if let Some(cost) = &self.cost {
+            write!(f, " {{ {cost} }}")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Custom for Inventory {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
+    }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<Inventory>(other) {
+            self == other
+        } else {
+            false
+        }
+    }
+}
 
 // TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
