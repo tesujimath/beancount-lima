@@ -10,7 +10,7 @@ use steel::{
 };
 use steel_derive::Steel;
 
-use crate::types::*;
+use crate::{steel_decimal::SteelDecimal, types::*};
 
 // TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
@@ -46,7 +46,7 @@ impl InventoryBuilder {
                     .filter_map(|(k, v)| {
                         (!v.is_zero()).then_some((
                             k.into(),
-                            Into::<Decimal>::into(v).into_steelval().unwrap(),
+                            Into::<SteelDecimal>::into(v).into_steelval().unwrap(),
                         ))
                     })
                     .collect::<steel::HashMap<SteelVal, SteelVal>>(),
