@@ -1,11 +1,8 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
-use beancount_parser_lima::{self as parser, BeancountSources, ElementType, Span, Spanned};
+use beancount_parser_lima::{self as parser, ElementType, Span, Spanned};
 use color_eyre::eyre::Result;
-use std::{
-    fmt::Display,
-    sync::{Arc, Mutex, MutexGuard},
-};
+use std::{fmt::Display, ops::Deref, sync::Arc};
 use steel::{
     rvals::{as_underlying_type, Custom, CustomType, SteelString, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
@@ -263,20 +260,24 @@ impl From<&parser::Amount<'_>> for Amount {
     }
 }
 
-#[derive(Clone, Debug, Steel)]
-pub struct WrappedBeancountSources(Arc<Mutex<BeancountSources>>);
+#[derive(Clone, Debug)]
+pub(crate) struct CustomShared<T>(Arc<T>);
 
-impl From<BeancountSources> for WrappedBeancountSources {
-    fn from(sources: BeancountSources) -> Self {
-        WrappedBeancountSources(Arc::new(Mutex::new(sources)))
+impl<T> From<T> for CustomShared<T> {
+    fn from(value: T) -> Self {
+        CustomShared(Arc::new(value))
     }
 }
 
-impl WrappedBeancountSources {
-    pub fn lock(&self) -> MutexGuard<BeancountSources> {
-        self.0.lock().unwrap()
+impl<T> Deref for CustomShared<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
     }
 }
+
+impl<T> Custom for CustomShared<T> where T: 'static {}
 
 #[derive(Clone, Debug)]
 pub struct Element {
@@ -296,7 +297,7 @@ impl parser::ElementType for Element {
 }
 
 #[derive(Clone, Debug)]
-pub struct WrappedSpannedElement(Arc<Spanned<Element>>);
+pub struct WrappedSpannedElement(CustomShared<Spanned<Element>>);
 
 impl Custom for WrappedSpannedElement {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
@@ -309,12 +310,15 @@ where
     T: parser::ElementType,
 {
     fn from(spanned_element: &Spanned<T>) -> Self {
-        WrappedSpannedElement(Arc::new(parser::spanned(
-            Element {
-                element_type: spanned_element.element_type(),
-            },
-            *spanned_element.span(),
-        )))
+        WrappedSpannedElement(
+            parser::spanned(
+                Element {
+                    element_type: spanned_element.element_type(),
+                },
+                *spanned_element.span(),
+            )
+            .into(),
+        )
     }
 }
 
@@ -356,7 +360,7 @@ impl WrappedSpannedElement {
     }
 
     pub(crate) fn ffi_error(&self, message: String) -> WrappedError {
-        WrappedError(Arc::new(self.0.as_ref().error(message)))
+        WrappedError(self.0.as_ref().error(message).into())
     }
 
     pub(crate) fn span(&self) -> Span {
@@ -365,17 +369,17 @@ impl WrappedSpannedElement {
 }
 
 #[derive(Clone, Debug)]
-pub struct WrappedError(Arc<parser::Error>);
+pub struct WrappedError(CustomShared<parser::Error>);
 
 impl Custom for WrappedError {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.0.as_ref().to_string()))
+        Some(Ok(self.0.to_string()))
     }
 }
 
 impl AsRef<parser::Error> for WrappedError {
     fn as_ref(&self) -> &parser::Error {
-        self.0.as_ref()
+        &self.0
     }
 }
 

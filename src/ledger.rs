@@ -22,7 +22,7 @@ use crate::{config::LedgerBuilderConfig, steel_date::SteelDate, types::*};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
-    pub(crate) sources: WrappedBeancountSources,
+    pub(crate) sources: CustomShared<BeancountSources>,
     pub(crate) directives: SteelVector,
     pub(crate) options: SteelHashMap,
 }
@@ -79,7 +79,7 @@ impl Ledger {
         builder.build(sources, error_w)
     }
 
-    fn sources(&self) -> WrappedBeancountSources {
+    fn sources(&self) -> CustomShared<BeancountSources> {
         self.sources.clone()
     }
 
@@ -104,19 +104,17 @@ impl Ledger {
     }
 }
 
-fn write_ffi_error(sources: WrappedBeancountSources, error: WrappedError) {
+fn write_ffi_error(sources: &CustomShared<BeancountSources>, error: WrappedError) {
     tracing::debug!("write_ffi_error");
 
-    let sources = sources.lock();
     sources
         .write(&std::io::stderr(), vec![error.as_ref().clone()])
         .unwrap();
 }
 
-fn write_ffi_errors(sources: WrappedBeancountSources, errors: Vec<WrappedError>) {
+fn write_ffi_errors(sources: &CustomShared<BeancountSources>, errors: Vec<WrappedError>) {
     tracing::debug!("write_ffi_errors");
 
-    let sources = sources.lock();
     sources
         .write(
             &std::io::stderr(),
