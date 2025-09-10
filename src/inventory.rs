@@ -89,7 +89,7 @@ impl InventoryAccumulator {
         if let SteelVal::Custom(posting) = posting {
             if let Some(posting) = as_underlying_type::<Posting>(posting.read().as_ref()) {
                 let account_name = posting.account.as_str();
-                let units = posting.amount.number;
+                let units = posting.amount.number.clone();
                 let currency = posting.amount.currency.as_str();
 
                 match self.accounts.get_mut(account_name) {

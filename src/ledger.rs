@@ -206,7 +206,7 @@ impl LedgerBuilder {
     fn directive(&mut self, directive: &Spanned<parser::Directive>) {
         use parser::DirectiveVariant::*;
 
-        let date: Date = (*directive.date().item()).into();
+        let date: SteelDate = (*directive.date().item()).into();
         let element = Into::<WrappedSpannedElement>::into(directive);
 
         match directive.variant() {
@@ -227,7 +227,7 @@ impl LedgerBuilder {
     fn transaction(
         &mut self,
         transaction: &parser::Transaction,
-        date: Date,
+        date: SteelDate,
         element: WrappedSpannedElement,
     ) {
         let mut postings = Vec::default();
@@ -385,7 +385,7 @@ impl LedgerBuilder {
     fn post<D>(
         &mut self,
         element: WrappedSpannedElement,
-        date: Date,
+        date: SteelDate,
         account_name: &str,
         amount: rust_decimal::Decimal,
         currency: String,
@@ -475,7 +475,7 @@ impl LedgerBuilder {
         }
     }
 
-    fn price(&mut self, price: &parser::Price, date: Date, element: WrappedSpannedElement) {}
+    fn price(&mut self, price: &parser::Price, date: SteelDate, element: WrappedSpannedElement) {}
 
     // base account is known
     fn rollup_inventory(
@@ -521,7 +521,12 @@ impl LedgerBuilder {
         }
     }
 
-    fn balance(&mut self, balance: &parser::Balance, date: Date, element: WrappedSpannedElement) {
+    fn balance(
+        &mut self,
+        balance: &parser::Balance,
+        date: SteelDate,
+        element: WrappedSpannedElement,
+    ) {
         let account_name = balance.account().item().to_string();
         let (margin, pad_idx) = if self.open_accounts.contains_key(&account_name) {
             // what's the gap between what we have and what the balance says we should have?
@@ -740,7 +745,7 @@ impl LedgerBuilder {
         })
     }
 
-    fn open(&mut self, open: &parser::Open, date: Date, element: WrappedSpannedElement) {
+    fn open(&mut self, open: &parser::Open, date: SteelDate, element: WrappedSpannedElement) {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(open.account().item().to_string()) {
             Occupied(open_entry) => {
@@ -772,7 +777,7 @@ impl LedgerBuilder {
         }
     }
 
-    fn close(&mut self, close: &parser::Close, date: Date, element: WrappedSpannedElement) {
+    fn close(&mut self, close: &parser::Close, date: SteelDate, element: WrappedSpannedElement) {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(close.account().item().to_string()) {
             Occupied(open_entry) => {
@@ -802,12 +807,12 @@ impl LedgerBuilder {
     fn commodity(
         &mut self,
         commodity: &parser::Commodity,
-        date: Date,
+        date: SteelDate,
         element: WrappedSpannedElement,
     ) {
     }
 
-    fn pad(&mut self, pad: &parser::Pad, date: Date, element: WrappedSpannedElement) {
+    fn pad(&mut self, pad: &parser::Pad, date: SteelDate, element: WrappedSpannedElement) {
         let account_name = pad.account().item().to_string();
         if self.open_accounts.contains_key(&account_name) {
             let account = self.accounts.get_mut(&account_name).unwrap();
@@ -847,16 +852,16 @@ impl LedgerBuilder {
     fn document(
         &mut self,
         document: &parser::Document,
-        date: Date,
+        date: SteelDate,
         element: WrappedSpannedElement,
     ) {
     }
 
-    fn note(&mut self, note: &parser::Note, date: Date, element: WrappedSpannedElement) {}
+    fn note(&mut self, note: &parser::Note, date: SteelDate, element: WrappedSpannedElement) {}
 
-    fn event(&mut self, event: &parser::Event, date: Date, element: WrappedSpannedElement) {}
+    fn event(&mut self, event: &parser::Event, date: SteelDate, element: WrappedSpannedElement) {}
 
-    fn query(&mut self, query: &parser::Query, date: Date, element: WrappedSpannedElement) {}
+    fn query(&mut self, query: &parser::Query, date: SteelDate, element: WrappedSpannedElement) {}
 }
 
 #[derive(Debug)]
@@ -974,7 +979,7 @@ where
 
 #[derive(Debug)]
 struct BalanceDiagnostic {
-    date: Date,
+    date: SteelDate,
     description: Option<String>,
     amount: Option<Amount>,
     balance: Vec<Amount>,

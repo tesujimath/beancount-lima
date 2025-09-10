@@ -13,7 +13,7 @@ use steel_derive::Steel;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Directive {
-    pub(crate) date: Date,
+    pub(crate) date: SteelDate,
     pub(crate) element: WrappedSpannedElement,
     pub(crate) variant: DirectiveVariant,
 }
@@ -259,9 +259,9 @@ impl From<&parser::Amount<'_>> for Amount {
     }
 }
 
-pub(crate) type Date = Steely<time::Date>;
+pub(crate) type SteelDate = Steely<time::Date>;
 
-impl Date {
+impl SteelDate {
     fn new(y: i32, m: i32, d: i32) -> steel::rvals::Result<Self> {
         u8::try_from(m)
             .ok()
@@ -294,12 +294,12 @@ impl Date {
     }
 
     // beginning of time
-    fn bot() -> Date {
+    fn bot() -> SteelDate {
         time::Date::MIN.into()
     }
 
     // end of time
-    fn eot() -> Date {
+    fn eot() -> SteelDate {
         time::Date::MAX.into()
     }
 
@@ -459,19 +459,19 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("amount-number", Amount::number);
     steel_engine.register_fn("amount-currency", Amount::currency);
 
-    steel_engine.register_type::<Date>("date?");
-    steel_engine.register_fn("date", Date::new);
-    steel_engine.register_fn("date-bot", Date::bot);
-    steel_engine.register_fn("date-eot", Date::eot);
-    steel_engine.register_fn("date=?", Date::eq);
-    steel_engine.register_fn("date>?", Date::gt);
-    steel_engine.register_fn("date<?", Date::lt);
-    steel_engine.register_fn("date>=?", Date::ge);
-    steel_engine.register_fn("date<=?", Date::le);
-    steel_engine.register_fn("parse-date", Date::parse);
-    steel_engine.register_fn("date-after", Date::after);
-    steel_engine.register_fn("date-before", Date::before);
-    steel_engine.register_fn("date-julian", Date::julian);
+    steel_engine.register_type::<SteelDate>("date?");
+    steel_engine.register_fn("date", SteelDate::new);
+    steel_engine.register_fn("date-bot", SteelDate::bot);
+    steel_engine.register_fn("date-eot", SteelDate::eot);
+    steel_engine.register_fn("date=?", SteelDate::eq);
+    steel_engine.register_fn("date>?", SteelDate::gt);
+    steel_engine.register_fn("date<?", SteelDate::lt);
+    steel_engine.register_fn("date>=?", SteelDate::ge);
+    steel_engine.register_fn("date<=?", SteelDate::le);
+    steel_engine.register_fn("parse-date", SteelDate::parse);
+    steel_engine.register_fn("date-after", SteelDate::after);
+    steel_engine.register_fn("date-before", SteelDate::before);
+    steel_engine.register_fn("date-julian", SteelDate::julian);
 
     steel_engine.register_type::<SteelDecimal>("decimal?");
     steel_engine.register_fn("decimal", SteelDecimal::new);

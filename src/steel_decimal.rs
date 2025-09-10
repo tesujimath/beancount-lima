@@ -1,8 +1,10 @@
+use std::ops::Add;
+
 use steel::{SteelErr, SteelVal};
 
-use crate::steely::Steely;
+use crate::{custom_wrapper::CustomWrapperWithEq, steely::Steely};
 
-pub(crate) type SteelDecimal = Steely<rust_decimal::Decimal>;
+pub(crate) type SteelDecimal = Steely<CustomWrapperWithEq<rust_decimal::Decimal>>;
 
 impl SteelDecimal {
     pub(crate) fn add(&self, other: SteelDecimal) -> SteelDecimal {
@@ -73,5 +75,19 @@ impl SteelDecimal {
             }
             (*d).into()
         })
+    }
+}
+
+impl Add for &SteelDecimal {
+    type Output = SteelDecimal;
+
+    fn add(self, rhs: &SteelDecimal) -> SteelDecimal {
+        self.map2(rhs, |value, rhs| *value + *rhs)
+
+        // let value = self.value.get_mut().unwrap().get_mut();
+        // let value = value.as_any_ref_mut().downcast_mut::<T>().unwrap();
+        // let rhs = rhs.value.read();
+        // let rhs = rhs.as_any_ref().downcast_ref::<T>().unwrap();
+        // value.add_assign(*rhs);
     }
 }

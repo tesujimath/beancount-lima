@@ -42,6 +42,7 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 color-eyre = "0.6.5"
 lazy_format = "2.0.3"
+parking_lot = { version = "0.12", features = ["arc_lock", "send_guard"] }
 
 [dev-dependencies]
 test-generator = "0.3.1"

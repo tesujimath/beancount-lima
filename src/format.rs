@@ -10,10 +10,10 @@ impl Display for Directive {
         use DirectiveVariant::*;
 
         match &self.variant {
-            Transaction(x) => x.fmt(f, self.date /*, &self.metadata*/),
+            Transaction(x) => x.fmt(f, &self.date /*, &self.metadata*/),
             // TODO
             Price(x) => Ok(()), //x.fmt(f, self.date /*, &self.metadata*/),
-            Balance(x) => x.fmt(f, self.date /*, &self.metadata*/),
+            Balance(x) => x.fmt(f, &self.date /*, &self.metadata*/),
             Open(x) => Ok(()),      //x.fmt(f, self.date /*, &self.metadata*/),
             Close(x) => Ok(()),     //x.fmt(f, self.date /*, &self.metadata*/),
             Commodity(x) => Ok(()), //x.fmt(f, self.date /*, &self.metadata*/),
@@ -27,7 +27,11 @@ impl Display for Directive {
 }
 
 impl Transaction {
-    fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut Formatter<'_>,
+        date: &SteelDate, /*, metadata: &Metadata*/
+    ) -> fmt::Result {
         write!(f, "{} {}", date, &self.flag)?;
 
         format(f, &self.payee, double_quoted, SPACE, Some(SPACE))?;
@@ -47,7 +51,11 @@ impl Transaction {
 }
 
 impl Balance {
-    fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
+    fn fmt(
+        &self,
+        f: &mut Formatter<'_>,
+        date: &SteelDate, /*, metadata: &Metadata*/
+    ) -> fmt::Result {
         write!(f, "{} balance {} {}", date, &self.account, &self.amount)?;
         simple_format(f, self.tolerance.as_ref(), Some(TILDE_SPACE))?;
 
