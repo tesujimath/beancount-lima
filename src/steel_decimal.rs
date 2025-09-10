@@ -1,5 +1,5 @@
+use rust_decimal::Decimal;
 use std::fmt::Display;
-
 use steel::{
     rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
@@ -7,11 +7,11 @@ use steel::{
 };
 
 #[derive(Copy, Clone, Debug)]
-pub struct SteelDecimal(rust_decimal::Decimal);
+pub struct SteelDecimal(Decimal);
 
 impl SteelDecimal {
     fn new(m: i64, e: u32) -> Self {
-        rust_decimal::Decimal::new(m, e).into()
+        Decimal::new(m, e).into()
     }
 
     fn add(&self, other: SteelDecimal) -> SteelDecimal {
@@ -27,11 +27,11 @@ impl SteelDecimal {
     }
 
     fn zero() -> Self {
-        rust_decimal::Decimal::ZERO.into()
+        Decimal::ZERO.into()
     }
 
     fn is_zero(&self) -> bool {
-        self.0 == rust_decimal::Decimal::ZERO
+        self.0 == Decimal::ZERO
     }
 
     // width of digits and/or sign to left of decimal point
@@ -57,7 +57,7 @@ impl SteelDecimal {
     }
 
     fn parse(raw: String) -> steel::rvals::Result<Self> {
-        rust_decimal::Decimal::from_str_exact(&raw)
+        Decimal::from_str_exact(&raw)
             .map_err(|e| SteelErr::new(steel::rerrs::ErrorKind::ConversionError, e.to_string()))
             .map(Self)
     }
@@ -73,13 +73,13 @@ impl SteelDecimal {
     }
 }
 
-impl From<rust_decimal::Decimal> for SteelDecimal {
-    fn from(value: rust_decimal::Decimal) -> Self {
+impl From<Decimal> for SteelDecimal {
+    fn from(value: Decimal) -> Self {
         Self(value)
     }
 }
 
-impl From<SteelDecimal> for rust_decimal::Decimal {
+impl From<SteelDecimal> for Decimal {
     fn from(value: SteelDecimal) -> Self {
         value.0
     }

@@ -1,7 +1,7 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
+use rust_decimal::Decimal;
 use std::collections::HashMap;
-
 use steel::{
     gc::Gc,
     rvals::{as_underlying_type, Custom, IntoSteelVal, SteelString},
@@ -15,18 +15,18 @@ use crate::{steel_decimal::SteelDecimal, types::*};
 // TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
 pub(crate) struct InventoryBuilder {
-    positions: HashMap<String, rust_decimal::Decimal>, // indexed by currency
+    positions: HashMap<String, Decimal>, // indexed by currency
 }
 
 impl InventoryBuilder {
-    fn with_initial_balance(units: rust_decimal::Decimal, currency: &str) -> InventoryBuilder {
+    fn with_initial_balance(units: Decimal, currency: &str) -> InventoryBuilder {
         let mut positions = HashMap::default();
         positions.insert(currency.to_string(), units);
 
         Self { positions }
     }
 
-    fn post(&mut self, units: rust_decimal::Decimal, currency: &str) {
+    fn post(&mut self, units: Decimal, currency: &str) {
         match self.positions.get_mut(currency) {
             Some(bal) => *bal += units,
             None => {

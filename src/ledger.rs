@@ -4,6 +4,7 @@ use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
 };
 use color_eyre::eyre::{eyre, Result, WrapErr};
+use rust_decimal::Decimal;
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
@@ -231,8 +232,7 @@ impl LedgerBuilder {
         let mut postings = Vec::default();
 
         // determine auto-posting for at most one unspecified account
-        let mut residual =
-            hashbrown::HashMap::<&parser::Currency<'_>, rust_decimal::Decimal>::default();
+        let mut residual = hashbrown::HashMap::<&parser::Currency<'_>, Decimal>::default();
         let mut unspecified: Vec<&Spanned<parser::Posting<'_>>> = Vec::default();
 
         for posting in transaction.postings() {
@@ -385,7 +385,7 @@ impl LedgerBuilder {
         element: WrappedSpannedElement,
         date: SteelDate,
         account_name: &str,
-        amount: rust_decimal::Decimal,
+        amount: Decimal,
         currency: String,
         flag: Option<String>,
         description: D,
@@ -476,13 +476,9 @@ impl LedgerBuilder {
     fn price(&mut self, price: &parser::Price, date: SteelDate, element: WrappedSpannedElement) {}
 
     // base account is known
-    fn rollup_inventory(
-        &self,
-        base_account_name: &str,
-    ) -> hashbrown::HashMap<String, rust_decimal::Decimal> {
+    fn rollup_inventory(&self, base_account_name: &str) -> hashbrown::HashMap<String, Decimal> {
         if self.config.balance_rollup {
-            let mut rollup_inventory =
-                hashbrown::HashMap::<String, rust_decimal::Decimal>::default();
+            let mut rollup_inventory = hashbrown::HashMap::<String, Decimal>::default();
             self.accounts
                 .keys()
                 .filter_map(|s| {
@@ -538,10 +534,10 @@ impl LedgerBuilder {
                         (
                             cur,
                             balance.atol().amount().number().item().value()
-                                - Into::<rust_decimal::Decimal>::into(number),
+                                - Into::<Decimal>::into(number),
                         )
                     } else {
-                        (cur, -(Into::<rust_decimal::Decimal>::into(number)))
+                        (cur, -(Into::<Decimal>::into(number)))
                     }
                 })
                 .filter_map(|(cur, number)| {
@@ -551,7 +547,7 @@ impl LedgerBuilder {
                             .atol()
                             .tolerance()
                             .map(|x| *x.item())
-                            .unwrap_or(rust_decimal::Decimal::ZERO))
+                            .unwrap_or(Decimal::ZERO))
                     .then_some((cur.to_string(), number))
                 })
                 .collect::<HashMap<_, _>>();
@@ -565,7 +561,7 @@ impl LedgerBuilder {
                         .atol()
                         .tolerance()
                         .map(|x| *x.item())
-                        .unwrap_or(rust_decimal::Decimal::ZERO))
+                        .unwrap_or(Decimal::ZERO))
             {
                 margin.insert(
                     balance.atol().amount().currency().item().to_string(),
@@ -864,10 +860,10 @@ impl LedgerBuilder {
 
 #[derive(Debug)]
 struct InferredTolerance {
-    fallback: Option<rust_decimal::Decimal>,
-    by_currency: HashMap<String, rust_decimal::Decimal>,
+    fallback: Option<Decimal>,
+    by_currency: HashMap<String, Decimal>,
 
-    multiplier: rust_decimal::Decimal,
+    multiplier: Decimal,
 }
 
 impl InferredTolerance {
@@ -888,9 +884,9 @@ impl InferredTolerance {
     // Note that inferring tolerances from cost is not currently supported.
     fn remove_tolerated_residuals<'a, 'b>(
         &self,
-        residual: hashbrown::HashMap<&'a parser::Currency<'b>, rust_decimal::Decimal>,
+        residual: hashbrown::HashMap<&'a parser::Currency<'b>, Decimal>,
         coarsest_scale_for_tolerance: &hashbrown::HashMap<&parser::Currency, u32>,
-    ) -> hashbrown::HashMap<&'a parser::Currency<'b>, rust_decimal::Decimal> {
+    ) -> hashbrown::HashMap<&'a parser::Currency<'b>, Decimal> {
         residual
             .into_iter()
             .filter(|(cur, value)| {
@@ -920,7 +916,7 @@ impl InferredTolerance {
 
                     intolerable
                 } else if let Some(coarsest_scale) = coarsest_scale {
-                    let unit = rust_decimal::Decimal::new(1, *coarsest_scale);
+                    let unit = Decimal::new(1, *coarsest_scale);
                     let tol = unit * self.multiplier;
                     let intolerable =  abs_value > tol;
 
@@ -950,7 +946,7 @@ impl InferredTolerance {
 /// I don't understand why you would have a price annotation not fully specified, so this case is ignored.
 fn get_posting_amount_for_balancing_transaction<'a, 'b>(
     posting: &'b parser::Posting<'a>,
-) -> Option<(rust_decimal::Decimal, &'b parser::Currency<'a>)>
+) -> Option<(Decimal, &'b parser::Currency<'a>)>
 where
     'b: 'a,
 {
@@ -987,7 +983,7 @@ struct BalanceDiagnostic {
 struct AccountBuilder {
     // TODO support cost in inventory
     currencies: HashSet<String>,
-    inventory: hashbrown::HashMap<String, rust_decimal::Decimal>, // only non-zero positions are maintained
+    inventory: hashbrown::HashMap<String, Decimal>, // only non-zero positions are maintained
     opened: Span,
     // TODO
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive

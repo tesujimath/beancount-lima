@@ -2,6 +2,7 @@
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima::{self as parser, ElementType, Span, Spanned};
 use color_eyre::eyre::Result;
+use rust_decimal::Decimal;
 use std::{fmt::Display, ops::Deref, sync::Arc};
 use steel::{
     rvals::{as_underlying_type, Custom, CustomType, SteelString, SteelVector},
@@ -242,11 +243,11 @@ impl Custom for Amount {
     }
 }
 
-impl<S> From<(rust_decimal::Decimal, S)> for Amount
+impl<S> From<(Decimal, S)> for Amount
 where
     S: Display,
 {
-    fn from(value: (rust_decimal::Decimal, S)) -> Self {
+    fn from(value: (Decimal, S)) -> Self {
         Amount {
             number: value.0.into(),
             currency: value.1.to_string().into(),
