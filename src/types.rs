@@ -263,21 +263,6 @@ impl From<&parser::Amount<'_>> for Amount {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct MutexWrapper<T>(Arc<Mutex<T>>);
-
-impl<T> MutexWrapper<T> {
-    pub fn new(item: T) -> Self {
-        MutexWrapper(Arc::new(Mutex::new(item)))
-    }
-
-    pub fn lock(&self) -> MutexGuard<T> {
-        self.0.lock().unwrap()
-    }
-}
-
-impl<T> Custom for MutexWrapper<T> where T: Clone + Display + 'static {}
-
 #[derive(Clone, Debug, Steel)]
 pub struct WrappedBeancountSources(Arc<Mutex<BeancountSources>>);
 
