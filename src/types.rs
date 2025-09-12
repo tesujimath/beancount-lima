@@ -14,13 +14,13 @@ use steel_derive::Steel;
 use crate::{steel_date::SteelDate, steel_decimal::SteelDecimal};
 
 #[derive(Clone, Debug)]
-pub(crate) struct Directive {
+pub(crate) struct SteelDirective {
     pub(crate) date: SteelDate,
     pub(crate) element: WrappedSpannedElement,
     pub(crate) variant: DirectiveVariant,
 }
 
-impl Custom for Directive {
+impl Custom for SteelDirective {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
     }
@@ -42,7 +42,7 @@ pub(crate) enum DirectiveVariant {
 }
 
 // Scheme is not statically typed, so we don't force the user to unpack the directive variants, but rather support direct access
-impl Directive {
+impl SteelDirective {
     fn is_transaction(&self) -> bool {
         matches!(self.variant, DirectiveVariant::Transaction(_))
     }
@@ -107,7 +107,7 @@ pub(crate) struct Price {}
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Balance {
     pub(crate) account: SteelString,
-    pub(crate) amount: Amount,
+    pub(crate) amount: SteelAmount,
     pub(crate) tolerance: Option<SteelDecimal>,
 }
 
@@ -152,23 +152,23 @@ pub(crate) struct Query {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Posting {
+pub(crate) struct SteelPosting {
     pub(crate) flag: Option<SteelString>,
     pub(crate) account: SteelString,
-    pub(crate) amount: Amount,
+    pub(crate) amount: SteelAmount,
     // TODO:
     // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
     // pub(crate) price_annotation: Option<Spanned<PriceSpec<'a>>>,
     // pub(crate) metadata: Metadata<'a>,
 }
 
-impl Posting {
-    pub(crate) fn new<S1, S2>(account: S1, amount: Amount, flag: Option<S2>) -> Self
+impl SteelPosting {
+    pub(crate) fn new<S1, S2>(account: S1, amount: SteelAmount, flag: Option<S2>) -> Self
     where
         S1: Display,
         S2: Display,
     {
-        Posting {
+        SteelPosting {
             account: account.to_string().into(),
             amount,
             flag: flag.map(|flag| flag.to_string().into()),
@@ -179,7 +179,7 @@ impl Posting {
         self.account.clone()
     }
 
-    fn amount(&self) -> Amount {
+    fn amount(&self) -> SteelAmount {
         self.amount.clone()
     }
 
@@ -188,13 +188,13 @@ impl Posting {
     }
 }
 
-impl Custom for Posting {
+impl Custom for SteelPosting {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
     }
 
     fn equality_hint(&self, other: &dyn CustomType) -> bool {
-        if let Some(other) = as_underlying_type::<Posting>(other) {
+        if let Some(other) = as_underlying_type::<SteelPosting>(other) {
             self == other
         } else {
             false
@@ -203,13 +203,13 @@ impl Custom for Posting {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Amount {
+pub(crate) struct SteelAmount {
     pub(crate) number: SteelDecimal,
     pub(crate) currency: SteelString,
 }
 
 // https://github.com/mattwparas/steel/issues/365
-impl Amount {
+impl SteelAmount {
     fn new(number: SteelDecimal, currency: SteelString) -> Self {
         Self { number, currency }
     }
@@ -223,19 +223,19 @@ impl Amount {
     }
 }
 
-impl Display for Amount {
+impl Display for SteelAmount {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", &self.number, &self.currency)
     }
 }
 
-impl Custom for Amount {
+impl Custom for SteelAmount {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
     }
 
     fn equality_hint(&self, other: &dyn CustomType) -> bool {
-        if let Some(other) = as_underlying_type::<Amount>(other) {
+        if let Some(other) = as_underlying_type::<SteelAmount>(other) {
             self == other
         } else {
             false
@@ -243,19 +243,19 @@ impl Custom for Amount {
     }
 }
 
-impl<S> From<(Decimal, S)> for Amount
+impl<S> From<(Decimal, S)> for SteelAmount
 where
     S: Display,
 {
     fn from(value: (Decimal, S)) -> Self {
-        Amount {
+        SteelAmount {
             number: value.0.into(),
             currency: value.1.to_string().into(),
         }
     }
 }
 
-impl From<&parser::Amount<'_>> for Amount {
+impl From<&parser::Amount<'_>> for SteelAmount {
     fn from(value: &parser::Amount) -> Self {
         (value.number().value(), value.currency()).into()
     }
@@ -385,32 +385,32 @@ impl AsRef<parser::Error> for WrappedError {
 }
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
-    steel_engine.register_type::<Directive>("directive?");
-    steel_engine.register_fn("transaction?", Directive::is_transaction);
-    steel_engine.register_fn("price?", Directive::is_price);
-    steel_engine.register_fn("balance?", Directive::is_balance);
-    steel_engine.register_fn("open?", Directive::is_open);
-    steel_engine.register_fn("close?", Directive::is_close);
-    steel_engine.register_fn("commodity?", Directive::is_commodity);
-    steel_engine.register_fn("pad?", Directive::is_pad);
-    steel_engine.register_fn("document?", Directive::is_document);
-    steel_engine.register_fn("note?", Directive::is_note);
-    steel_engine.register_fn("event?", Directive::is_event);
-    steel_engine.register_fn("query?", Directive::is_query);
+    steel_engine.register_type::<SteelDirective>("directive?");
+    steel_engine.register_fn("transaction?", SteelDirective::is_transaction);
+    steel_engine.register_fn("price?", SteelDirective::is_price);
+    steel_engine.register_fn("balance?", SteelDirective::is_balance);
+    steel_engine.register_fn("open?", SteelDirective::is_open);
+    steel_engine.register_fn("close?", SteelDirective::is_close);
+    steel_engine.register_fn("commodity?", SteelDirective::is_commodity);
+    steel_engine.register_fn("pad?", SteelDirective::is_pad);
+    steel_engine.register_fn("document?", SteelDirective::is_document);
+    steel_engine.register_fn("note?", SteelDirective::is_note);
+    steel_engine.register_fn("event?", SteelDirective::is_event);
+    steel_engine.register_fn("query?", SteelDirective::is_query);
 
-    steel_engine.register_fn("transaction-postings", Directive::transaction_postings);
+    steel_engine.register_fn("transaction-postings", SteelDirective::transaction_postings);
 
-    steel_engine.register_type::<Posting>("posting?");
-    steel_engine.register_fn("posting->string", Posting::to_string);
-    steel_engine.register_fn("posting-account", Posting::account);
-    steel_engine.register_fn("posting-amount", Posting::amount);
-    steel_engine.register_fn("posting-flag", Posting::flag);
+    steel_engine.register_type::<SteelPosting>("posting?");
+    steel_engine.register_fn("posting->string", SteelPosting::to_string);
+    steel_engine.register_fn("posting-account", SteelPosting::account);
+    steel_engine.register_fn("posting-amount", SteelPosting::amount);
+    steel_engine.register_fn("posting-flag", SteelPosting::flag);
 
-    steel_engine.register_type::<Amount>("amount?");
-    steel_engine.register_fn("amount", Amount::new);
-    steel_engine.register_fn("amount->string", Amount::to_string);
-    steel_engine.register_fn("amount-number", Amount::number);
-    steel_engine.register_fn("amount-currency", Amount::currency);
+    steel_engine.register_type::<SteelAmount>("amount?");
+    steel_engine.register_fn("amount", SteelAmount::new);
+    steel_engine.register_fn("amount->string", SteelAmount::to_string);
+    steel_engine.register_fn("amount-number", SteelAmount::number);
+    steel_engine.register_fn("amount-currency", SteelAmount::currency);
 
     steel_engine.register_type::<WrappedError>("error?");
     steel_engine.register_fn("ffi-error", WrappedSpannedElement::ffi_error);

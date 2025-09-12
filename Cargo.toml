@@ -42,6 +42,9 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 color-eyre = "0.6.5"
 lazy_format = "2.0.3"
+strum = "0.27.2"
+strum_macros = "0.27.2"
+joinery = "3.1.0"
 
 [dev-dependencies]
 test-generator = "0.3.1"

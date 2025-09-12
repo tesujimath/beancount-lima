@@ -1,25 +1,45 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
+use beancount_parser_lima as parser;
+use joinery::JoinableIterator;
 use rust_decimal::Decimal;
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, ops::Deref};
 use steel::{
     gc::Gc,
-    rvals::{as_underlying_type, Custom, CustomType, IntoSteelVal, SteelString},
+    rvals::{as_underlying_type, Custom, CustomType, IntoSteelVal, SteelString, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelVal,
+    SteelVal, Vector,
 };
 use steel_derive::Steel;
+use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
+use time::Date;
 
-use crate::{steel_date::SteelDate, steel_decimal::SteelDecimal, types::*};
+use crate::{booking::*, steel_date::SteelDate, steel_decimal::SteelDecimal, types::*};
+
+impl From<Cost> for SteelCost {
+    fn from(value: Cost) -> Self {
+        let Cost {
+            number,
+            currency,
+            date,
+            label,
+        } = value;
+        Self {
+            amount: (number, currency).into(),
+            date: date.into(),
+            label: label.map(|label| label.into()),
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Cost {
-    amount: Amount,
+pub(crate) struct SteelCost {
+    amount: SteelAmount,
     date: SteelDate,
     label: Option<SteelString>,
 }
 
-impl Display for Cost {
+impl Display for SteelCost {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", &self.amount, &self.date)?;
         if let Some(label) = &self.label {
@@ -30,13 +50,13 @@ impl Display for Cost {
     }
 }
 
-impl Custom for Cost {
+impl Custom for SteelCost {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
     }
 
     fn equality_hint(&self, other: &dyn CustomType) -> bool {
-        if let Some(other) = as_underlying_type::<Cost>(other) {
+        if let Some(other) = as_underlying_type::<SteelCost>(other) {
             self == other
         } else {
             false
@@ -45,12 +65,22 @@ impl Custom for Cost {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Position {
-    units: Amount,
-    cost: Option<Cost>,
+pub(crate) struct SteelPosition {
+    units: SteelAmount,
+    cost: Option<SteelCost>,
 }
 
-impl Display for Position {
+impl From<(String, Position)> for SteelPosition {
+    fn from(value: (String, Position)) -> Self {
+        let (currency, Position { units, cost }) = value;
+        Self {
+            units: (units, currency).into(),
+            cost: cost.map(|cost| cost.into()),
+        }
+    }
+}
+
+impl Display for SteelPosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.units)?;
         if let Some(cost) = &self.cost {
@@ -61,44 +91,13 @@ impl Display for Position {
     }
 }
 
-impl Custom for Position {
+impl Custom for SteelPosition {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
     }
 
     fn equality_hint(&self, other: &dyn CustomType) -> bool {
-        if let Some(other) = as_underlying_type::<Position>(other) {
-            self == other
-        } else {
-            false
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Inventory {
-    units: Amount,
-    cost: Option<Cost>,
-}
-
-impl Display for Inventory {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.units)?;
-        if let Some(cost) = &self.cost {
-            write!(f, " {{ {cost} }}")?;
-        }
-
-        Ok(())
-    }
-}
-
-impl Custom for Inventory {
-    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
-        Some(Ok(self.to_string()))
-    }
-
-    fn equality_hint(&self, other: &dyn CustomType) -> bool {
-        if let Some(other) = as_underlying_type::<Inventory>(other) {
+        if let Some(other) = as_underlying_type::<SteelPosition>(other) {
             self == other
         } else {
             false
@@ -108,51 +107,89 @@ impl Custom for Inventory {
 
 // TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
-pub(crate) struct InventoryBuilder {
-    positions: HashMap<String, Decimal>, // indexed by currency
+pub(crate) struct Inventory(HashMap<String, Positions>); // indexed by currency
+
+impl Deref for Inventory {
+    type Target = HashMap<String, Positions>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-impl InventoryBuilder {
-    fn with_initial_balance(units: Decimal, currency: &str) -> InventoryBuilder {
+impl Inventory {
+    fn with_initial_position(currency: &str, position: Position) -> Inventory {
         let mut positions = HashMap::default();
-        positions.insert(currency.to_string(), units);
+        positions.insert(currency.to_string(), position.into());
 
-        Self { positions }
+        Self(positions)
     }
 
-    fn post(&mut self, units: Decimal, currency: &str) {
-        match self.positions.get_mut(currency) {
-            Some(bal) => *bal += units,
+    // TODO this should include CostSpec and the booking method
+    fn book(&mut self, currency: &str, position: Position) {
+        // TODO cost
+        match self.0.get_mut(currency) {
+            Some(positions) => positions.book(position, Booking::Strict), // TODO booking method
             None => {
-                self.positions.insert(currency.to_string(), units);
+                self.0.insert(currency.to_string(), position.into());
             }
         }
     }
+}
 
-    // build all positions, discarding those with zero balance
-    fn build(self) -> SteelVal {
-        let Self { positions } = self;
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(crate) struct SteelInventory(SteelVector); // of SteelPosition
 
-        SteelVal::HashMapV(
-            Gc::new(
-                positions
-                    .into_iter()
-                    .filter_map(|(k, v)| {
-                        (!v.is_zero()).then_some((
-                            k.into(),
-                            Into::<SteelDecimal>::into(v).into_steelval().unwrap(),
-                        ))
-                    })
-                    .collect::<steel::HashMap<SteelVal, SteelVal>>(),
-            )
-            .into(),
-        )
+impl From<Inventory> for SteelInventory {
+    fn from(value: Inventory) -> Self {
+        // return positions sorted by currency
+        let Inventory(mut positions_by_currency) = value;
+        // sorted by currency for determinism
+        let mut currencies = positions_by_currency
+            .keys()
+            .map(|currency| currency.to_string())
+            .collect::<Vec<_>>();
+        currencies.sort();
+
+        let positions = currencies
+            .into_iter()
+            .flat_map(|currency| {
+                positions_by_currency
+                    .remove(&currency)
+                    .unwrap()
+                    .into_iter_with_currency(currency)
+                    .map(Into::<SteelPosition>::into)
+                    .map(|position| position.into_steelval().unwrap())
+            })
+            .collect::<Vec<_>>();
+
+        SteelInventory(Gc::new(Into::<Vector<_>>::into(positions)).into())
+    }
+}
+
+impl Display for SteelInventory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.iter().join_with(" "))
+    }
+}
+
+impl Custom for SteelInventory {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
+    }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<SteelInventory>(other) {
+            self == other
+        } else {
+            false
+        }
     }
 }
 
 #[derive(Clone, Default, Debug)]
 pub(crate) struct InventoryAccumulator {
-    accounts: HashMap<String, InventoryBuilder>, // indexed by account name
+    accounts: HashMap<String, Inventory>, // indexed by account name
     currency_usage: HashMap<String, i32>,
 }
 
@@ -165,17 +202,19 @@ impl Custom for InventoryAccumulator {
 impl InventoryAccumulator {
     pub(crate) fn post(&mut self, posting: SteelVal) {
         if let SteelVal::Custom(posting) = posting {
-            if let Some(posting) = as_underlying_type::<Posting>(posting.read().as_ref()) {
+            if let Some(posting) = as_underlying_type::<SteelPosting>(posting.read().as_ref()) {
                 let account_name = posting.account.as_str();
                 let units = posting.amount.number.into();
                 let currency = posting.amount.currency.as_str();
+                // TODO cost
+                let position = Position { units, cost: None };
 
                 match self.accounts.get_mut(account_name) {
-                    Some(account) => account.post(units, currency),
+                    Some(account) => account.book(currency, position),
                     None => {
                         self.accounts.insert(
                             account_name.to_string(),
-                            InventoryBuilder::with_initial_balance(units, currency),
+                            Inventory::with_initial_position(currency, position),
                         );
                     }
                 }
@@ -221,7 +260,12 @@ impl InventoryAccumulator {
             Gc::new(
                 accounts
                     .into_iter()
-                    .map(|(k, v)| (k.into(), v.build()))
+                    .map(|(k, v)| {
+                        (
+                            k.into(),
+                            Into::<SteelInventory>::into(v).into_steelval().unwrap(),
+                        )
+                    })
                     .collect::<steel::HashMap<SteelVal, SteelVal>>(),
             )
             .into(),

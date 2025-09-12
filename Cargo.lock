@@ -270,6 +270,7 @@ dependencies = [
  "color-eyre",
  "csv",
  "hashbrown 0.15.4",
+ "joinery",
  "lazy_format",
  "regex",
  "rust_decimal",
@@ -279,6 +280,8 @@ dependencies = [
  "steel-core",
  "steel-derive",
  "steel-repl",
+ "strum",
+ "strum_macros",
  "test-generator",
  "time",
  "tracing",
@@ -1296,6 +1299,12 @@ name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
+
+[[package]]
+name = "joinery"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57d8bde02bbf44a562cf068a8ff4a68842df387e302a03a4de4a57fcf82ec377"
 
 [[package]]
 name = "js-sys"
