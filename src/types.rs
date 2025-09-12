@@ -3,8 +3,9 @@
 use beancount_parser_lima::{self as parser, ElementType, Span, Spanned};
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
-use std::{fmt::Display, ops::Deref, sync::Arc};
+use std::{fmt::Display, ops::Deref};
 use steel::{
+    gc::Shared,
     rvals::{as_underlying_type, Custom, CustomType, SteelString, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelErr, SteelVal,
@@ -261,12 +262,13 @@ impl From<&parser::Amount<'_>> for SteelAmount {
     }
 }
 
+/// For third-party types we need to share
 #[derive(Clone, Debug)]
-pub(crate) struct CustomShared<T>(Arc<T>);
+pub(crate) struct CustomShared<T>(Shared<T>);
 
 impl<T> From<T> for CustomShared<T> {
     fn from(value: T) -> Self {
-        CustomShared(Arc::new(value))
+        CustomShared(Shared::new(value))
     }
 }
 
