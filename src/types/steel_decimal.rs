@@ -1,5 +1,8 @@
 use rust_decimal::Decimal;
-use std::fmt::Display;
+use std::{
+    fmt::Display,
+    ops::{Add, AddAssign},
+};
 use steel::{
     rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
@@ -122,6 +125,20 @@ impl Custom for SteelDecimal {
         } else {
             false
         }
+    }
+}
+
+impl Add for SteelDecimal {
+    type Output = SteelDecimal;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        (self.0 + rhs.0).into()
+    }
+}
+
+impl AddAssign for SteelDecimal {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0
     }
 }
 

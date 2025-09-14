@@ -9,17 +9,17 @@
 (require "steel/sorting/merge-sort.scm")
 
 (define (directives->ledger directives)
-  (let ((inv-accum (inventory-accumulator)))
+  (let ((invs-builder (inventories-builder)))
     (transduce directives
                (filtering transaction?)
                (mapping transaction-postings)
                (flattening)
                (into-for-each (lambda (post)
-                                (inventory-accumulator-post inv-accum post))))
+                                (inventories-builder-post invs-builder post))))
     (let*
-        ((currencies (inventory-accumulator-currencies inv-accum))
-         (main-currency (inventory-accumulator-main-currency inv-accum))
-         (inv (inventory-accumulator-build inv-accum))
+        ((currencies (inventories-builder-currencies invs-builder))
+         (main-currency (inventories-builder-main-currency invs-builder))
+         (inv (inventories-builder-build invs-builder))
          (account-names (merge-sort (hash-keys->list inv) #:comparator string<?)))
       (ledger (merge-sort currencies #:comparator string<?)
               main-currency

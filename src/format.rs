@@ -1,11 +1,11 @@
 use lazy_format::lazy_format;
 use std::fmt::{self, Display, Formatter};
 
-use crate::{steel_date::SteelDate, types::*};
+use crate::types::*;
 
 // adapted from beancount-parser-lima
 
-impl Display for SteelDirective {
+impl Display for Directive {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use DirectiveVariant::*;
 
@@ -76,7 +76,7 @@ impl Balance {
 //     }
 // }
 
-impl Display for SteelPosting {
+impl Display for Posting {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         simple_format(f, &self.flag, None)?;
 

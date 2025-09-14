@@ -285,8 +285,6 @@ where
 }
 
 fn register_types(steel_engine: &mut Engine) {
-    steel_date::register_types(steel_engine);
-    steel_decimal::register_types(steel_engine);
     types::register_types(steel_engine);
     ledger::register_types(steel_engine);
     import::register_types(steel_engine);
@@ -313,8 +311,6 @@ pub(crate) mod format;
 pub(crate) mod import;
 pub(crate) mod inventory;
 pub(crate) mod ledger;
-pub(crate) mod steel_date;
-pub(crate) mod steel_decimal;
 pub(crate) mod tabulate;
 pub(crate) mod types;
 

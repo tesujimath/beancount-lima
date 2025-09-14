@@ -19,7 +19,7 @@ use steel::{
 };
 use steel_derive::Steel;
 
-use crate::{config::LedgerBuilderConfig, steel_date::SteelDate, types::*};
+use crate::{config::LedgerBuilderConfig, types::*};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
@@ -129,7 +129,7 @@ fn write_ffi_errors(sources: &CustomShared<BeancountSources>, errors: Vec<Wrappe
 
 #[derive(Debug)]
 struct LedgerBuilder {
-    directives: Vec<SteelDirective>,
+    directives: Vec<Directive>,
     // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
     open_accounts: hashbrown::HashMap<String, Span>,
     closed_accounts: hashbrown::HashMap<String, Span>,
@@ -370,7 +370,7 @@ impl LedgerBuilder {
                 .map(|narration| narration.to_string().into()),
         };
 
-        self.directives.push(SteelDirective {
+        self.directives.push(Directive {
             date,
             element,
             variant: DirectiveVariant::Transaction(transaction),
@@ -389,7 +389,7 @@ impl LedgerBuilder {
         currency: String,
         flag: Option<String>,
         description: D,
-    ) -> Option<SteelPosting>
+    ) -> Option<Posting>
     where
         D: Into<String>,
     {
@@ -424,7 +424,7 @@ impl LedgerBuilder {
                     }
                 }
 
-                let amount: SteelAmount = (amount, currency).into();
+                let amount: Amount = (amount, currency).into();
 
                 // collate balance from inventory across all currencies, sorted so deterministic
                 let mut currencies = account.inventory.keys().collect::<Vec<_>>();
@@ -435,9 +435,9 @@ impl LedgerBuilder {
                         let amount = account.inventory.get(cur).unwrap();
                         (*amount, cur.clone()).into()
                     })
-                    .collect::<Vec<SteelAmount>>();
+                    .collect::<Vec<Amount>>();
 
-                let posting = SteelPosting::new(account_name, amount.clone(), flag);
+                let posting = Posting::new(account_name, amount.clone(), flag);
                 account.postings.push(posting.clone());
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
@@ -732,7 +732,7 @@ impl LedgerBuilder {
                 .tolerance()
                 .map(|tolerance| (*tolerance.item()).into()),
         };
-        self.directives.push(SteelDirective {
+        self.directives.push(Directive {
             date,
             element,
             variant: DirectiveVariant::Balance(balance),
@@ -821,14 +821,14 @@ impl LedgerBuilder {
                     .push(self.directives[unused_pad_idx].element.error("unused"));
             }
 
-            self.directives.push(SteelDirective {
+            self.directives.push(Directive {
                 date,
                 element: element.clone(),
                 variant: DirectiveVariant::Pad(Pad { source }),
             });
 
             // also need a transaction to be back-filled later with whatever got padded
-            self.directives.push(SteelDirective {
+            self.directives.push(Directive {
                 date,
                 element,
                 variant: DirectiveVariant::Transaction(Transaction {
@@ -975,8 +975,8 @@ where
 struct BalanceDiagnostic {
     date: SteelDate,
     description: Option<String>,
-    amount: Option<SteelAmount>,
-    balance: Vec<SteelAmount>,
+    amount: Option<Amount>,
+    balance: Vec<Amount>,
 }
 
 #[derive(Debug)]
@@ -987,7 +987,7 @@ struct AccountBuilder {
     opened: Span,
     // TODO
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
-    postings: Vec<SteelPosting>,
+    postings: Vec<Posting>,
     pad_idx: Option<usize>, // index in directives in LedgerBuilder
     balance_diagnostics: Vec<BalanceDiagnostic>,
 }

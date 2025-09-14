@@ -1,33 +1,19 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima as parser;
-use rust_decimal::Decimal;
 use std::ops::Deref;
 use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
-use time::Date;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Cost {
-    pub(crate) number: Decimal,
-    pub(crate) currency: String,
-    pub(crate) date: Date,
-    pub(crate) label: Option<String>,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Position {
-    pub(crate) units: Decimal, // currency is external
-    pub(crate) cost: Option<Cost>,
-}
+use crate::types::*;
 
 /// A list of positions for a currency satisfying these invariants:
 /// 1. If there is a simple position without cost, it occurs first in the list
 /// 2. All other positions are unique w.r.t cost.(currency, date, label)
 /// 3. Sort order of these is by date then currency then label.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Positions(Vec<Position>);
+pub(crate) struct PositionBuilder(Vec<Position>);
 
-impl Deref for Positions {
+impl Deref for PositionBuilder {
     type Target = Vec<Position>;
 
     fn deref(&self) -> &Self::Target {
@@ -35,7 +21,7 @@ impl Deref for Positions {
     }
 }
 
-impl Positions {
+impl PositionBuilder {
     /// The booking algorithm, TODO cost
     pub(crate) fn book(&mut self, position: Position, method: Booking) {
         if !position.cost.is_none() {
@@ -45,7 +31,7 @@ impl Positions {
         // insert or combine with existing
         match self.0.first_mut() {
             Some(first) => {
-                first.units += position.units;
+                first.units.number += position.units.number;
             }
             None => {
                 self.0.push(position);
@@ -63,7 +49,7 @@ impl Positions {
     }
 }
 
-impl From<Position> for Positions {
+impl From<Position> for PositionBuilder {
     fn from(value: Position) -> Self {
         Self(vec![value])
     }
