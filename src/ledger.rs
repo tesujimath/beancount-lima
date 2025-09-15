@@ -363,11 +363,11 @@ impl LedgerBuilder {
                     .collect::<Vector<SteelVal>>(),
             )
             .into(),
-            flag: transaction.flag().to_string().into(),
-            payee: transaction.payee().map(|payee| payee.to_string().into()),
+            flag: transaction.flag().to_string(),
+            payee: transaction.payee().map(|payee| payee.to_string()),
             narration: transaction
                 .narration()
-                .map(|narration| narration.to_string().into()),
+                .map(|narration| narration.to_string()),
         };
 
         self.directives.push(Directive {
@@ -721,7 +721,7 @@ impl LedgerBuilder {
         });
 
         let balance = Balance {
-            account: account_name.into(),
+            account: account_name,
             amount: (
                 balance.atol().amount().number().value(),
                 balance.atol().amount().currency(),
@@ -810,7 +810,7 @@ impl LedgerBuilder {
         let account_name = pad.account().item().to_string();
         if self.open_accounts.contains_key(&account_name) {
             let account = self.accounts.get_mut(&account_name).unwrap();
-            let source = pad.source().to_string().into();
+            let source = pad.source().to_string();
 
             let unused_pad_idx = account.pad_idx.replace(self.directives.len());
 

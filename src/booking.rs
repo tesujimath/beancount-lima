@@ -24,7 +24,7 @@ impl Deref for PositionsBuilder {
 impl PositionsBuilder {
     /// The booking algorithm, TODO cost
     pub(crate) fn book(&mut self, position: Position, method: Booking) {
-        if !position.cost.is_none() {
+        if position.cost.is_some() {
             panic!("cost not yet supported for booking")
         }
 

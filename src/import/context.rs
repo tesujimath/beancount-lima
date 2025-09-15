@@ -5,7 +5,7 @@ use color_eyre::eyre::{eyre, Result};
 use std::{collections::HashSet, io::Write, path::Path};
 use steel::{
     gc::Gc,
-    rvals::{IntoSteelVal, SteelHashMap, SteelHashSet, SteelString},
+    rvals::{IntoSteelVal, SteelHashMap, SteelHashSet},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelVal,
 };
@@ -14,7 +14,7 @@ use steel_derive::Steel;
 // context for import, i.e. ledger
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Context {
-    pub(crate) path: SteelString,
+    pub(crate) path: String,
     pub(crate) txnids: SteelHashSet, // HashSet<SteelVal::StringV>,
     pub(crate) payees: SteelHashMap, // HashMap<SteelVal::StringV, HashMap<SteelVal::StringV, SteelVal::IntV>>,
     pub(crate) narrations: SteelHashMap, // HashMap<SteelVal::StringV, HashMap<SteelVal::StringV, SteelVal::IntV>>,
@@ -69,8 +69,8 @@ impl Context {
         }
     }
 
-    pub(crate) fn path(&self) -> SteelVal {
-        SteelVal::StringV(self.path.clone())
+    pub(crate) fn path(&self) -> String {
+        self.path.clone()
     }
 
     pub(crate) fn txnids(&self) -> SteelVal {
@@ -139,7 +139,7 @@ impl<'a> ImportContextBuilder<'a> {
             .into();
 
             Ok(Context {
-                path: path.into(),
+                path,
                 txnids,
                 payees: payees_or_narrations_to_steel_hashmap(payees),
                 narrations: payees_or_narrations_to_steel_hashmap(narrations),

@@ -5,7 +5,7 @@ use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
 use std::fmt::Display;
 use steel::{
-    rvals::{as_underlying_type, Custom, CustomType, SteelString},
+    rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
 };
 
@@ -13,8 +13,8 @@ use crate::types::{steel_date::SteelDate, steel_decimal::SteelDecimal};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Posting {
-    pub(crate) flag: Option<SteelString>,
-    pub(crate) account: SteelString,
+    pub(crate) flag: Option<String>,
+    pub(crate) account: String,
     pub(crate) amount: Amount,
     // TODO:
     // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
@@ -29,13 +29,13 @@ impl Posting {
         S2: Display,
     {
         Posting {
-            account: account.to_string().into(),
+            account: account.to_string(),
             amount,
-            flag: flag.map(|flag| flag.to_string().into()),
+            flag: flag.map(|flag| flag.to_string()),
         }
     }
 
-    fn account(&self) -> SteelString {
+    fn account(&self) -> String {
         self.account.clone()
     }
 
@@ -43,7 +43,7 @@ impl Posting {
         self.amount.clone()
     }
 
-    fn flag(&self) -> Option<SteelString> {
+    fn flag(&self) -> Option<String> {
         self.flag.clone()
     }
 }
@@ -65,12 +65,12 @@ impl Custom for Posting {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Amount {
     pub(crate) number: SteelDecimal,
-    pub(crate) currency: SteelString,
+    pub(crate) currency: String,
 }
 
 // https://github.com/mattwparas/steel/issues/365
 impl Amount {
-    fn new(number: SteelDecimal, currency: SteelString) -> Self {
+    fn new(number: SteelDecimal, currency: String) -> Self {
         Self { number, currency }
     }
 
@@ -78,7 +78,7 @@ impl Amount {
         self.number
     }
 
-    fn currency(&self) -> SteelString {
+    fn currency(&self) -> String {
         self.currency.clone()
     }
 }
@@ -110,7 +110,7 @@ where
     fn from(value: (Decimal, S)) -> Self {
         Amount {
             number: value.0.into(),
-            currency: value.1.to_string().into(),
+            currency: value.1.to_string(),
         }
     }
 }
@@ -124,9 +124,9 @@ impl From<&parser::Amount<'_>> for Amount {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Cost {
     number: SteelDecimal,
-    currency: SteelString,
+    currency: String,
     date: SteelDate,
-    label: Option<SteelString>,
+    label: Option<String>,
 }
 
 impl Display for Cost {

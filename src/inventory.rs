@@ -4,10 +4,7 @@ use joinery::JoinableIterator;
 use std::{collections::HashMap, fmt::Display, ops::Deref};
 use steel::{
     gc::Gc,
-    rvals::{
-        as_underlying_type, Custom, CustomType, IntoSteelVal, SteelHashMap, SteelString,
-        SteelVector,
-    },
+    rvals::{as_underlying_type, Custom, CustomType, IntoSteelVal, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelVal, Vector,
 };
@@ -57,7 +54,7 @@ impl Inventory {
     fn units(&self) -> SteelVal {
         self.iter_position_units()
             .fold(
-                HashMap::<SteelString, SteelDecimal>::default(),
+                HashMap::<String, SteelDecimal>::default(),
                 |mut hm, units| {
                     if hm.contains_key(&units.currency) {
                         *hm.get_mut(&units.currency).unwrap() += units.number;
@@ -195,22 +192,19 @@ impl InventoriesBuilder {
         }
     }
 
-    fn currencies(&self) -> Vec<SteelString> {
+    fn currencies(&self) -> Vec<String> {
         self.currency_usage
             .keys()
-            .map(|currency| currency.to_string().into())
-            .collect::<Vec<SteelString>>()
+            .map(|currency| currency.to_string())
+            .collect::<Vec<String>>()
     }
 
-    fn main_currency(&self) -> SteelString {
-        let main_currency = self
-            .currency_usage
+    fn main_currency(&self) -> String {
+        self.currency_usage
             .iter()
             .max_by_key(|(_, n)| **n)
             .map(|(cur, _)| cur.clone())
-            .unwrap_or(DEFAULT_CURRENCY.to_string());
-
-        main_currency.into()
+            .unwrap_or(DEFAULT_CURRENCY.to_string())
     }
 
     // build inventories, filtering out empty ones

@@ -3,7 +3,7 @@
 use beancount_parser_lima::ElementType;
 use color_eyre::eyre::Result;
 use steel::{
-    rvals::{Custom, SteelString, SteelVector},
+    rvals::{Custom, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelErr, SteelVal,
 };
@@ -93,9 +93,9 @@ impl Directive {
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Transaction {
-    pub(crate) flag: SteelString,
-    pub(crate) payee: Option<SteelString>,
-    pub(crate) narration: Option<SteelString>,
+    pub(crate) flag: String,
+    pub(crate) payee: Option<String>,
+    pub(crate) narration: Option<String>,
     pub(crate) postings: SteelVector,
 }
 
@@ -104,7 +104,7 @@ pub(crate) struct Price {}
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Balance {
-    pub(crate) account: SteelString,
+    pub(crate) account: String,
     pub(crate) amount: Amount,
     pub(crate) tolerance: Option<SteelDecimal>,
 }
@@ -126,7 +126,7 @@ pub(crate) struct Commodity {
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Pad {
-    pub(crate) source: SteelString,
+    pub(crate) source: String,
 }
 
 #[derive(Clone, Steel, Debug)]
