@@ -170,12 +170,16 @@ impl InventoriesBuilder {
         }
     }
 
+    // return sorted currencies
     fn currencies(&self) -> Vec<String> {
-        self.currency_usage
+        let mut currencies = self
+            .currency_usage
             .read()
             .keys()
             .map(|currency| currency.to_string())
-            .collect::<Vec<String>>()
+            .collect::<Vec<String>>();
+        currencies.sort();
+        currencies
     }
 
     fn main_currency(&self) -> String {

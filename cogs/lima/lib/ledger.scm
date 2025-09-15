@@ -21,7 +21,7 @@
          (main-currency (inventories-builder-main-currency invs-builder))
          (inv (inventories-builder-build invs-builder))
          (account-names (merge-sort (hash-keys->list inv) #:comparator string<?)))
-      (ledger (merge-sort currencies #:comparator string<?)
+      (ledger currencies
               main-currency
               account-names
               inv))))
