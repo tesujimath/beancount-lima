@@ -1,9 +1,9 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use joinery::JoinableIterator;
-use std::{collections::HashMap, fmt::Display, ops::Deref};
+use std::{collections::HashMap, fmt::Display};
 use steel::{
-    gc::Shared,
+    gc::{MutContainer, Shared, SharedMut},
     rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelVal,
@@ -14,32 +14,24 @@ use crate::{booking::*, types::*};
 
 // TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
-pub(crate) struct InventoryBuilder(HashMap<String, PositionsBuilder>); // indexed by currency
-
-impl Deref for InventoryBuilder {
-    type Target = HashMap<String, PositionsBuilder>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+pub(crate) struct InventoryBuilder(SharedMut<HashMap<String, PositionsBuilder>>); // indexed by currency
 
 impl InventoryBuilder {
     fn with_initial_position(position: Position) -> InventoryBuilder {
         let mut positions = HashMap::default();
         positions.insert(position.units.currency.to_string(), position.into());
 
-        Self(positions)
+        Self(Shared::new(MutContainer::new(positions)))
     }
 
     // TODO this should include CostSpec and the booking method
     fn book(&mut self, position: Position) {
         // TODO cost
-        match self.0.get_mut(position.units.currency.as_str()) {
+        let mut positions = self.0.write();
+        match positions.get_mut(position.units.currency.as_str()) {
             Some(positions) => positions.book(position, Booking::Strict), // TODO booking method
             None => {
-                self.0
-                    .insert(position.units.currency.to_string(), position.into());
+                positions.insert(position.units.currency.to_string(), position.into());
             }
         }
     }
@@ -75,10 +67,11 @@ impl Inventory {
     }
 }
 
-impl From<InventoryBuilder> for Option<Inventory> {
-    fn from(value: InventoryBuilder) -> Self {
+impl From<&InventoryBuilder> for Option<Inventory> {
+    fn from(value: &InventoryBuilder) -> Self {
         // return positions sorted by currency
-        let InventoryBuilder(mut positions_by_currency) = value;
+        let InventoryBuilder(positions_by_currency) = value;
+        let mut positions_by_currency = positions_by_currency.write();
         // sorted by currency for determinism
         let mut currencies = positions_by_currency
             .keys()
@@ -128,8 +121,8 @@ impl Custom for Inventory {
 
 #[derive(Clone, Default, Debug)]
 pub(crate) struct InventoriesBuilder {
-    accounts: HashMap<String, InventoryBuilder>, // indexed by account name
-    currency_usage: HashMap<String, i32>,
+    accounts: SharedMut<HashMap<String, InventoryBuilder>>, // indexed by account name
+    currency_usage: SharedMut<HashMap<String, i32>>,
 }
 
 impl Custom for InventoriesBuilder {
@@ -150,22 +143,23 @@ impl InventoriesBuilder {
                     cost: None,
                 };
 
-                match self.accounts.get_mut(account_name) {
+                let mut accounts = self.accounts.write();
+                match accounts.get_mut(account_name) {
                     Some(account) => account.book(position),
                     None => {
-                        self.accounts.insert(
+                        accounts.insert(
                             account_name.to_string(),
                             InventoryBuilder::with_initial_position(position),
                         );
                     }
                 }
-
-                match self.currency_usage.get_mut(currency) {
+                let mut currency_usage = self.currency_usage.write();
+                match currency_usage.get_mut(currency) {
                     Some(usage) => {
                         *usage += 1;
                     }
                     None => {
-                        self.currency_usage.insert(currency.to_string(), 1);
+                        currency_usage.insert(currency.to_string(), 1);
                     }
                 }
             } else {
@@ -178,6 +172,7 @@ impl InventoriesBuilder {
 
     fn currencies(&self) -> Vec<String> {
         self.currency_usage
+            .read()
             .keys()
             .map(|currency| currency.to_string())
             .collect::<Vec<String>>()
@@ -185,6 +180,7 @@ impl InventoriesBuilder {
 
     fn main_currency(&self) -> String {
         self.currency_usage
+            .read()
             .iter()
             .max_by_key(|(_, n)| **n)
             .map(|(cur, _)| cur.clone())
@@ -196,8 +192,9 @@ impl InventoriesBuilder {
         let Self { accounts, .. } = self;
 
         accounts
-            .into_iter()
-            .filter_map(|(k, v)| Into::<Option<Inventory>>::into(v).map(|v| (k, v)))
+            .read()
+            .iter()
+            .filter_map(|(k, v)| Into::<Option<Inventory>>::into(v).map(|v| (k.clone(), v)))
             .collect::<HashMap<String, Inventory>>()
     }
 }
