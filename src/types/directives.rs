@@ -12,7 +12,7 @@ use steel::{
 use steel_derive::Steel;
 use time::Date;
 
-use crate::types::{common::*, element::*};
+use crate::types::{common::*, element::*, steel_date::SteelDate};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Directive {
@@ -44,9 +44,14 @@ pub(crate) enum DirectiveVariant {
 
 // Scheme is not statically typed, so we don't force the user to unpack the directive variants, but rather support direct access
 impl Directive {
+    fn date(&self) -> SteelDate {
+        self.date.into()
+    }
+
     fn is_transaction(&self) -> bool {
         matches!(self.variant, DirectiveVariant::Transaction(_))
     }
+
     fn transaction_postings(&self) -> steel::rvals::Result<Vec<Posting>> {
         if let DirectiveVariant::Transaction(x) = &self.variant {
             Ok((*x.postings).clone())
@@ -154,6 +159,7 @@ pub(crate) struct Query {
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Directive>("directive?");
+    steel_engine.register_fn("directive-date", Directive::date);
     steel_engine.register_fn("transaction?", Directive::is_transaction);
     steel_engine.register_fn("price?", Directive::is_price);
     steel_engine.register_fn("balance?", Directive::is_balance);
