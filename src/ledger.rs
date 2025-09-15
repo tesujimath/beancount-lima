@@ -12,10 +12,10 @@ use std::{
     path::Path,
 };
 use steel::{
-    gc::Gc,
-    rvals::{IntoSteelVal, SteelHashMap, SteelVector},
+    gc::{Gc, Shared},
+    rvals::{IntoSteelVal, SteelHashMap},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelVal, Vector,
+    SteelVal,
 };
 use steel_derive::Steel;
 use time::Date;
@@ -25,7 +25,7 @@ use crate::{config::LedgerBuilderConfig, types::*};
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
     pub(crate) sources: CustomShared<BeancountSources>,
-    pub(crate) directives: SteelVector,
+    pub(crate) directives: Shared<Vec<Directive>>,
     pub(crate) options: SteelHashMap,
 }
 
@@ -34,7 +34,7 @@ impl Ledger {
     pub(crate) fn empty() -> Self {
         Ledger {
             sources: BeancountSources::from("").into(),
-            directives: Gc::new(Vector::default()).into(),
+            directives: Vec::default().into(),
             options: Gc::new(steel::HashMap::default()).into(),
         }
     }
@@ -85,8 +85,8 @@ impl Ledger {
         self.sources.clone()
     }
 
-    fn directives(&self) -> SteelVal {
-        SteelVal::VectorV(self.directives.clone())
+    fn directives(&self) -> Vec<Directive> {
+        (*self.directives).clone()
     }
 
     fn options(&self) -> SteelVal {
@@ -188,13 +188,7 @@ impl LedgerBuilder {
         if errors.is_empty() {
             Ok(Ledger {
                 sources: sources.into(),
-                directives: Gc::new(
-                    directives
-                        .into_iter()
-                        .map(|directive| directive.into_steelval().unwrap())
-                        .collect::<Vector<SteelVal>>(),
-                )
-                .into(),
+                directives: directives.into(),
                 options: parser_options,
             })
         } else {
@@ -357,13 +351,7 @@ impl LedgerBuilder {
         }
 
         let transaction = Transaction {
-            postings: Gc::new(
-                postings
-                    .into_iter()
-                    .map(|posting| posting.into_steelval().unwrap())
-                    .collect::<Vector<SteelVal>>(),
-            )
-            .into(),
+            postings: postings.into(),
             flag: transaction.flag().to_string(),
             payee: transaction.payee().map(|payee| payee.to_string()),
             narration: transaction
@@ -617,13 +605,7 @@ impl LedgerBuilder {
                 if let DirectiveVariant::Transaction(pad_transaction) =
                     &mut self.directives[pad_idx + 1].variant
                 {
-                    pad_transaction.postings = Gc::new(
-                        pad_postings
-                            .into_iter()
-                            .map(|posting| posting.into_steelval().unwrap())
-                            .collect::<Vector<SteelVal>>(),
-                    )
-                    .into();
+                    pad_transaction.postings = pad_postings.into();
                 } else {
                     panic!("directive at {} is not a transaction", pad_idx + 1);
                 }
@@ -828,7 +810,7 @@ impl LedgerBuilder {
                 date,
                 element,
                 variant: DirectiveVariant::Transaction(Transaction {
-                    postings: Gc::new(Vector::default()).into(),
+                    postings: Vec::default().into(),
                     flag: PAD_FLAG.into(),
                     payee: None,
                     narration: None,

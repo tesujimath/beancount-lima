@@ -3,10 +3,10 @@
 use joinery::JoinableIterator;
 use std::{collections::HashMap, fmt::Display, ops::Deref};
 use steel::{
-    gc::Gc,
-    rvals::{as_underlying_type, Custom, CustomType, IntoSteelVal, SteelVector},
+    gc::Shared,
+    rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelVal, Vector,
+    SteelVal,
 };
 use steel_derive::Steel;
 
@@ -47,7 +47,7 @@ impl InventoryBuilder {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Inventory {
-    positions: SteelVector, // of Position
+    positions: Shared<Vec<Position>>, // of Position
 }
 
 impl Inventory {
@@ -66,24 +66,12 @@ impl Inventory {
         )
     }
 
-    fn positions(&self) -> SteelVal {
-        SteelVal::VectorV(self.positions.clone())
+    fn positions(&self) -> Vec<Position> {
+        (*self.positions).clone()
     }
 
     fn iter_position_units(&self) -> impl Iterator<Item = Amount> {
-        self.positions.iter().map(|v| {
-            if let SteelVal::Custom(v) = v {
-                let v = v.read();
-                let v = v.as_ref();
-                if let Some(v) = as_underlying_type::<Position>(v) {
-                    v.units.clone()
-                } else {
-                    panic!("positions list has non-position")
-                }
-            } else {
-                panic!("positions list has non-custom entry");
-            }
-        })
+        self.positions.iter().map(|v| v.units.clone())
     }
 }
 
@@ -105,7 +93,6 @@ impl From<InventoryBuilder> for Option<Inventory> {
                     .remove(&currency)
                     .unwrap()
                     .into_positions()
-                    .map(|position| position.into_steelval().unwrap())
             })
             .collect::<Vec<_>>();
 
@@ -113,7 +100,7 @@ impl From<InventoryBuilder> for Option<Inventory> {
             None
         } else {
             Some(Inventory {
-                positions: Gc::new(Into::<Vector<_>>::into(positions)).into(),
+                positions: positions.into(),
             })
         }
     }
@@ -205,21 +192,13 @@ impl InventoriesBuilder {
     }
 
     // build inventories, filtering out empty ones
-    fn build(self) -> SteelVal {
+    fn build(self) -> HashMap<String, Inventory> {
         let Self { accounts, .. } = self;
 
-        SteelVal::HashMapV(
-            Gc::new(
-                accounts
-                    .into_iter()
-                    .filter_map(|(k, v)| {
-                        Into::<Option<Inventory>>::into(v)
-                            .map(|v| (k.into(), v.into_steelval().unwrap()))
-                    })
-                    .collect::<steel::HashMap<SteelVal, SteelVal>>(),
-            )
-            .into(),
-        )
+        accounts
+            .into_iter()
+            .filter_map(|(k, v)| Into::<Option<Inventory>>::into(v).map(|v| (k, v)))
+            .collect::<HashMap<String, Inventory>>()
     }
 }
 

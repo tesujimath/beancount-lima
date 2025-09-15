@@ -4,9 +4,10 @@ use beancount_parser_lima::ElementType;
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
 use steel::{
-    rvals::{Custom, SteelVector},
+    gc::Shared,
+    rvals::Custom,
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelErr, SteelVal,
+    SteelErr,
 };
 use steel_derive::Steel;
 use time::Date;
@@ -46,9 +47,9 @@ impl Directive {
     fn is_transaction(&self) -> bool {
         matches!(self.variant, DirectiveVariant::Transaction(_))
     }
-    fn transaction_postings(&self) -> steel::rvals::Result<SteelVal> {
+    fn transaction_postings(&self) -> steel::rvals::Result<Vec<Posting>> {
         if let DirectiveVariant::Transaction(x) = &self.variant {
-            Ok(SteelVal::VectorV(x.postings.clone()))
+            Ok((*x.postings).clone())
         } else {
             Err(SteelErr::new(
                 steel::rerrs::ErrorKind::TypeMismatch,
@@ -98,7 +99,7 @@ pub(crate) struct Transaction {
     pub(crate) flag: String,
     pub(crate) payee: Option<String>,
     pub(crate) narration: Option<String>,
-    pub(crate) postings: SteelVector,
+    pub(crate) postings: Shared<Vec<Posting>>,
 }
 
 #[derive(Clone, Steel, Debug)]
