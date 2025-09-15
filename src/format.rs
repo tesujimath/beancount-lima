@@ -1,5 +1,6 @@
 use lazy_format::lazy_format;
 use std::fmt::{self, Display, Formatter};
+use time::Date;
 
 use crate::types::*;
 
@@ -27,11 +28,7 @@ impl Display for Directive {
 }
 
 impl Transaction {
-    fn fmt(
-        &self,
-        f: &mut Formatter<'_>,
-        date: SteelDate, /*, metadata: &Metadata*/
-    ) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} {}", date, &self.flag)?;
 
         format(f, &self.payee, double_quoted, SPACE, Some(SPACE))?;
@@ -51,11 +48,7 @@ impl Transaction {
 }
 
 impl Balance {
-    fn fmt(
-        &self,
-        f: &mut Formatter<'_>,
-        date: SteelDate, /*, metadata: &Metadata*/
-    ) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} balance {} {}", date, &self.account, &self.amount)?;
         simple_format(f, self.tolerance.as_ref(), Some(TILDE_SPACE))?;
 

@@ -9,12 +9,13 @@ use steel::{
     SteelErr, SteelVal,
 };
 use steel_derive::Steel;
+use time::Date;
 
-use crate::types::{common::*, element::*, steel_date::*};
+use crate::types::{common::*, element::*};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Directive {
-    pub(crate) date: SteelDate,
+    pub(crate) date: Date,
     pub(crate) element: WrappedSpannedElement,
     pub(crate) variant: DirectiveVariant,
 }

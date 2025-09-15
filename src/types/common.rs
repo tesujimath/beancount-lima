@@ -8,8 +8,9 @@ use steel::{
     rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
 };
+use time::Date;
 
-use crate::types::{steel_date::SteelDate, steel_decimal::SteelDecimal};
+use crate::types::steel_decimal::SteelDecimal;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Posting {
@@ -128,7 +129,7 @@ impl From<&parser::Amount<'_>> for Amount {
 pub(crate) struct Cost {
     number: Decimal,
     currency: String,
-    date: SteelDate,
+    date: Date,
     label: Option<String>,
 }
 
