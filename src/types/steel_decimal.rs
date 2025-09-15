@@ -33,7 +33,7 @@ impl SteelDecimal {
         Decimal::ZERO.into()
     }
 
-    fn is_zero(&self) -> bool {
+    pub(crate) fn is_zero(&self) -> bool {
         self.0 == Decimal::ZERO
     }
 

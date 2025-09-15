@@ -11,9 +11,9 @@ use crate::types::*;
 /// 2. All other positions are unique w.r.t cost.(currency, date, label)
 /// 3. Sort order of these is by date then currency then label.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct PositionBuilder(Vec<Position>);
+pub(crate) struct PositionsBuilder(Vec<Position>);
 
-impl Deref for PositionBuilder {
+impl Deref for PositionsBuilder {
     type Target = Vec<Position>;
 
     fn deref(&self) -> &Self::Target {
@@ -21,7 +21,7 @@ impl Deref for PositionBuilder {
     }
 }
 
-impl PositionBuilder {
+impl PositionsBuilder {
     /// The booking algorithm, TODO cost
     pub(crate) fn book(&mut self, position: Position, method: Booking) {
         if !position.cost.is_none() {
@@ -39,17 +39,15 @@ impl PositionBuilder {
         }
     }
 
-    pub(crate) fn into_iter_with_currency(
-        self,
-        currency: String,
-    ) -> impl Iterator<Item = (String, Position)> {
+    // return non-zero positions only
+    pub(crate) fn into_positions(self) -> impl Iterator<Item = Position> {
         self.0
             .into_iter()
-            .map(move |position| (currency.clone(), position))
+            .filter(|p| !p.units.number.is_zero() || p.cost.is_some())
     }
 }
 
-impl From<Position> for PositionBuilder {
+impl From<Position> for PositionsBuilder {
     fn from(value: Position) -> Self {
         Self(vec![value])
     }

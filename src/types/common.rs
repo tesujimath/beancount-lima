@@ -160,6 +160,20 @@ pub(crate) struct Position {
     pub(crate) cost: Option<Cost>,
 }
 
+impl Position {
+    fn new(units: Amount, cost: Option<Cost>) -> Self {
+        Self { units, cost }
+    }
+
+    fn units(&self) -> Amount {
+        self.units.clone()
+    }
+
+    fn cost(&self) -> Option<Cost> {
+        self.cost.clone()
+    }
+}
+
 impl Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.units)?;
@@ -197,4 +211,9 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("amount->string", Amount::to_string);
     steel_engine.register_fn("amount-number", Amount::number);
     steel_engine.register_fn("amount-currency", Amount::currency);
+
+    steel_engine.register_type::<Position>("position?");
+    steel_engine.register_fn("position", Position::new);
+    steel_engine.register_fn("position-units", Position::units);
+    steel_engine.register_fn("position-cost", Position::cost);
 }

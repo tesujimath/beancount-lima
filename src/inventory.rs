@@ -4,7 +4,10 @@ use joinery::JoinableIterator;
 use std::{collections::HashMap, fmt::Display, ops::Deref};
 use steel::{
     gc::Gc,
-    rvals::{as_underlying_type, Custom, CustomType, IntoSteelVal, SteelString, SteelVector},
+    rvals::{
+        as_underlying_type, Custom, CustomType, IntoSteelVal, SteelHashMap, SteelString,
+        SteelVector,
+    },
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelVal, Vector,
 };
@@ -14,10 +17,10 @@ use crate::{booking::*, types::*};
 
 // TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
-pub(crate) struct InventoryBuilder(HashMap<String, PositionBuilder>); // indexed by currency
+pub(crate) struct InventoryBuilder(HashMap<String, PositionsBuilder>); // indexed by currency
 
 impl Deref for InventoryBuilder {
-    type Target = HashMap<String, PositionBuilder>;
+    type Target = HashMap<String, PositionsBuilder>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -46,9 +49,51 @@ impl InventoryBuilder {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Inventory(SteelVector); // of SteelPosition
+pub(crate) struct Inventory {
+    positions: SteelVector, // of Position
+}
 
-impl From<InventoryBuilder> for Inventory {
+impl Inventory {
+    fn units(&self) -> SteelVal {
+        self.iter_position_units()
+            .fold(
+                HashMap::<SteelString, SteelDecimal>::default(),
+                |mut hm, units| {
+                    if hm.contains_key(&units.currency) {
+                        *hm.get_mut(&units.currency).unwrap() += units.number;
+                    } else {
+                        hm.insert(units.currency.clone(), units.number);
+                    }
+
+                    hm
+                },
+            )
+            .into_steelval()
+            .unwrap()
+    }
+
+    fn positions(&self) -> SteelVal {
+        SteelVal::VectorV(self.positions.clone())
+    }
+
+    fn iter_position_units(&self) -> impl Iterator<Item = Amount> {
+        self.positions.iter().map(|v| {
+            if let SteelVal::Custom(v) = v {
+                let v = v.read();
+                let v = v.as_ref();
+                if let Some(v) = as_underlying_type::<Position>(v) {
+                    v.units.clone()
+                } else {
+                    panic!("positions list has non-position")
+                }
+            } else {
+                panic!("positions list has non-custom entry");
+            }
+        })
+    }
+}
+
+impl From<InventoryBuilder> for Option<Inventory> {
     fn from(value: InventoryBuilder) -> Self {
         // return positions sorted by currency
         let InventoryBuilder(mut positions_by_currency) = value;
@@ -65,18 +110,24 @@ impl From<InventoryBuilder> for Inventory {
                 positions_by_currency
                     .remove(&currency)
                     .unwrap()
-                    .into_iter_with_currency(currency)
+                    .into_positions()
                     .map(|position| position.into_steelval().unwrap())
             })
             .collect::<Vec<_>>();
 
-        Inventory(Gc::new(Into::<Vector<_>>::into(positions)).into())
+        if positions.is_empty() {
+            None
+        } else {
+            Some(Inventory {
+                positions: Gc::new(Into::<Vector<_>>::into(positions)).into(),
+            })
+        }
     }
 }
 
 impl Display for Inventory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.iter().join_with(" "))
+        write!(f, "[{}]", self.positions.iter().join_with(", "))
     }
 }
 
@@ -162,6 +213,7 @@ impl InventoriesBuilder {
         main_currency.into()
     }
 
+    // build inventories, filtering out empty ones
     fn build(self) -> SteelVal {
         let Self { accounts, .. } = self;
 
@@ -169,11 +221,9 @@ impl InventoriesBuilder {
             Gc::new(
                 accounts
                     .into_iter()
-                    .map(|(k, v)| {
-                        (
-                            k.into(),
-                            Into::<Inventory>::into(v).into_steelval().unwrap(),
-                        )
+                    .filter_map(|(k, v)| {
+                        Into::<Option<Inventory>>::into(v)
+                            .map(|v| (k.into(), v.into_steelval().unwrap()))
                     })
                     .collect::<steel::HashMap<SteelVal, SteelVal>>(),
             )
@@ -197,4 +247,8 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
         InventoriesBuilder::main_currency,
     );
     steel_engine.register_fn("inventories-builder-build", InventoriesBuilder::build);
+
+    steel_engine.register_type::<Inventory>("inventory?");
+    steel_engine.register_fn("inventory-positions", Inventory::positions);
+    steel_engine.register_fn("inventory-units", Inventory::units);
 }
