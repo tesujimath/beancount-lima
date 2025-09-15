@@ -2,6 +2,7 @@
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima::ElementType;
 use color_eyre::eyre::Result;
+use rust_decimal::Decimal;
 use steel::{
     rvals::{Custom, SteelVector},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
@@ -9,7 +10,7 @@ use steel::{
 };
 use steel_derive::Steel;
 
-use crate::types::{common::*, element::*, steel_date::*, steel_decimal::*};
+use crate::types::{common::*, element::*, steel_date::*};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Directive {
@@ -106,7 +107,7 @@ pub(crate) struct Price {}
 pub(crate) struct Balance {
     pub(crate) account: String,
     pub(crate) amount: Amount,
-    pub(crate) tolerance: Option<SteelDecimal>,
+    pub(crate) tolerance: Option<Decimal>,
 }
 
 #[derive(Clone, Steel, Debug)]

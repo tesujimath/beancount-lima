@@ -51,22 +51,19 @@ pub(crate) struct Inventory {
 }
 
 impl Inventory {
-    fn units(&self) -> SteelVal {
-        self.iter_position_units()
-            .fold(
-                HashMap::<String, SteelDecimal>::default(),
-                |mut hm, units| {
-                    if hm.contains_key(&units.currency) {
-                        *hm.get_mut(&units.currency).unwrap() += units.number;
-                    } else {
-                        hm.insert(units.currency.clone(), units.number);
-                    }
+    fn units(&self) -> HashMap<String, SteelDecimal> {
+        self.iter_position_units().fold(
+            HashMap::<String, SteelDecimal>::default(),
+            |mut hm, units| {
+                if hm.contains_key(&units.currency) {
+                    *hm.get_mut(&units.currency).unwrap() += units.number.into();
+                } else {
+                    hm.insert(units.currency.clone(), units.number.into());
+                }
 
-                    hm
-                },
-            )
-            .into_steelval()
-            .unwrap()
+                hm
+            },
+        )
     }
 
     fn positions(&self) -> SteelVal {

@@ -730,7 +730,7 @@ impl LedgerBuilder {
             tolerance: balance
                 .atol()
                 .tolerance()
-                .map(|tolerance| (*tolerance.item()).into()),
+                .map(|tolerance| (*tolerance.item())),
         };
         self.directives.push(Directive {
             date,

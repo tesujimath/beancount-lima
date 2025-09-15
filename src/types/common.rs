@@ -64,18 +64,21 @@ impl Custom for Posting {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Amount {
-    pub(crate) number: SteelDecimal,
+    pub(crate) number: Decimal,
     pub(crate) currency: String,
 }
 
 // https://github.com/mattwparas/steel/issues/365
 impl Amount {
     fn new(number: SteelDecimal, currency: String) -> Self {
-        Self { number, currency }
+        Self {
+            number: number.into(),
+            currency,
+        }
     }
 
     fn number(&self) -> SteelDecimal {
-        self.number
+        self.number.into()
     }
 
     fn currency(&self) -> String {
@@ -109,7 +112,7 @@ where
 {
     fn from(value: (Decimal, S)) -> Self {
         Amount {
-            number: value.0.into(),
+            number: value.0,
             currency: value.1.to_string(),
         }
     }
@@ -123,7 +126,7 @@ impl From<&parser::Amount<'_>> for Amount {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Cost {
-    number: SteelDecimal,
+    number: Decimal,
     currency: String,
     date: SteelDate,
     label: Option<String>,
