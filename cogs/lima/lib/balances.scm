@@ -1,7 +1,6 @@
 (provide display-balance-sheet)
 
 (require "lima/lib/types.scm")
-(require "lima/lib/tabulate.scm")
 
 (define (inventory-units-for-currencies inv currencies)
   (map (lambda (cur)
@@ -25,4 +24,4 @@
                 (into-list)))))
 
 (define (display-balance-sheet ldg)
-  (display (tabulate (collate-balance-sheet ldg) 'left 'centre)))
+  (display (tabulate (collate-balance-sheet ldg))))

@@ -289,6 +289,7 @@ fn register_types(steel_engine: &mut Engine) {
     ledger::register_types(steel_engine);
     import::register_types(steel_engine);
     inventory::register_types(steel_engine);
+    tabulate::register(steel_engine);
 }
 
 fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<()> {

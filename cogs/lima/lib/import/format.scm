@@ -3,11 +3,15 @@
 (require "srfi/srfi-28/format.scm")
 (require "lima/lib/types.scm")
 (require "lima/lib/string.scm")
-(require (only-in "lima/lib/tabulate.scm" spaces))
 (require "lima/lib/import/account-inference.scm")
 
 (define (quoted space value)
   (format "~a\"~a\"" space value))
+
+(define (repeat-string n s)
+  (transduce (map (lambda (i) s) (range n)) (into-string)))
+
+(define (spaces n) (repeat-string n " "))
 
 (define (format-amount amt space)
   (format "~a~a~a"

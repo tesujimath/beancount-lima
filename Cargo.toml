@@ -45,6 +45,11 @@ lazy_format = "2.0.3"
 strum = "0.27.2"
 strum_macros = "0.27.2"
 joinery = "3.1.0"
+tabulator = { version = "0.1.0", features = ["num-bigint", "rust_decimal"] }
+# tabulator = { path = "../tabulator-rs", features = [
+#   "num-bigint",
+#   "rust_decimal",
+# ] }
 
 [dev-dependencies]
 test-generator = "0.3.1"

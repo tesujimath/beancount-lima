@@ -8,6 +8,7 @@ use steel::{
     rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
 };
+use tabulator::{Align, Cell};
 use time::Date;
 
 use crate::types::steel_decimal::SteelDecimal;
@@ -104,6 +105,15 @@ impl Custom for Amount {
         } else {
             false
         }
+    }
+}
+
+impl From<Amount> for Cell<'static> {
+    fn from(value: Amount) -> Self {
+        Cell::Row(vec![
+            value.number.into(),
+            (value.currency, Align::Left).into(),
+        ])
     }
 }
 

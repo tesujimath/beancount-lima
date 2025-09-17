@@ -3,7 +3,6 @@
 (require "steel/sorting/merge-sort.scm")
 (require "srfi/srfi-28/format.scm")
 (require "lima/lib/types.scm")
-(require "lima/lib/tabulate.scm")
 
 (define (repeated value n) (letrec ((repeated_ (lambda (value n a) (if (<= n 0) a (repeated_ value (- n 1) (cons value a))))))
                              (repeated_ value n '())))
@@ -79,4 +78,4 @@
     rollup-combined))
 
 (define (display-rollup ldg)
-  (display (tabulate (collate-rollup ldg) 'left 'centre)))
+  (display (tabulate (collate-rollup ldg))))

@@ -3,7 +3,6 @@
 (require "srfi/srfi-28/format.scm")
 (require "steel/sorting/merge-sort.scm")
 (require "lima/lib/types.scm")
-(require "lima/lib/tabulate.scm")
 
 ;; infer expenses account from payees and narrations we found in the ledger
 ;; the secondary accounts are a list of either strings, or lists of string count category

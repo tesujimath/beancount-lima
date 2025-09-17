@@ -18,6 +18,7 @@ use steel::{
     SteelVal,
 };
 use steel_derive::Steel;
+use tabulator::{layout, Align, Cell, Layout, Spacing, Style};
 use time::Date;
 
 use crate::{config::LedgerBuilderConfig, types::*};
@@ -633,32 +634,34 @@ impl LedgerBuilder {
                 );
 
                 // determine context for error by collating postings since last balance
-                let annotation = account
-                    .balance_diagnostics
-                    .drain(..)
-                    .map(|bd| {
-                        vec![
-                            bd.date.to_string(),
-                            bd.amount
-                                .map(|amt| amt.to_string())
-                                .unwrap_or("          ".to_string()),
-                            bd.balance
-                                .into_iter()
-                                .map(|amt| amt.to_string())
-                                .collect::<Vec<_>>()
-                                .join(", "),
-                            bd.description.unwrap_or("".to_string()),
-                        ]
-                    })
-                    .collect::<Vec<_>>();
+                let annotation = Cell::Column(
+                    account
+                        .balance_diagnostics
+                        .drain(..)
+                        .map(|bd| {
+                            Cell::Row(vec![
+                                (bd.date.to_string(), Align::Left).into(),
+                                bd.amount.map(|amt| amt.into()).unwrap_or_else(Cell::empty),
+                                Cell::Row(
+                                    bd.balance
+                                        .into_iter()
+                                        .map(|amt| amt.into())
+                                        .collect::<Vec<_>>(),
+                                ),
+                                bd.description
+                                    .map(|d| (d, Align::Left).into())
+                                    .unwrap_or_else(Cell::empty),
+                            ])
+                        })
+                        .collect::<Vec<_>>(),
+                );
+                use Spacing::*;
+                let layout = layout!([Medium; _, Minor, [Medium; Minor], _]);
 
-                use super::tabulate::Align::*;
-                let annotation =
-                    super::tabulate::tabulate(annotation, vec![Left, Right, Right, Left], "  ")
-                        .join("\n");
-
-                self.errors
-                    .push(element.annotated_error(reason, annotation));
+                self.errors.push(element.annotated_error(
+                    reason,
+                    annotation.layout(&layout, Style::default()).to_string(),
+                ));
 
                 tracing::debug!(
                     "adjusting inventory {:?} for {:?}",

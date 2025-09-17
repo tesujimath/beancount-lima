@@ -1,38 +1,102 @@
-pub enum Align {
-    Left,
-    Right,
+use rust_decimal::Decimal;
+use std::result::Result;
+use steel::{
+    gc::GcMut,
+    rvals::{as_underlying_type, CustomType},
+    steel_vm::{engine::Engine, register_fn::RegisterFn},
+    SteelErr, SteelVal,
+};
+use tabulator::{Align, Cell};
+
+use crate::types::SteelDecimal;
+
+fn custom_to_cell<'a>(value: &GcMut<Box<dyn CustomType>>) -> Result<Cell<'a>, SteelErr> {
+    use Align::Left;
+
+    let value = value.read();
+
+    if let Some(value) = as_underlying_type::<SteelDecimal>(value.as_ref()) {
+        Ok(Into::<Decimal>::into(*value).into())
+    } else {
+        value.display().map(|s| (s, Left).into()).map_err(|e| {
+            SteelErr::new(
+                steel::rerrs::ErrorKind::TypeMismatch,
+                format!("failed to format custom value: {e}"),
+            )
+        })
+    }
 }
 
-pub fn tabulate(rows: Vec<Vec<String>>, mut align: Vec<Align>, inter_column: &str) -> Vec<String> {
-    // get width of each column, max of cell lengths
-    let mut width = Vec::default();
-    for row in rows.iter() {
-        while width.len() < row.len() {
-            width.push(0usize);
-        }
+fn container_to_cell<'a, I>(value: I) -> Result<Cell<'a>, SteelErr>
+where
+    I: IntoIterator<Item = &'a SteelVal>,
+{
+    value
+        .into_iter()
+        .map(steelval_to_cell)
+        .collect::<Result<Vec<_>, SteelErr>>()
+        .map(Cell::Row)
+}
 
-        for (i, cell) in row.iter().enumerate() {
-            if width[i] < cell.len() {
-                width[i] = cell.len();
-            }
-        }
+fn anchored_rational(s: String) -> Cell<'static> {
+    let anchor = s
+        .find('/')
+        .map(|idx| idx - 1)
+        .unwrap_or_else(|| s.len() - 1);
+    Cell::anchored(s, anchor)
+}
+
+fn steelval_to_cell(value: &SteelVal) -> Result<Cell, SteelErr> {
+    use Align::Left;
+    use SteelVal::*;
+
+    match value {
+        BoolV(x) => Ok((x.to_string(), Left).into()),
+        NumV(x) => Ok((*x).into()),
+        IntV(x) => Ok((*x).into()),
+        BigNum(x) => Ok(x.as_ref().into()),
+        Rational(x) => Ok(anchored_rational(x.to_string())),
+        BigRational(x) => Ok(anchored_rational(x.to_string())),
+        CharV(x) => Ok((x.to_string(), Left).into()),
+        StringV(s) => Ok((s.as_str(), Left).into()),
+        SymbolV(s) => Ok((s.as_str(), Left).into()),
+        Complex(x) => Ok((x.to_string(), Left).into()),
+
+        Custom(x) => custom_to_cell(x),
+
+        ListV(x) => container_to_cell(x),
+
+        // TODO turn these into rows
+        // VectorV(x) => Ok(Cell::Left(Borrowed("oops"))),
+        // IterV(x) => Ok(Cell::Left(Borrowed("oops"))),
+        // Pair(x) => Ok(Cell::Left(Borrowed("oops"))),
+        // MutableVector(x) => Ok(Cell::Left(Borrowed("oops"))),
+        // BoxedIterator(x) => Ok(Cell::Left(Borrowed("oops"))),
+        // Boxed(x) => Ok(Cell::Left(Borrowed("oops"))),
+        // HeapAllocated(x) => Ok(Cell::Left(Borrowed("oops"))),
+        _ => Err(SteelErr::new(
+            steel::rerrs::ErrorKind::TypeMismatch,
+            format!("can't tabulate {value:?}"),
+        )),
     }
+}
 
-    // default alignment if under-length
-    while align.len() < width.len() {
-        align.push(Align::Left);
-    }
-
-    rows.into_iter()
+fn table_to_cell(rows: &[Vec<SteelVal>]) -> Result<Cell, SteelErr> {
+    rows.iter()
         .map(|row| {
-            row.into_iter()
-                .enumerate()
-                .map(|(i, cell)| match align[i] {
-                    Align::Left => format!("{:<width$}", cell, width = width[i]),
-                    Align::Right => format!("{:>width$}", cell, width = width[i]),
-                })
-                .collect::<Vec<_>>()
-                .join(inter_column)
+            row.iter()
+                .map(steelval_to_cell)
+                .collect::<Result<Vec<_>, SteelErr>>()
+                .map(Cell::Row)
         })
-        .collect::<Vec<_>>()
+        .collect::<Result<Vec<_>, SteelErr>>()
+        .map(Cell::Column)
+}
+
+fn tabulate(rows: Vec<Vec<SteelVal>>) -> Result<String, SteelErr> {
+    table_to_cell(&rows).map(|cell| cell.to_string())
+}
+
+pub(crate) fn register(steel_engine: &mut Engine) {
+    steel_engine.register_fn("tabulate", tabulate);
 }

@@ -17,9 +17,6 @@
 (require "lima/lib/ledger.scm")
 (provide ledger-filter)
 
-(require "lima/lib/tabulate.scm")
-(provide tabulate)
-
 (require "lima/lib/balances.scm")
 (provide display-balance-sheet)
 
