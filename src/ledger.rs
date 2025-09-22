@@ -18,7 +18,7 @@ use steel::{
     SteelVal,
 };
 use steel_derive::Steel;
-use tabulator::{layout, Align, Cell, Layout, Spacing, Style};
+use tabulator::{spacing, Align, Cell, Space, Spacing, Style};
 use time::Date;
 
 use crate::{config::LedgerBuilderConfig, types::*};
@@ -655,12 +655,12 @@ impl LedgerBuilder {
                         })
                         .collect::<Vec<_>>(),
                 );
-                use Spacing::*;
-                let layout = layout!([Medium; _, Minor, [Medium; Minor], _]);
+                use Space::*;
+                let spacing = spacing!([Medium; _, Minor, [Medium; Minor], _]);
 
                 self.errors.push(element.annotated_error(
                     reason,
-                    annotation.layout(&layout, Style::default()).to_string(),
+                    annotation.layout(&spacing, Style::default()).to_string(),
                 ));
 
                 tracing::debug!(
