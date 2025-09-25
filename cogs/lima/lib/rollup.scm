@@ -28,7 +28,7 @@
          (depth-rollup (foldl (lambda (accname0 depth-rollup)
                                 (let* ((depth (first depth-rollup))
                                        (rollup0 (second depth-rollup))
-                                       (inv0 (hash-get accounts accname0))
+                                       (inv0 (inventory-units (hash-get accounts accname0)))
                                        (subacns (split-many accname0 ":"))
                                        (parent-accnames0 (foldl (lambda (sub accs)
                                                                   (let* ((last-parent (car accs))
@@ -66,7 +66,7 @@
                                                        (rollup-bal (first rollup-bal-merged))
                                                        (rollup-merged (second rollup-bal-merged))
                                                        (bal (let ((inv (hash-try-get accounts accname0)))
-                                                              (if inv (or (hash-try-get inv cur) (decimal-zero))
+                                                              (if inv (or (hash-try-get (inventory-units inv) cur) (decimal-zero))
                                                                   (decimal-zero)))))
                                                   (rollup-row accname0
                                                               rollup-bal
