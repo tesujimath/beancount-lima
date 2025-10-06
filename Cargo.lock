@@ -2554,9 +2554,9 @@ dependencies = [
 
 [[package]]
 name = "tabulator"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c975e82b1751ef2b127e5691ce11babb5a28666f98d1bd66e13d7d646af09b6"
+checksum = "808dbf2362f79ec2fe2b14769126eca78901b41cb52e0fd10dd49b21c92afdea"
 dependencies = [
  "itertools",
  "joinery",

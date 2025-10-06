@@ -18,7 +18,7 @@ use steel::{
     SteelVal,
 };
 use steel_derive::Steel;
-use tabulator::{spacing, Align, Cell, Space, Spacing, Style};
+use tabulator::{Align, Cell, Gap};
 use time::Date;
 
 use crate::{config::LedgerBuilderConfig, types::*};
@@ -639,29 +639,29 @@ impl LedgerBuilder {
                         .balance_diagnostics
                         .drain(..)
                         .map(|bd| {
-                            Cell::Row(vec![
-                                (bd.date.to_string(), Align::Left).into(),
-                                bd.amount.map(|amt| amt.into()).unwrap_or_else(Cell::empty),
-                                Cell::Row(
-                                    bd.balance
-                                        .into_iter()
-                                        .map(|amt| amt.into())
-                                        .collect::<Vec<_>>(),
-                                ),
-                                bd.description
-                                    .map(|d| (d, Align::Left).into())
-                                    .unwrap_or_else(Cell::empty),
-                            ])
+                            Cell::Row(
+                                vec![
+                                    (bd.date.to_string(), Align::Left).into(),
+                                    bd.amount.map(|amt| amt.into()).unwrap_or_else(Cell::empty),
+                                    Cell::Row(
+                                        bd.balance
+                                            .into_iter()
+                                            .map(|amt| amt.into())
+                                            .collect::<Vec<_>>(),
+                                        Gap::Minor,
+                                    ),
+                                    bd.description
+                                        .map(|d| (d, Align::Left).into())
+                                        .unwrap_or_else(Cell::empty),
+                                ],
+                                Gap::Medium,
+                            )
                         })
                         .collect::<Vec<_>>(),
                 );
-                use Space::*;
-                let spacing = spacing!([Medium; _, Minor, [Medium; Minor], _]);
 
-                self.errors.push(element.annotated_error(
-                    reason,
-                    annotation.layout(&spacing, Style::default()).to_string(),
-                ));
+                self.errors
+                    .push(element.annotated_error(reason, annotation.to_string()));
 
                 tracing::debug!(
                     "adjusting inventory {:?} for {:?}",
