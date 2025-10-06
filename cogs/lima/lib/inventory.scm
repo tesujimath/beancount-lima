@@ -5,17 +5,17 @@
 (require "steel/sorting/merge-sort.scm")
 
 (define (directives->inventories directives
-                                 #:date-filter
-                                 [date-filter #f]
-                                 #:account-filter
-                                 [account-filter #f])
-  (let ((invs-builder (inventories-builder))
-        (directive-filter (if date-filter
-                              (lambda (d) (date-filter (directive-date d)))
-                              (lambda (d) #t)))
-        (posting-filter (if account-filter
-                            (lambda (p) (account-filter (posting-account p)))
-                            (lambda (p) #t))))
+                                 #:filters
+                                 [filters (hash)])
+  (let* ((invs-builder (inventories-builder))
+         (date-filter (hash-try-get filters 'date))
+         (account-filter (hash-try-get filters 'account))
+         (directive-filter (if date-filter
+                               (lambda (d) (date-filter (directive-date d)))
+                               (lambda (d) #t)))
+         (posting-filter (if account-filter
+                             (lambda (p) (account-filter (posting-account p)))
+                             (lambda (p) #t))))
     (transduce directives
                (filtering transaction?)
                (filtering directive-filter)
