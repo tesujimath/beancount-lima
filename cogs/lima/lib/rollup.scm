@@ -22,9 +22,9 @@
 (define (collate-rollup
          ldg
          #:cur
-         [cur (ledger-main-currency ldg)])
-  (let* ((account-names (ledger-account-names ldg))
-         (accounts (ledger-accounts ldg))
+         [cur (inventories-main-currency ldg)])
+  (let* ((account-names (inventories-account-names ldg))
+         (accounts (inventories-accounts ldg))
          (depth-rollup (foldl (lambda (accname0 depth-rollup)
                                 (let* ((depth (first depth-rollup))
                                        (rollup0 (second depth-rollup))

@@ -1,5 +1,5 @@
-(provide *ledger*)
+(provide *inventories*)
 
-(require "lima/lib/ledger.scm")
+(require "lima/lib/inventory.scm")
 
-(define *ledger* (directives->ledger *directives*))
+(define *inventories* (directives->inventories *directives*))

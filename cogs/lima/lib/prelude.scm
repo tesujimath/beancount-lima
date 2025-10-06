@@ -1,21 +1,21 @@
 (require "lima/lib/types.scm")
 (provide
-  ledger
-  ledger?
-  ledger-currencies
-  ledger-main-currency
-  ledger-account-names
-  ledger-accounts
-  period
-  period?
-  period-within?
-  make-period-within?)
+ inventories
+ inventories?
+ inventories-currencies
+ inventories-main-currency
+ inventories-account-names
+ inventories-accounts
+ period
+ period?
+ period-within?
+ make-period-within?)
 
 (require "lima/lib/fiscal-year.scm")
 (provide fy make-fy?)
 
-(require "lima/lib/ledger.scm")
-(provide ledger-filter)
+(require "lima/lib/inventory.scm")
+(provide directives->inventories)
 
 (require "lima/lib/balances.scm")
 (provide display-balance-sheet)
@@ -24,4 +24,4 @@
 (provide display-rollup)
 
 (require "lima/lib/globals.scm")
-(provide *ledger*)
+(provide *inventories*)
