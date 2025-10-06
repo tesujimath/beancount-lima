@@ -22,14 +22,14 @@
            ;; or there may be no transactions
            (has-at-least-one-transaction (not (empty? txns))))
       (if (and has-balance has-at-least-one-transaction)
-        (let ((get-balance (make-field-getter field-names "balance" parse-decimal-cents))
-              (txn0 (car txns))
-              ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
-              (get-date (make-field-getter field-names "date" (lambda (x) (date-after (parse-date x "%d/%m/%Y") 1)))))
-          (list (hash 'date (get-date txn0)
-                      'amount (amount (get-balance txn0) cur)
-                      'account account)))
-        (list)))))
+          (let ((get-balance (make-field-getter field-names "balance" parse-decimal-cents))
+                (txn0 (car txns))
+                ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
+                (get-date (make-field-getter field-names "date" (lambda (x) (date-after (parse-date x "%d/%m/%Y") 1)))))
+            (list (hash 'date (get-date txn0)
+                        'amount (amount (get-balance txn0) cur)
+                        'account account)))
+          (list)))))
 
 ;; extract imported First Direct flavour CSV transactions into an intermediate representation
 ;; where the account is inferred from the path by picking the first in `accounts-by-id`
@@ -39,10 +39,10 @@
     (let* ((hdr (import-source-header source))
            (path (hash-get hdr 'path))
            (primary-account (find-and-map-or-default
-                            (lambda (k) (string-contains? path k))
-                            (hash-keys->list accounts-by-id)
-                            (lambda (k) (hash-get accounts-by-id k))
-                            "Assets:Unknown"))
+                             (lambda (k) (string-contains? path k))
+                             (hash-keys->list accounts-by-id)
+                             (lambda (k) (hash-get accounts-by-id k))
+                             "Assets:Unknown"))
            (field-names (import-source-fields source))
            (get-date (make-field-getter field-names "date" (lambda (x) (parse-date x "%d/%m/%Y"))))
            (get-amount (make-field-getter field-names "amount" parse-decimal-cents))

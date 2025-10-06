@@ -14,13 +14,13 @@
          (balamt (or (hash-try-get hdr 'balamt) '()))
          (dtasof (or (hash-try-get hdr 'dtasof) '())))
     (if (or (empty? balamt) (empty? dtasof))
-      '()
-      ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
-      (let ((date (date-after (parse-date dtasof "%Y%m%d") 1))
-            (amt (parse-decimal-cents balamt)))
-        (list (hash 'date date
-                    'account account
-                    'amount (amount amt cur)))))))
+        '()
+        ;; Beancount balance date is as of midnight at the beginning of the day, but we have the end of the day, so add 1 day
+        (let ((date (date-after (parse-date dtasof "%Y%m%d") 1))
+              (amt (parse-decimal-cents balamt)))
+          (list (hash 'date date
+                      'account account
+                      'amount (amount amt cur)))))))
 
 ;; extract imported OFX1 transactions into an intermediate representation
 (define (make-extract-txn accounts-by-id source)
