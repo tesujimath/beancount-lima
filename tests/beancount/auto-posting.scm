@@ -2,7 +2,7 @@
 (require (for-syntax "steel/tests/unit-test.scm"))
 
 (let ((current-nzd (or (hash-try-get
-                        (inventory-units (hash-get (ledger-accounts *inventories*) "Assets:Bank:Current"))
+                        (inventory-units (hash-get (inventories-accounts *inventories*) "Assets:Bank:Current"))
                         "NZD")
                        (decimal-zero))))
   (check-equal? "current-nzd" current-nzd (decimal -2965 2)))

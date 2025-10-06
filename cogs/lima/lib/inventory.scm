@@ -4,12 +4,24 @@
 (require "lima/lib/account.scm")
 (require "steel/sorting/merge-sort.scm")
 
-(define (directives->inventories directives)
-  (let ((invs-builder (inventories-builder)))
+(define (directives->inventories directives
+                                 #:date-filter
+                                 [date-filter #f]
+                                 #:account-filter
+                                 [account-filter #f])
+  (let ((invs-builder (inventories-builder))
+        (directive-filter (if date-filter
+                              (lambda (d) (date-filter (directive-date d)))
+                              (lambda (d) #t)))
+        (posting-filter (if account-filter
+                            (lambda (p) (account-filter (posting-account p)))
+                            (lambda (p) #t))))
     (transduce directives
                (filtering transaction?)
+               (filtering directive-filter)
                (mapping transaction-postings)
                (flattening)
+               (filtering posting-filter)
                (into-for-each (lambda (post)
                                 (inventories-builder-post invs-builder post))))
     (let*
@@ -21,34 +33,3 @@
                    main-currency
                    account-names
                    inv))))
-
-;; Return a new ledger filtered by `predicates`, which is an alist with the following keys:
-;; `account-name` a predicate that takes an account name
-;; `date` a predicate that takes a posting date
-;;
-;; The result is the intersection of all predicates.
-;;
-;; (define (inventories-filter predicates ldg)
-;;   (let* ((filtered-account-name? (combined-predicate 'account-name predicates))
-;;                                         ; (filtered-date? (combined-predicate 'date predicates))
-;;                                         ; (filtered-posting? (lambda (pst) (filtered-date? (posting-date pst))))
-
-;;          (filtered-account-names
-;;           (filter filtered-account-name?
-;;                   (inventories-account-names ldg)))
-
-;;          (filtered-accounts
-;;           (transduce filtered-account-names
-;;                      (mapping (lambda (name)
-;;                                 (let* ((acc (hash-get (inventories-accounts ldg) name))
-;;                                         ; (filtered-acc (postings->account (filter filtered-posting? (account-postings acc))))
-;;                                         ; (not-filtered-acc (postings->account (account-postings acc))))
-;;                                         ; TODO fix this
-;;                                        (empty-todo '()))
-;;                                   (cons name empty-todo))))
-;;                      (into-hashmap))))
-;;     (ledger
-;;      (inventories-currencies ldg)
-;;      (inventories-main-currency ldg)
-;;      filtered-account-names
-;;      filtered-accounts)))

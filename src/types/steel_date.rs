@@ -10,6 +10,12 @@ use time::Date;
 pub struct SteelDate(Date);
 
 impl SteelDate {
+    fn today() -> steel::rvals::Result<Self> {
+        time::OffsetDateTime::now_local()
+            .map(|t| t.date().into())
+            .map_err(|e| SteelErr::new(steel::rerrs::ErrorKind::ConversionError, e.to_string()))
+    }
+
     fn new(y: i32, m: i32, d: i32) -> steel::rvals::Result<Self> {
         u8::try_from(m)
             .ok()
@@ -128,6 +134,7 @@ impl Deref for SteelDate {
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<SteelDate>("date?");
+    steel_engine.register_fn("today", SteelDate::today);
     steel_engine.register_fn("date", SteelDate::new);
     steel_engine.register_fn("date-bot", SteelDate::bot);
     steel_engine.register_fn("date-eot", SteelDate::eot);
