@@ -144,6 +144,11 @@ impl Custom for Cumulator {
 }
 
 impl Cumulator {
+    pub(crate) fn reduce(mut self, posting: SteelVal) -> Self {
+        self.post(posting);
+        self
+    }
+
     pub(crate) fn post(&mut self, posting: SteelVal) {
         if let SteelVal::Custom(posting) = posting {
             if let Some(posting) = as_underlying_type::<Posting>(posting.read().as_ref()) {
@@ -235,6 +240,7 @@ const DEFAULT_CURRENCY: &str = "USD"; // ugh
 pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_type::<Cumulator>("cumulator?");
     steel_engine.register_fn("cumulator", Cumulator::default);
+    steel_engine.register_fn("cumulator-reduce", Cumulator::reduce);
     steel_engine.register_fn("cumulator-post", Cumulator::post);
     steel_engine.register_fn("cumulator-account-names", Cumulator::account_names);
     steel_engine.register_fn("cumulator-currencies", Cumulator::currencies);

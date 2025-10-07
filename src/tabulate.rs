@@ -8,7 +8,7 @@ use steel::{
 };
 use tabulator::{Align, Cell, Gap};
 
-use crate::types::SteelDecimal;
+use crate::types::{Amount, SteelDecimal};
 
 fn custom_to_cell<'a>(value: &GcMut<Box<dyn CustomType>>) -> Result<Cell<'a>, SteelErr> {
     use Align::Left;
@@ -17,6 +17,8 @@ fn custom_to_cell<'a>(value: &GcMut<Box<dyn CustomType>>) -> Result<Cell<'a>, St
 
     if let Some(value) = as_underlying_type::<SteelDecimal>(value.as_ref()) {
         Ok(Into::<Decimal>::into(*value).into())
+    } else if let Some(value) = as_underlying_type::<Amount>(value.as_ref()) {
+        Ok(value.clone().into())
     } else {
         value.display().map(|s| (s, Left).into()).map_err(|e| {
             SteelErr::new(

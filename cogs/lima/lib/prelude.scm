@@ -10,8 +10,8 @@
 (require "lima/lib/fiscal-year.scm")
 (provide fy make-fy?)
 
-(require "lima/lib/inventory.scm")
-(provide collect-postings cumulate-postings)
+(require "lima/lib/reducers.scm")
+(provide reduce-postings cumulate-postings tabulate-postings)
 
 (require "lima/lib/balances.scm")
 (provide display-balance-sheet)
