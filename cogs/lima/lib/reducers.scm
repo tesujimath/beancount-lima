@@ -1,16 +1,17 @@
 (provide reduce-postings cumulate-postings tabulate-postings)
 
+(require (only-in "lima/lib/list.scm" all))
+
 ;; reducer is a function of three args: acc post txn
 (define (reduce-postings directives reducer init
                           #:filters [filters (hash)])
-  (let* ((date-filter (hash-try-get filters 'date))
-         (account-filter (hash-try-get filters 'account))
-         (directive-filter (if date-filter
-                               (lambda (d) (date-filter (directive-date d)))
-                               (lambda (d) #t)))
-         (posting-filter (if account-filter
-                             (lambda (p) (account-filter (posting-account p)))
-                             (lambda (p) #t))))
+  (let* ((apply-filters (lambda (key-filter-alist)
+                          (lambda (x) (all (lambda (key-selector) (let ((filt (hash-try-get filters (car key-selector))))
+                                                          (if filt (filt ((cdr key-selector) x)) #t))) key-filter-alist))))
+         (directive-filter (apply-filters `((date . ,directive-date))))
+         (posting-filter (apply-filters `((amount . ,posting-amount)
+                                          (account . ,posting-account))))
+         )
     (transduce directives
                (filtering transaction?)
                (filtering directive-filter)

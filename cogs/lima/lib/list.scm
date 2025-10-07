@@ -2,11 +2,11 @@
 
 (define (flatmap proc seq)
   (letrec ((accumulate
-             (lambda (op initial sequence)
-               (if (null? sequence)
-                 initial
-                 (op (car sequence)
-                   (accumulate op initial (cdr sequence)))))))
+            (lambda (op initial sequence)
+              (if (null? sequence)
+                  initial
+                  (op (car sequence)
+                      (accumulate op initial (cdr sequence)))))))
     (accumulate append '() (map proc seq))))
 
 ;; example
@@ -16,10 +16,10 @@
 ;; return the smallest index of `x` in `lst`, or fail if not found
 (define (list-index lst x)
   (letrec ((list-index-acc
-             (lambda (lst x n)
-               (cond [(empty? lst) (error! x "not found in" lst)]
-                 [(equal? (car lst) x) n]
-                 [else (list-index-acc (cdr lst) x (+ n 1))]))))
+            (lambda (lst x n)
+              (cond [(empty? lst) (error! x "not found in" lst)]
+                    [(equal? (car lst) x) n]
+                    [else (list-index-acc (cdr lst) x (+ n 1))]))))
     (list-index-acc lst x 0)))
 
 (define (all predicate lst)
@@ -30,23 +30,23 @@
 
 (define (find predicate lst)
   (cond
-    [(empty? lst) #f]
-    [(predicate (car lst)) (car lst)]
-    [else (find predicate (cdr lst))]))
+   [(empty? lst) #f]
+   [(predicate (car lst)) (car lst)]
+   [else (find predicate (cdr lst))]))
 
 (define (find-and-map-or-default predicate lst f default)
   (let ((found (find predicate lst)))
     (if found
-      (f found)
-      default)))
+        (f found)
+        default)))
 
 ;; partition a list by predicate returning a pair
 ;; whose car is the list of elements for which the predicate is true
 (define (partition predicate lst)
   (let ((partitioned
-          (foldl (lambda (item acc) (if (predicate item)
-                                     (cons (cons item (car acc)) (cdr acc))
-                                     (cons (car acc) (cons item (cdr acc)))))
-            '(() . ())
-            lst)))
+         (foldl (lambda (item acc) (if (predicate item)
+                                       (cons (cons item (car acc)) (cdr acc))
+                                       (cons (car acc) (cons item (cdr acc)))))
+                '(() . ())
+                lst)))
     (cons (reverse (car partitioned)) (reverse (cdr partitioned)))))
