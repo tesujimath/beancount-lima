@@ -8,14 +8,14 @@
        currencies))
 
 ;; collate means build a list of rows with columns ready for tabulation
-(define (collate-balance-sheet ldg)
-  (let ((all-currencies (inventories-currencies ldg)))
+(define (collate-balance-sheet cum)
+  (let ((all-currencies (cumulator-currencies cum)))
     (cons
      (cons "" all-currencies)
-     (transduce (inventories-account-names ldg)
+     (transduce (cumulator-account-names cum)
                 (compose
                  (mapping (lambda (account-name)
-                            (let* ((inv (hash-get (inventories-accounts ldg) account-name)))
+                            (let* ((inv (cumulator-account cum account-name)))
                               (cons account-name inv))))
                  (mapping (lambda (pair)
                             (let* ((account-name (car pair))
@@ -23,5 +23,5 @@
                               (cons account-name (inventory-units-for-currencies inv all-currencies))))))
                 (into-list)))))
 
-(define (display-balance-sheet ldg)
-  (display (tabulate (collate-balance-sheet ldg))))
+(define (display-balance-sheet cum)
+  (display (tabulate (collate-balance-sheet cum))))

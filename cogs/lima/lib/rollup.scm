@@ -20,15 +20,14 @@
 
 ;; collate means build a list of rows with columns ready for tabulation
 (define (collate-rollup
-         ldg
+         cum
          #:cur
-         [cur (inventories-main-currency ldg)])
-  (let* ((account-names (inventories-account-names ldg))
-         (accounts (inventories-accounts ldg))
+         [cur (cumulator-main-currency cum)])
+  (let* ((account-names (cumulator-account-names cum))
          (depth-rollup (foldl (lambda (accname0 depth-rollup)
                                 (let* ((depth (first depth-rollup))
                                        (rollup0 (second depth-rollup))
-                                       (inv0 (inventory-units (hash-get accounts accname0)))
+                                       (inv0 (inventory-units (cumulator-account cum accname0)))
                                        (subacns (split-many accname0 ":"))
                                        (parent-accnames0 (foldl (lambda (sub accs)
                                                                   (let* ((last-parent (car accs))
@@ -65,7 +64,7 @@
                                                        (rollup-bal-merged (hash-get rollup accname0))
                                                        (rollup-bal (first rollup-bal-merged))
                                                        (rollup-merged (second rollup-bal-merged))
-                                                       (bal (let ((inv (hash-try-get accounts accname0)))
+                                                       (bal (let ((inv (cumulator-account cum accname0)))
                                                               (if inv (or (hash-try-get (inventory-units inv) cur) (decimal-zero))
                                                                   (decimal-zero)))))
                                                   (rollup-row accname0
@@ -77,5 +76,5 @@
                                      (into-list))))
     rollup-combined))
 
-(define (display-rollup ldg)
-  (display (tabulate (collate-rollup ldg))))
+(define (display-rollup cum)
+  (display (tabulate (collate-rollup cum))))

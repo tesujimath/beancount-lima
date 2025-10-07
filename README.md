@@ -20,7 +20,7 @@ aya> lima
    ___/ / /_/  __/  __/ /            :? for help
   /____/\__/\___/\___/_/
 
-λ > (display-balance-sheet *inventories* *options*)
+λ > (display-balance-sheet (cumulate-postings *directives*))
                                            GBP     NZD
 Assets:Bank:Current                              -100.78
 Assets:Bank:UK                            -5.00
@@ -31,7 +31,7 @@ Expenses:Groceries                         5.00    27.50
 Income:Unknown                                     -4.72
 
 
-λ > (display-rollup *inventories*)
+λ > (display-rollup (cumulate-postings *directives*))
 Assets                                    -100.78
 Assets:Bank                                        -100.78
 Assets:Bank:Current                                         -100.78

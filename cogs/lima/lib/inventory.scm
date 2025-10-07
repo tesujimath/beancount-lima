@@ -1,14 +1,12 @@
-(provide directives->inventories)
+(provide collect-postings cumulate-postings)
 
 (require "lima/lib/types.scm")
 (require "lima/lib/account.scm")
 (require "steel/sorting/merge-sort.scm")
 
-(define (directives->inventories directives
-                                 #:filters
-                                 [filters (hash)])
-  (let* ((invs-builder (inventories-builder))
-         (date-filter (hash-try-get filters 'date))
+(define (collect-postings directives collector
+                          #:filters [filters (hash)])
+  (let* ((date-filter (hash-try-get filters 'date))
          (account-filter (hash-try-get filters 'account))
          (directive-filter (if date-filter
                                (lambda (d) (date-filter (directive-date d)))
@@ -22,14 +20,11 @@
                (mapping transaction-postings)
                (flattening)
                (filtering posting-filter)
-               (into-for-each (lambda (post)
-                                (inventories-builder-post invs-builder post))))
-    (let*
-        ((currencies (inventories-builder-currencies invs-builder))
-         (main-currency (inventories-builder-main-currency invs-builder))
-         (inv (inventories-builder-build invs-builder))
-         (account-names (merge-sort (hash-keys->list inv) #:comparator string<?)))
-      (inventories currencies
-                   main-currency
-                   account-names
-                   inv))))
+               (into-for-each collector))))
+
+(define (cumulate-postings directives
+                           #:filters
+                           [filters (hash)])
+  (let ((cum (cumulator)))
+    (collect-postings directives (curry cumulator-post cum) #:filters filters)
+    cum))

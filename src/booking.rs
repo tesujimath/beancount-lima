@@ -1,7 +1,10 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima as parser;
-use std::ops::Deref;
+use std::{
+    mem::{replace, take},
+    ops::Deref,
+};
 use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 
 use crate::types::*;
@@ -10,6 +13,7 @@ use crate::types::*;
 /// 1. If there is a simple position without cost, it occurs first in the list
 /// 2. All other positions are unique w.r.t cost.(currency, date, label)
 /// 3. Sort order of these is by date then currency then label.
+/// 4. All positions are non-empty.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct PositionsBuilder(Vec<Position>);
 
@@ -37,19 +41,32 @@ impl PositionsBuilder {
                 self.0.push(position);
             }
         }
+
+        self.remove_empty_positions();
     }
 
-    // return non-zero positions only
-    pub(crate) fn into_positions(self) -> impl Iterator<Item = Position> {
-        self.0
-            .into_iter()
-            .filter(|p| !p.units.number.is_zero() || p.cost.is_some())
+    fn remove_empty_positions(&mut self) {
+        // first cheaply check there are any before building a new Vec
+        let any_empty = self.0.iter().any(Position::is_empty);
+        if any_empty {
+            let non_empty = take(&mut self.0)
+                .into_iter()
+                .filter_map(|p| if p.is_empty() { None } else { Some(p) })
+                .collect::<Vec<_>>();
+            self.0 = non_empty;
+        }
     }
 }
 
 impl From<Position> for PositionsBuilder {
     fn from(value: Position) -> Self {
         Self(vec![value])
+    }
+}
+
+impl From<PositionsBuilder> for Vec<Position> {
+    fn from(value: PositionsBuilder) -> Self {
+        value.0
     }
 }
 

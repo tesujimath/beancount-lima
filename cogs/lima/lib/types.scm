@@ -1,10 +1,4 @@
 (provide
- inventories
- inventories?
- inventories-currencies
- inventories-main-currency
- inventories-account-names
- inventories-accounts
  period
  period?
  period-within?
@@ -28,5 +22,3 @@
                                                              (date<=? d d0))))
 ;; return a predicate for since d0
 (define (make-period-since? d0) (lambda (d)  (date>=? d d0)))
-
-(struct inventories (currencies main-currency account-names accounts) #:transparent)

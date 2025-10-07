@@ -6,7 +6,7 @@ use steel::{
     gc::{MutContainer, Shared, SharedMut},
     rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelVal,
+    SteelErr, SteelVal,
 };
 use steel_derive::Steel;
 
@@ -27,19 +27,32 @@ impl InventoryBuilder {
     // TODO this should include CostSpec and the booking method
     fn book(&mut self, position: Position) {
         // TODO cost
-        let mut positions = self.0.write();
-        match positions.get_mut(position.units.currency.as_str()) {
-            Some(positions) => positions.book(position, Booking::Strict), // TODO booking method
-            None => {
-                positions.insert(position.units.currency.to_string(), position.into());
+        let mut positions_by_currency = self.0.write();
+        let empty = match positions_by_currency.get_mut(position.units.currency.as_str()) {
+            Some(positions) => {
+                // TODO booking method
+                positions.book(position, Booking::Strict);
+                positions.is_empty()
             }
+            None => {
+                positions_by_currency.insert(position.units.currency.to_string(), position.into());
+                false
+            }
+        };
+
+        if empty {
+            positions_by_currency.retain(|_cur, positions| !positions.is_empty());
         }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.read().is_empty()
     }
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Inventory {
-    positions: Shared<Vec<Position>>, // of Position
+    positions: Shared<Vec<Position>>,
 }
 
 impl Inventory {
@@ -67,7 +80,8 @@ impl Inventory {
     }
 }
 
-impl From<&InventoryBuilder> for Option<Inventory> {
+// precondition: not empty, otherwise will panic
+impl From<&InventoryBuilder> for Inventory {
     fn from(value: &InventoryBuilder) -> Self {
         // return positions sorted by currency
         let InventoryBuilder(positions_by_currency) = value;
@@ -82,19 +96,16 @@ impl From<&InventoryBuilder> for Option<Inventory> {
         let positions = currencies
             .into_iter()
             .flat_map(|currency| {
-                positions_by_currency
-                    .remove(&currency)
-                    .unwrap()
-                    .into_positions()
+                Into::<Vec<Position>>::into(positions_by_currency.remove(&currency).unwrap())
             })
             .collect::<Vec<_>>();
 
         if positions.is_empty() {
-            None
+            panic!("can't build inventory from empty builder")
         } else {
-            Some(Inventory {
+            Inventory {
                 positions: positions.into(),
-            })
+            }
         }
     }
 }
@@ -120,18 +131,19 @@ impl Custom for Inventory {
 }
 
 #[derive(Clone, Default, Debug)]
-pub(crate) struct InventoriesBuilder {
+/// An Accumulator is a collector for postings for building inventory
+pub(crate) struct Cumulator {
     accounts: SharedMut<HashMap<String, InventoryBuilder>>, // indexed by account name
     currency_usage: SharedMut<HashMap<String, i32>>,
 }
 
-impl Custom for InventoriesBuilder {
+impl Custom for Cumulator {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(format!("{:?}", &self)))
     }
 }
 
-impl InventoriesBuilder {
+impl Cumulator {
     pub(crate) fn post(&mut self, posting: SteelVal) {
         if let SteelVal::Custom(posting) = posting {
             if let Some(posting) = as_underlying_type::<Posting>(posting.read().as_ref()) {
@@ -145,7 +157,7 @@ impl InventoriesBuilder {
 
                 let mut accounts = self.accounts.write();
                 match accounts.get_mut(account_name) {
-                    Some(account) => account.book(position),
+                    Some(invb) => invb.book(position),
                     None => {
                         accounts.insert(
                             account_name.to_string(),
@@ -191,33 +203,43 @@ impl InventoriesBuilder {
             .unwrap_or(DEFAULT_CURRENCY.to_string())
     }
 
-    // build inventories, filtering out empty ones
-    fn build(self) -> HashMap<String, Inventory> {
-        let Self { accounts, .. } = self;
-
-        accounts
+    // return sorted account names for non-empty accounts
+    fn account_names(&self) -> Vec<String> {
+        let mut account_names = self
+            .accounts
             .read()
             .iter()
-            .filter_map(|(k, v)| Into::<Option<Inventory>>::into(v).map(|v| (k.clone(), v)))
-            .collect::<HashMap<String, Inventory>>()
+            .filter_map(|(name, invb)| {
+                if invb.is_empty() {
+                    None
+                } else {
+                    Some(name.clone())
+                }
+            })
+            .collect::<Vec<_>>();
+
+        account_names.sort();
+        account_names
+    }
+
+    fn account(&self, name: String) -> Option<Inventory> {
+        self.accounts
+            .read()
+            .get(&name)
+            .and_then(|invb| (!invb.is_empty()).then(|| invb.into()))
     }
 }
 
 const DEFAULT_CURRENCY: &str = "USD"; // ugh
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
-    steel_engine.register_type::<InventoriesBuilder>("inventories-builder?");
-    steel_engine.register_fn("inventories-builder", InventoriesBuilder::default);
-    steel_engine.register_fn("inventories-builder-post", InventoriesBuilder::post);
-    steel_engine.register_fn(
-        "inventories-builder-currencies",
-        InventoriesBuilder::currencies,
-    );
-    steel_engine.register_fn(
-        "inventories-builder-main-currency",
-        InventoriesBuilder::main_currency,
-    );
-    steel_engine.register_fn("inventories-builder-build", InventoriesBuilder::build);
+    steel_engine.register_type::<Cumulator>("cumulator?");
+    steel_engine.register_fn("cumulator", Cumulator::default);
+    steel_engine.register_fn("cumulator-post", Cumulator::post);
+    steel_engine.register_fn("cumulator-account-names", Cumulator::account_names);
+    steel_engine.register_fn("cumulator-currencies", Cumulator::currencies);
+    steel_engine.register_fn("cumulator-main-currency", Cumulator::main_currency);
+    steel_engine.register_fn("cumulator-account", Cumulator::account);
 
     steel_engine.register_type::<Inventory>("inventory?");
     steel_engine.register_fn("inventory-positions", Inventory::positions);

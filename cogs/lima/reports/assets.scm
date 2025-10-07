@@ -2,7 +2,7 @@
 
 (let* ((rollup (hash-try-get *args* 'rollup))
        (assets-account-name (hash-get *options* 'name_assets))
-       (assets (inventories-filter `((account-name . ,(lambda (s) (starts-with? s assets-account-name)))) *inventories*)))
+       (cum (cumulate-postings *directives* #:filters (hash 'account (lambda (acc) (starts-with? acc assets-account-name))))))
   (if rollup
-      (display-rollup assets)
-      (display-balance-sheet assets)))
+      (display-rollup cum)
+      (display-balance-sheet cum)))

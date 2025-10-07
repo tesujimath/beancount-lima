@@ -86,6 +86,10 @@ impl Amount {
     fn currency(&self) -> String {
         self.currency.clone()
     }
+
+    fn is_zero(&self) -> bool {
+        self.number.is_zero()
+    }
 }
 
 impl Display for Amount {
@@ -175,16 +179,20 @@ pub(crate) struct Position {
 }
 
 impl Position {
-    fn new(units: Amount, cost: Option<Cost>) -> Self {
+    pub(crate) fn new(units: Amount, cost: Option<Cost>) -> Self {
         Self { units, cost }
     }
 
-    fn units(&self) -> Amount {
+    pub(crate) fn units(&self) -> Amount {
         self.units.clone()
     }
 
-    fn cost(&self) -> Option<Cost> {
+    pub(crate) fn cost(&self) -> Option<Cost> {
         self.cost.clone()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.units.is_zero() && self.cost.is_none()
     }
 }
 
