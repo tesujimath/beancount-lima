@@ -21,6 +21,10 @@ impl SteelDecimal {
         (self.0 + other.0).into()
     }
 
+    fn abs(&self) -> SteelDecimal {
+        self.0.abs().into()
+    }
+
     fn numerator(&self) -> isize {
         self.0.mantissa() as isize
     }
@@ -153,6 +157,7 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("decimal-zero", SteelDecimal::zero);
     steel_engine.register_fn("decimal-zero?", SteelDecimal::is_zero);
     steel_engine.register_fn("decimal-add", SteelDecimal::add);
+    steel_engine.register_fn("decimal-abs", SteelDecimal::abs);
     steel_engine.register_fn("decimal->string", SteelDecimal::to_string);
     steel_engine.register_fn("decimal-numerator", SteelDecimal::numerator);
     steel_engine.register_fn("decimal-denominator", SteelDecimal::denominator);

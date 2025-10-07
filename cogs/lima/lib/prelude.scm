@@ -18,3 +18,15 @@
 
 (require "lima/lib/rollup.scm")
 (provide display-rollup)
+
+(require "lima/lib/filters.scm")
+(provide
+ f/date<
+ f/date<=
+ f/date>
+ f/date>=
+ f/date=
+ f/date-recent
+ f/amount-exceeds
+ f/acc
+ f/subacc)

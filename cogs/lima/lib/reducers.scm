@@ -2,9 +2,12 @@
 
 (require (only-in "lima/lib/list.scm" all))
 
+;; select items which pass all filters, not public, since this is the default behaviour
+(define (f/and filters)
+  (lambda (x) (all (lambda (f) (f x)) filters)))
+
 ;; reducer is a function of three args: acc post txn
-(define (reduce-postings directives reducer init
-                          #:filters [filters (hash)])
+(define (reduce-postings directives filters reducer init)
   (let* ((apply-filters (lambda (key-filter-alist)
                           (lambda (x) (all (lambda (key-selector) (let ((filt (hash-try-get filters (car key-selector))))
                                                           (if filt (filt ((cdr key-selector) x)) #t))) key-filter-alist))))
@@ -14,23 +17,19 @@
          )
     (transduce directives
                (filtering transaction?)
-               (filtering directive-filter)
+               (filtering (f/and filters))
                ;; combine each posting with its transaction:
                (mapping (lambda (txn) (transduce (transaction-postings txn)
                                                (mapping (lambda (p) (cons p txn)))
                                                (into-list))))
                (flattening)
-               (filtering (lambda (px) (posting-filter (car px))))
-               (into-reducer (lambda (acc px) (reducer acc (car px) (cdr px)))
+               (filtering (lambda (p-txn) ((f/and filters) (car p-txn))))
+               (into-reducer (lambda (acc p-txn) (reducer acc (car p-txn) (cdr p-txn)))
                              init))))
 
-(define (cumulate-postings directives
-                           #:filters
-                           [filters (hash)])
-  (reduce-postings directives (lambda (acc p txn) (cumulator-reduce acc p)) (cumulator) #:filters filters))
+(define (cumulate-postings directives . filters)
+  (reduce-postings directives filters (lambda (acc p txn) (cumulator-reduce acc p)) (cumulator)))
 
-(define (tabulate-postings directives
-                           #:filters
-                           [filters (hash)])
-  (let ((postings-with-dates (reverse (reduce-postings directives (lambda (acc p txn) (cons (list (directive-date txn) (posting-account p) (posting-amount p)) acc)) (list) #:filters filters))))
+(define (tabulate-postings directives . filters)
+  (let ((postings-with-dates (reverse (reduce-postings directives filters (lambda (acc p txn) (cons (list (directive-date txn) (posting-account p) (posting-amount p)) acc)) (list)))))
     (tabulate postings-with-dates)))
