@@ -29,4 +29,5 @@
  f/date-recent
  f/amount-exceeds
  f/acc
- f/subacc)
+ f/subacc
+ f/or)
