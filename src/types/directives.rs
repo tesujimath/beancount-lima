@@ -52,20 +52,35 @@ impl Directive {
         matches!(self.variant, DirectiveVariant::Transaction(_))
     }
 
-    fn transaction_postings(&self) -> steel::rvals::Result<Vec<Posting>> {
+    fn as_transaction(&self) -> steel::rvals::Result<&Transaction> {
         if let DirectiveVariant::Transaction(x) = &self.variant {
-            Ok((*x.postings).clone())
+            Ok(x)
         } else {
             Err(SteelErr::new(
                 steel::rerrs::ErrorKind::TypeMismatch,
                 format!(
-                    "can't call transaction_postings on {}",
+                    "directive is a {} not a transaction",
                     self.element.element_type()
                 ),
             ))
         }
     }
-    // TODO other accessors
+
+    fn transaction_postings(&self) -> steel::rvals::Result<Vec<Posting>> {
+        Ok((*self.as_transaction()?.postings).clone())
+    }
+
+    fn transaction_flag(&self) -> steel::rvals::Result<String> {
+        Ok(self.as_transaction()?.flag.clone())
+    }
+
+    fn transaction_payee(&self) -> steel::rvals::Result<Option<String>> {
+        Ok(self.as_transaction()?.payee.clone())
+    }
+
+    fn transaction_narration(&self) -> steel::rvals::Result<Option<String>> {
+        Ok(self.as_transaction()?.narration.clone())
+    }
 
     fn is_price(&self) -> bool {
         matches!(self.variant, DirectiveVariant::Price(_))
@@ -173,4 +188,7 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("query?", Directive::is_query);
 
     steel_engine.register_fn("transaction-postings", Directive::transaction_postings);
+    steel_engine.register_fn("transaction-flag", Directive::transaction_flag);
+    steel_engine.register_fn("transaction-payee", Directive::transaction_payee);
+    steel_engine.register_fn("transaction-narration", Directive::transaction_narration);
 }
