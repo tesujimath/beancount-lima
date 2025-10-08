@@ -1,10 +1,7 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
 use beancount_parser_lima as parser;
-use std::{
-    mem::{replace, take},
-    ops::Deref,
-};
+use std::{mem::take, ops::Deref};
 use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 
 use crate::types::*;
@@ -64,9 +61,9 @@ impl From<Position> for PositionsBuilder {
     }
 }
 
-impl From<PositionsBuilder> for Vec<Position> {
-    fn from(value: PositionsBuilder) -> Self {
-        value.0
+impl From<&PositionsBuilder> for Vec<Position> {
+    fn from(value: &PositionsBuilder) -> Self {
+        value.0.clone()
     }
 }
 

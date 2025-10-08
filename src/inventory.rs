@@ -6,7 +6,7 @@ use steel::{
     gc::{MutContainer, Shared, SharedMut},
     rvals::{as_underlying_type, Custom, CustomType},
     steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelErr, SteelVal,
+    SteelVal,
 };
 use steel_derive::Steel;
 
@@ -85,7 +85,7 @@ impl From<&InventoryBuilder> for Inventory {
     fn from(value: &InventoryBuilder) -> Self {
         // return positions sorted by currency
         let InventoryBuilder(positions_by_currency) = value;
-        let mut positions_by_currency = positions_by_currency.write();
+        let positions_by_currency = positions_by_currency.read();
         // sorted by currency for determinism
         let mut currencies = positions_by_currency
             .keys()
@@ -96,7 +96,7 @@ impl From<&InventoryBuilder> for Inventory {
         let positions = currencies
             .into_iter()
             .flat_map(|currency| {
-                Into::<Vec<Position>>::into(positions_by_currency.remove(&currency).unwrap())
+                Into::<Vec<Position>>::into(positions_by_currency.get(&currency).unwrap())
             })
             .collect::<Vec<_>>();
 
