@@ -21,5 +21,7 @@
                               (cons account-name (inventory-units-for-currencies inv all-currencies))))))
                 (into-list)))))
 
-(define (display-balance-sheet cum)
+(define/contract
+  (display-balance-sheet cum)
+  (->/c cumulator? void?)
   (display (tabulate (collate-balance-sheet cum))))

@@ -78,5 +78,7 @@
                                      (into-list))))
     rollup-combined))
 
-(define (display-rollup cum)
+(define/contract
+  (display-rollup cum)
+  (->/c cumulator? void?)
   (display (tabulate (collate-rollup cum))))
