@@ -1,7 +1,6 @@
 (provide format-transaction format-balance format-include)
 
 (require "srfi/srfi-28/format.scm")
-(require "lima/lib/types.scm")
 (require "lima/lib/string.scm")
 (require "lima/lib/import/account-inference.scm")
 

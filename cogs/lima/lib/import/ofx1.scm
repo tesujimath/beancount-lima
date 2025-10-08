@@ -1,7 +1,6 @@
 (provide make-extract-txn extract-balance)
 
 (require "srfi/srfi-28/format.scm")
-(require "lima/lib/types.scm")
 (require "lima/lib/stdlib.scm")
 (require "lima/lib/import/extract.scm")
 

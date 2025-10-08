@@ -1,7 +1,5 @@
 (provide display-balance-sheet)
 
-(require "lima/lib/types.scm")
-
 (define (inventory-units-for-currencies inv currencies)
   (map (lambda (cur)
          (or (hash-try-get (inventory-units inv) cur) ""))

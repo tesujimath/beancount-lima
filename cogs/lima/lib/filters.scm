@@ -8,6 +8,7 @@
  f/amount-exceeds
  f/acc
  f/subacc
+ f/and
  f/or)
 
 (require "srfi/srfi-28/format.scm")
@@ -61,6 +62,9 @@
   (f/subacc name)
   (->/c string? function?)
   (account-filter (lambda (acc) (or (equal? acc name) (starts-with? acc (format "~a:" name))))))
+
+(define (f/and . filters)
+  (lambda (x) (all (lambda (f) (f x)) filters)))
 
 (define (f/or . filters)
   (lambda (x) (any (lambda (f) (f x)) filters)))

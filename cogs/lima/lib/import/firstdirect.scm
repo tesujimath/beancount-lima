@@ -1,6 +1,5 @@
 (provide extractors)
 
-(require "lima/lib/types.scm")
 (require "lima/lib/list.scm")
 (require "lima/lib/stdlib.scm")
 (require "lima/lib/import/extract.scm")
