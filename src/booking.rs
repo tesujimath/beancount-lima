@@ -98,3 +98,19 @@ impl From<parser::Booking> for Booking {
         }
     }
 }
+
+impl From<Booking> for parser::Booking {
+    fn from(value: Booking) -> Self {
+        use Booking::*;
+
+        match value {
+            Strict => parser::Booking::Strict,
+            StrictWithSize => parser::Booking::StrictWithSize,
+            None => parser::Booking::None,
+            Average => parser::Booking::Average,
+            Fifo => parser::Booking::Fifo,
+            Lifo => parser::Booking::Lifo,
+            Hifo => parser::Booking::Hifo,
+        }
+    }
+}

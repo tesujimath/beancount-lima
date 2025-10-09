@@ -463,7 +463,16 @@ impl LedgerBuilder {
         }
     }
 
-    fn price(&mut self, price: &parser::Price, date: Date, element: WrappedSpannedElement) {}
+    fn price(&mut self, price: &parser::Price, date: Date, element: WrappedSpannedElement) {
+        self.directives.push(Directive {
+            date,
+            element,
+            variant: DirectiveVariant::Price(Price {
+                currency: price.currency().item().to_string(),
+                amount: price.amount().item().into(),
+            }),
+        })
+    }
 
     // base account is known
     fn rollup_inventory(&self, base_account_name: &str) -> hashbrown::HashMap<String, Decimal> {
@@ -750,6 +759,22 @@ impl LedgerBuilder {
                 }
             }
         }
+
+        let mut currencies = open
+            .currencies()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        currencies.sort();
+
+        self.directives.push(Directive {
+            date,
+            element,
+            variant: DirectiveVariant::Open(Open {
+                account: open.account().item().to_string(),
+                currencies,
+                booking: open.booking().map(|booking| (*booking.item()).into()),
+            }),
+        })
     }
 
     fn close(&mut self, close: &parser::Close, date: Date, element: WrappedSpannedElement) {
@@ -777,6 +802,14 @@ impl LedgerBuilder {
                 self.errors.push(element.error("account not open"));
             }
         }
+
+        self.directives.push(Directive {
+            date,
+            element,
+            variant: DirectiveVariant::Close(Close {
+                account: close.account().item().to_string(),
+            }),
+        })
     }
 
     fn commodity(
@@ -785,6 +818,13 @@ impl LedgerBuilder {
         date: Date,
         element: WrappedSpannedElement,
     ) {
+        self.directives.push(Directive {
+            date,
+            element,
+            variant: DirectiveVariant::Commodity(Commodity {
+                currency: commodity.currency().item().to_string(),
+            }),
+        })
     }
 
     fn pad(&mut self, pad: &parser::Pad, date: Date, element: WrappedSpannedElement) {
@@ -805,7 +845,10 @@ impl LedgerBuilder {
             self.directives.push(Directive {
                 date,
                 element: element.clone(),
-                variant: DirectiveVariant::Pad(Pad { source }),
+                variant: DirectiveVariant::Pad(Pad {
+                    account: account_name,
+                    source,
+                }),
             });
 
             // also need a transaction to be back-filled later with whatever got padded
@@ -830,13 +873,48 @@ impl LedgerBuilder {
         date: Date,
         element: WrappedSpannedElement,
     ) {
+        self.directives.push(Directive {
+            date,
+            element: element.clone(),
+            variant: DirectiveVariant::Document(Document {
+                account: document.account().item().to_string(),
+                path: document.path().item().to_string(),
+            }),
+        });
     }
 
-    fn note(&mut self, note: &parser::Note, date: Date, element: WrappedSpannedElement) {}
+    fn note(&mut self, note: &parser::Note, date: Date, element: WrappedSpannedElement) {
+        self.directives.push(Directive {
+            date,
+            element: element.clone(),
+            variant: DirectiveVariant::Note(Note {
+                account: note.account().item().to_string(),
+                comment: note.comment().item().to_string(),
+            }),
+        });
+    }
 
-    fn event(&mut self, event: &parser::Event, date: Date, element: WrappedSpannedElement) {}
+    fn event(&mut self, event: &parser::Event, date: Date, element: WrappedSpannedElement) {
+        self.directives.push(Directive {
+            date,
+            element: element.clone(),
+            variant: DirectiveVariant::Event(Event {
+                event_type: event.event_type().item().to_string(),
+                description: event.description().item().to_string(),
+            }),
+        });
+    }
 
-    fn query(&mut self, query: &parser::Query, date: Date, element: WrappedSpannedElement) {}
+    fn query(&mut self, query: &parser::Query, date: Date, element: WrappedSpannedElement) {
+        self.directives.push(Directive {
+            date,
+            element: element.clone(),
+            variant: DirectiveVariant::Query(Query {
+                name: query.name().item().to_string(),
+                content: query.content().item().to_string(),
+            }),
+        });
+    }
 }
 
 #[derive(Debug)]

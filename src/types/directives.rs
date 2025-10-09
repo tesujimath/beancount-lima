@@ -12,7 +12,7 @@ use steel::{
 use steel_derive::Steel;
 use time::Date;
 
-use crate::types::{common::*, element::*, steel_date::SteelDate};
+use crate::{booking::Booking, types::*};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Directive {
@@ -123,7 +123,10 @@ pub(crate) struct Transaction {
 }
 
 #[derive(Clone, Steel, Debug)]
-pub(crate) struct Price {}
+pub(crate) struct Price {
+    pub(crate) currency: String,
+    pub(crate) amount: Amount,
+}
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Balance {
@@ -134,42 +137,49 @@ pub(crate) struct Balance {
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Open {
-    // TODO
+    pub(crate) account: String,
+    pub(crate) currencies: Vec<String>,
+    pub(crate) booking: Option<Booking>,
 }
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Close {
-    // TODO
+    pub(crate) account: String,
 }
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Commodity {
-    // TODO
+    pub(crate) currency: String,
 }
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Pad {
+    pub(crate) account: String,
     pub(crate) source: String,
 }
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Document {
-    // TODO
+    pub(crate) account: String,
+    pub(crate) path: String,
 }
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Note {
-    // TODO
+    pub(crate) account: String,
+    pub(crate) comment: String,
 }
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Event {
-    // TODO
+    pub(crate) event_type: String,
+    pub(crate) description: String,
 }
 
 #[derive(Clone, Steel, Debug)]
 pub(crate) struct Query {
-    // TODO
+    pub(crate) name: String,
+    pub(crate) content: String,
 }
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {
