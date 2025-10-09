@@ -89,6 +89,10 @@ impl WrappedSpannedElement {
             .into()
     }
 
+    pub(crate) fn warning<S: Into<String>>(&self, message: S) -> parser::AnnotatedWarning {
+        self.0.as_ref().warning(message).into()
+    }
+
     pub(crate) fn ffi_error(&self, message: String) -> WrappedError {
         WrappedError(self.0.as_ref().error(message).into())
     }

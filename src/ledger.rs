@@ -141,6 +141,7 @@ struct LedgerBuilder {
     parser_options: SteelHashMap,
     config: LedgerBuilderConfig,
     errors: Vec<parser::AnnotatedError>,
+    warnings: Vec<parser::AnnotatedWarning>,
 }
 
 impl LedgerBuilder {
@@ -159,6 +160,7 @@ impl LedgerBuilder {
             parser_options,
             config,
             errors: Vec::default(),
+            warnings: Vec::default(),
         }
     }
 
@@ -183,10 +185,15 @@ impl LedgerBuilder {
             currency_usage,
             parser_options,
             errors,
+            warnings,
             ..
         } = self;
 
         if errors.is_empty() {
+            if !warnings.is_empty() {
+                sources.write(error_w, warnings)?;
+            }
+
             Ok(Ledger {
                 sources: sources.into(),
                 directives: directives.into(),
@@ -757,6 +764,14 @@ impl LedgerBuilder {
                         ),
                     );
                 }
+            }
+        }
+
+        if let Some(booking) = open.booking() {
+            if *booking.item() != parser::Booking::Strict {
+                self.warnings.push(
+                    element.warning("booking methods other than strict are not yet supported"),
+                );
             }
         }
 
