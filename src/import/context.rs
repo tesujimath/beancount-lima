@@ -41,7 +41,7 @@ impl Context {
                 plugins: _,
                 warnings,
             }) => {
-                sources.write(error_w, warnings)?;
+                sources.write_errors_or_warnings(error_w, warnings)?;
                 let mut builder = ImportContextBuilder::new(
                     path.to_string_lossy().into_owned(),
                     txnid_keys,
@@ -62,8 +62,8 @@ impl Context {
             }
 
             Err(ParseError { errors, warnings }) => {
-                sources.write(error_w, errors)?;
-                sources.write(error_w, warnings)?;
+                sources.write_errors_or_warnings(error_w, errors)?;
+                sources.write_errors_or_warnings(error_w, warnings)?;
                 Err(eyre!("parse error"))
             }
         }
@@ -145,7 +145,7 @@ impl<'a> ImportContextBuilder<'a> {
                 narrations: payees_or_narrations_to_steel_hashmap(narrations),
             })
         } else {
-            sources.write(error_w, self.errors)?;
+            sources.write_errors_or_warnings(error_w, self.errors)?;
             Err(eyre!("builder error"))
         }
     }

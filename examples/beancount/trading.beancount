@@ -1,0 +1,57 @@
+; Example trading
+; https://beancount.github.io/docs/trading_with_beancount.html
+
+1970-01-01 commodity USD
+
+1970-01-01 commodity AAPL
+
+2010-03-01 open Assets:US:ETrade:Cash
+2010-03-01 open Assets:US:ETrade:IBM
+2010-03-01 open Expenses:Financial:Commissions
+2010-03-01 open Income:US:ETrade:PnL
+
+2014-02-16 * "Buying some IBM"
+  Assets:US:ETrade:IBM                                                       10 IBM {160.00 USD}
+  Assets:US:ETrade:Cash                                                -1609.95 USD
+  Expenses:Financial:Commissions                                           9.95 USD
+
+2014-02-17 * "Selling some IBM"
+  Assets:US:ETrade:IBM                                                       -3 IBM {160.00 USD} @ 170.00 USD
+  Assets:US:ETrade:Cash                                                  500.05 USD
+  Expenses:Financial:Commissions                                           9.95 USD
+  Income:US:ETrade:PnL
+
+2014-02-18 * "I put my chips on big blue!"
+  Assets:US:ETrade:IBM                                                        5 IBM {180.00 USD}
+  Assets:US:ETrade:Cash                                                 -909.95 USD
+  Expenses:Financial:Commissions                                           9.95 USD
+
+2014-03-18 * "Selling all my blue chips."
+  Assets:US:ETrade:IBM                                                      -12 IBM {} @ 172.00 USD
+  Assets:US:ETrade:Cash                                                 2054.05 USD
+  Expenses:Financial:Commissions                                           9.95 USD
+  Income:US:ETrade:PnL
+
+2014-04-16 * "Buying some more IBM"
+  Assets:US:ETrade:IBM                                                       10 IBM {173.00 USD}
+  Assets:US:ETrade:Cash                                                -1739.95 USD
+  Expenses:Financial:Commissions                                           9.95 USD
+
+2014-04-26 * "Buying IBM yet again"
+  Assets:US:ETrade:IBM                                                       10 IBM {180.00 USD}
+  Assets:US:ETrade:Cash                                                -1809.95 USD
+  Expenses:Financial:Commissions                                           9.95 USD
+
+2014-05-01 * "Selling some older blue chips."
+  Assets:US:ETrade:IBM                                                       -4 IBM {173.00 USD} @ 185.00 USD
+  Assets:US:ETrade:Cash                                                  740.00 USD
+  Expenses:Financial:Commissions                                           9.95 USD
+  Income:US:ETrade:PnL
+
+2014-05-02 * "Selling some newer blue chips."
+  Assets:US:ETrade:IBM                                                       -4 IBM {180.00 USD} @ 186.00 USD
+  Assets:US:ETrade:Cash                                                  744.00 USD
+  Expenses:Financial:Commissions                                           9.95 USD
+  Income:US:ETrade:PnL
+
+;; TODO dated lots

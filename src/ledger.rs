@@ -59,7 +59,7 @@ impl Ledger {
                 plugins: _,
                 warnings,
             }) => {
-                sources.write(error_w, warnings)?;
+                sources.write_errors_or_warnings(error_w, warnings)?;
                 let mut builder = LedgerBuilder::new(&options, config);
 
                 for directive in directives {
@@ -69,8 +69,8 @@ impl Ledger {
             }
 
             Err(ParseError { errors, warnings }) => {
-                sources.write(error_w, errors)?;
-                sources.write(error_w, warnings)?;
+                sources.write_errors_or_warnings(error_w, errors)?;
+                sources.write_errors_or_warnings(error_w, warnings)?;
                 Err(eyre! {"parse error"})
             }
         }?;
@@ -111,7 +111,7 @@ fn write_ffi_error(sources: &CustomShared<BeancountSources>, error: WrappedError
     tracing::debug!("write_ffi_error");
 
     sources
-        .write(&std::io::stderr(), vec![error.as_ref().clone()])
+        .write_errors_or_warnings(&std::io::stderr(), vec![error.as_ref().clone()])
         .unwrap();
 }
 
@@ -119,7 +119,7 @@ fn write_ffi_errors(sources: &CustomShared<BeancountSources>, errors: Vec<Wrappe
     tracing::debug!("write_ffi_errors");
 
     sources
-        .write(
+        .write_errors_or_warnings(
             &std::io::stderr(),
             errors
                 .iter()
@@ -191,7 +191,7 @@ impl LedgerBuilder {
 
         if errors.is_empty() {
             if !warnings.is_empty() {
-                sources.write(error_w, warnings)?;
+                sources.write_errors_or_warnings(error_w, warnings)?;
             }
 
             Ok(Ledger {
@@ -200,7 +200,7 @@ impl LedgerBuilder {
                 options: parser_options,
             })
         } else {
-            sources.write(error_w, errors)?;
+            sources.write_errors_or_warnings(error_w, errors)?;
             Err(eyre!("builder error"))
         }
     }
@@ -241,7 +241,9 @@ impl LedgerBuilder {
         for posting in transaction.postings() {
             use hashbrown::hash_map::Entry::*;
 
-            if let Some((amount, currency)) = get_posting_amount_for_balancing_transaction(posting)
+            if let Some((amount, currency)) =
+                // TODO move together
+                crate::balancing::get_posting_amount_for_balancing_transaction(posting)
             {
                 match residual.entry(currency) {
                     Occupied(mut residual_entry) => {
@@ -302,6 +304,7 @@ impl LedgerBuilder {
                 amount,
                 currency.to_string(),
                 posting.flag().map(|flag| flag.item().to_string()),
+                posting.cost_spec().map(|cs| cs.item().into()),
                 description,
             ) {
                 postings.push(posting);
@@ -327,6 +330,7 @@ impl LedgerBuilder {
                     -number,
                     currency.to_string(),
                     unspecified.flag().map(|flag| flag.item().to_string()),
+                    unspecified.cost_spec().map(|cs| cs.item().into()),
                     description,
                 ) {
                     postings.push(posting);
@@ -385,6 +389,7 @@ impl LedgerBuilder {
         amount: Decimal,
         currency: String,
         flag: Option<String>,
+        cost_spec: Option<CostSpec>,
         description: D,
     ) -> Option<Posting>
     where
@@ -434,7 +439,7 @@ impl LedgerBuilder {
                     })
                     .collect::<Vec<Amount>>();
 
-                let posting = Posting::new(account_name, amount.clone(), flag);
+                let posting = Posting::new(account_name, amount.clone(), flag, cost_spec);
                 account.postings.push(posting.clone());
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
@@ -613,6 +618,7 @@ impl LedgerBuilder {
                         *number,
                         cur.clone(),
                         pad_flag,
+                        None,
                         "pad",
                     ) {
                         pad_postings.push(posting);
@@ -1012,36 +1018,6 @@ impl InferredTolerance {
                 }
             })
             .collect::<hashbrown::HashMap<_, _>>()
-    }
-}
-
-/// For balancing a transaction we use the price if there is one, otherwise simply the amount.
-///
-/// I don't understand why you would have a price annotation not fully specified, so this case is ignored.
-fn get_posting_amount_for_balancing_transaction<'a, 'b>(
-    posting: &'b parser::Posting<'a>,
-) -> Option<(Decimal, &'b parser::Currency<'a>)>
-where
-    'b: 'a,
-{
-    if let Some(price) = posting.price_annotation() {
-        use parser::PriceSpec::*;
-        use parser::ScopedExprValue::*;
-
-        match price.item() {
-            BareCurrency(_price_currency) => None,
-            BareAmount(_price_amount) => None,
-            CurrencyAmount(PerUnit(price_amount), price_currency) => posting
-                .amount()
-                .map(|amount| (amount.value() * price_amount.value(), price_currency)),
-            CurrencyAmount(Total(price_amount), price_currency) => {
-                Some((price_amount.value(), price_currency))
-            }
-        }
-    } else if let (Some(amount), Some(currency)) = (posting.amount(), posting.currency()) {
-        Some((amount.value(), currency.item()))
-    } else {
-        None
     }
 }
 

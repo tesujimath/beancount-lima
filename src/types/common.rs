@@ -18,14 +18,22 @@ pub(crate) struct Posting {
     pub(crate) flag: Option<String>,
     pub(crate) account: String,
     pub(crate) amount: Amount,
+    pub(crate) cost_spec: Option<CostSpec>,
     // TODO:
-    // pub(crate) cost_spec: Option<Spanned<CostSpec<'a>>>,
-    // pub(crate) price_annotation: Option<Spanned<PriceSpec<'a>>>,
+    // If there's a price it is fully determined during balancing, i.e. before creating the Posting,
+    // so we are able to hold here a fully specified price rather than a loosely defined price spec.  Later.
+    // pub(crate) price: Option<Price>,
+    //
     // pub(crate) metadata: Metadata<'a>,
 }
 
 impl Posting {
-    pub(crate) fn new<S1, S2>(account: S1, amount: Amount, flag: Option<S2>) -> Self
+    pub(crate) fn new<S1, S2>(
+        account: S1,
+        amount: Amount,
+        flag: Option<S2>,
+        cost_spec: Option<CostSpec>,
+    ) -> Self
     where
         S1: Display,
         S2: Display,
@@ -34,6 +42,7 @@ impl Posting {
             account: account.to_string(),
             amount,
             flag: flag.map(|flag| flag.to_string()),
+            cost_spec,
         }
     }
 
@@ -136,6 +145,69 @@ where
 impl From<&parser::Amount<'_>> for Amount {
     fn from(value: &parser::Amount) -> Self {
         (value.number().value(), value.currency()).into()
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(crate) struct CostSpec {
+    per_unit: Option<Decimal>,
+    total: Option<Decimal>,
+    currency: Option<String>,
+    date: Option<Date>,
+    label: Option<String>,
+    merge: bool,
+}
+
+impl From<&parser::CostSpec<'_>> for CostSpec {
+    fn from(value: &parser::CostSpec<'_>) -> Self {
+        Self {
+            per_unit: value.per_unit().map(|expr| expr.value()),
+            total: value.total().map(|expr| expr.value()),
+            currency: value.currency().map(|cur| cur.item().to_string()),
+            date: value.date().map(|date| *date.item()),
+            label: value.label().map(|label| label.item().to_string()),
+            merge: value.merge(),
+        }
+    }
+}
+
+impl Display for CostSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut prefix = "";
+        let space = " ";
+
+        f.write_str("{")?;
+
+        if let Some(per_unit) = &self.per_unit {
+            write!(f, "{prefix}{per_unit}")?;
+            prefix = space;
+        }
+
+        if let Some(total) = &self.total {
+            write!(f, "{prefix}# {total}")?;
+            prefix = space;
+        }
+
+        if let Some(currency) = &self.currency {
+            write!(f, "{prefix}{currency}")?;
+            prefix = space;
+        }
+
+        if let Some(date) = &self.date {
+            write!(f, "{prefix}{date}")?;
+            prefix = space;
+        }
+
+        if let Some(label) = &self.label {
+            write!(f, "{prefix}\"{label}\"")?;
+            prefix = space;
+        }
+
+        if self.merge {
+            write!(f, "{prefix}*",)?;
+        }
+
+        f.write_str("}")
     }
 }
 

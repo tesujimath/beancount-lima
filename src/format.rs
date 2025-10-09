@@ -145,12 +145,13 @@ impl Display for Posting {
             if self.flag.is_some() { SPACE } else { EMPTY },
             &self.account,
             &self.amount
-        )
+        )?;
 
-        // simple_format(f, &self.cost_spec, Some(SPACE))?;
+        simple_format(f, &self.cost_spec, Some(SPACE))?;
         // simple_format(f, &self.price_annotation, Some(" @ "))?;
-
         // self.metadata.fmt(f)
+
+        Ok(())
     }
 }
 
