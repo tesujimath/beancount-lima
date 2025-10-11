@@ -10,4 +10,4 @@
 (define/contract
   (f/date-fy y)
   (->/c int? function?)
-  (f/and (f/date> (- y 1) 4) (f/date< y 4)))
+  (f/and (f/date>= (- y 1) 4) (f/date< y 4)))
