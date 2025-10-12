@@ -147,7 +147,7 @@ impl Display for Posting {
             &self.amount
         )?;
 
-        simple_format(f, &self.cost_spec, Some(SPACE))?;
+        simple_format(f, &self.cost, Some(SPACE))?;
         // simple_format(f, &self.price_annotation, Some(" @ "))?;
         // self.metadata.fmt(f)
 

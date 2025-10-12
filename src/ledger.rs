@@ -21,7 +21,11 @@ use steel_derive::Steel;
 use tabulator::{Align, Cell, Gap};
 use time::Date;
 
-use crate::{config::LedgerBuilderConfig, types::*};
+use crate::{
+    balancing::{Weight, WeightSource},
+    config::LedgerBuilderConfig,
+    types::*,
+};
 
 #[derive(Clone, Debug, Steel)]
 pub(crate) struct Ledger {
@@ -304,7 +308,7 @@ impl LedgerBuilder {
                 amount,
                 currency.to_string(),
                 posting.flag().map(|flag| flag.item().to_string()),
-                posting.cost_spec().map(|cs| cs.item().into()),
+                None, // TODO posting.cost_spec().map(|cs| cs.item().into()),
                 description,
             ) {
                 postings.push(posting);
@@ -330,7 +334,7 @@ impl LedgerBuilder {
                     -number,
                     currency.to_string(),
                     unspecified.flag().map(|flag| flag.item().to_string()),
-                    unspecified.cost_spec().map(|cs| cs.item().into()),
+                    None, // TODO unspecified.cost_spec().map(|cs| cs.item().into()),
                     description,
                 ) {
                     postings.push(posting);
@@ -389,7 +393,7 @@ impl LedgerBuilder {
         amount: Decimal,
         currency: String,
         flag: Option<String>,
-        cost_spec: Option<CostSpec>,
+        cost: Option<Cost>,
         description: D,
     ) -> Option<Posting>
     where
@@ -439,7 +443,7 @@ impl LedgerBuilder {
                     })
                     .collect::<Vec<Amount>>();
 
-                let posting = Posting::new(account_name, amount.clone(), flag, cost_spec);
+                let posting = Posting::new(account_name, amount.clone(), flag, cost);
                 account.postings.push(posting.clone());
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
@@ -1019,6 +1023,85 @@ impl InferredTolerance {
             })
             .collect::<hashbrown::HashMap<_, _>>()
     }
+}
+
+fn convert_posting<'a>(
+    txn_date: Date,
+    posting: &'a parser::Spanned<parser::Posting<'a>>,
+    weight: Weight<'a>,
+) -> Result<Posting, parser::AnnotatedError> {
+    let flag = posting.flag().map(|flag| flag.item().to_string());
+    let account = posting.account().to_string();
+
+    let currency = posting
+        .currency()
+        .map(|cur| cur.item().to_string())
+        .or_else(|| (weight.source == WeightSource::Native).then(|| weight.currency.to_string()))
+        .ok_or(Into::<parser::AnnotatedError>::into(
+            posting.error("can't infer currency"),
+        ))?;
+
+    let units = posting
+        .amount()
+        .map(|amt| amt.item().value())
+        .or_else(|| (weight.source == WeightSource::Native).then(|| weight.number))
+        .ok_or(Into::<parser::AnnotatedError>::into(
+            posting.error("can't infer amount"),
+        ))?;
+
+    let cost = if let Some(cost_spec) = posting.cost_spec() {
+        let per_unit = cost_spec
+            .per_unit()
+            .map_or_else(
+                || {
+                    cost_spec
+                        .total()
+                        .map_or_else(
+                            || (weight.source == WeightSource::Cost).then(|| weight.number),
+                            |total| Some(total.item().value()),
+                        )
+                        .map(|total| total / units)
+                },
+                |per_unit| Some(per_unit.item().value()),
+            )
+            .ok_or(Into::<parser::AnnotatedError>::into(
+                posting.error("can't infer cost units"),
+            ))?;
+
+        let cost_currency = cost_spec
+            .currency()
+            .map_or_else(
+                || (weight.source == WeightSource::Cost).then(|| weight.currency.to_string()),
+                |currency| Some(currency.item().to_string()),
+            )
+            .ok_or(Into::<parser::AnnotatedError>::into(
+                posting.error("can't infer cost currency"),
+            ))?;
+
+        let cost_date = cost_spec
+            .date()
+            .map(|date| *date.item())
+            .unwrap_or(txn_date);
+        let label = cost_spec.label().map(|label| label.item().to_string());
+        let merge = cost_spec.merge();
+
+        Some(Cost {
+            per_unit,
+            currency: cost_currency,
+            date: cost_date,
+            label,
+            merge,
+        })
+    } else {
+        None
+    };
+
+    Ok(Posting {
+        flag,
+        account,
+        amount: (units, currency).into(),
+        cost,
+    })
 }
 
 #[derive(Debug)]

@@ -18,7 +18,7 @@ pub(crate) struct Posting {
     pub(crate) flag: Option<String>,
     pub(crate) account: String,
     pub(crate) amount: Amount,
-    pub(crate) cost_spec: Option<CostSpec>,
+    pub(crate) cost: Option<Cost>,
     // TODO:
     // If there's a price it is fully determined during balancing, i.e. before creating the Posting,
     // so we are able to hold here a fully specified price rather than a loosely defined price spec.  Later.
@@ -32,7 +32,7 @@ impl Posting {
         account: S1,
         amount: Amount,
         flag: Option<S2>,
-        cost_spec: Option<CostSpec>,
+        cost: Option<Cost>,
     ) -> Self
     where
         S1: Display,
@@ -42,7 +42,7 @@ impl Posting {
             account: account.to_string(),
             amount,
             flag: flag.map(|flag| flag.to_string()),
-            cost_spec,
+            cost,
         }
     }
 
@@ -149,84 +149,27 @@ impl From<&parser::Amount<'_>> for Amount {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct CostSpec {
-    per_unit: Option<Decimal>,
-    total: Option<Decimal>,
-    currency: Option<String>,
-    date: Option<Date>,
-    label: Option<String>,
-    merge: bool,
-}
-
-impl From<&parser::CostSpec<'_>> for CostSpec {
-    fn from(value: &parser::CostSpec<'_>) -> Self {
-        Self {
-            per_unit: value.per_unit().map(|expr| expr.value()),
-            total: value.total().map(|expr| expr.value()),
-            currency: value.currency().map(|cur| cur.item().to_string()),
-            date: value.date().map(|date| *date.item()),
-            label: value.label().map(|label| label.item().to_string()),
-            merge: value.merge(),
-        }
-    }
-}
-
-impl Display for CostSpec {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut prefix = "";
-        let space = " ";
-
-        f.write_str("{")?;
-
-        if let Some(per_unit) = &self.per_unit {
-            write!(f, "{prefix}{per_unit}")?;
-            prefix = space;
-        }
-
-        if let Some(total) = &self.total {
-            write!(f, "{prefix}# {total}")?;
-            prefix = space;
-        }
-
-        if let Some(currency) = &self.currency {
-            write!(f, "{prefix}{currency}")?;
-            prefix = space;
-        }
-
-        if let Some(date) = &self.date {
-            write!(f, "{prefix}{date}")?;
-            prefix = space;
-        }
-
-        if let Some(label) = &self.label {
-            write!(f, "{prefix}\"{label}\"")?;
-            prefix = space;
-        }
-
-        if self.merge {
-            write!(f, "{prefix}*",)?;
-        }
-
-        f.write_str("}")
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Cost {
-    number: Decimal,
-    currency: String,
-    date: Date,
-    label: Option<String>,
+    pub(crate) per_unit: Decimal,
+    pub(crate) currency: String,
+    pub(crate) date: Date,
+    pub(crate) label: Option<String>,
+    pub(crate) merge: bool,
 }
 
 impl Display for Cost {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", &self.number, &self.currency, &self.date)?;
+        write!(f, "{{{}, {} {}", &self.date, &self.per_unit, &self.currency)?;
+
         if let Some(label) = &self.label {
-            write!(f, " {label}")?;
+            write!(f, ", \"{label}\"")?;
         }
 
-        Ok(())
+        if self.merge {
+            write!(f, ", *",)?;
+        }
+
+        f.write_str("}")
     }
 }
 

@@ -21,9 +21,9 @@ struct WeightBuilder<'a> {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Weight<'a> {
-    number: rust_decimal::Decimal,
-    currency: &'a parser::Currency<'a>,
-    source: WeightSource,
+    pub(crate) number: rust_decimal::Decimal,
+    pub(crate) currency: &'a parser::Currency<'a>,
+    pub(crate) source: WeightSource,
 }
 
 impl<'a> Weight<'a> {
