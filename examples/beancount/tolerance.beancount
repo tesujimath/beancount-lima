@@ -1,0 +1,15 @@
+; example from https://groups.google.com/g/beancount/c/lfW7WWfN9z0/m/fyATZXgwAQAJ
+
+option "inferred_tolerance_default" "IDR:0"
+option "inferred_tolerance_default" "USD:0.02"
+option "inferred_tolerance_default" "*:0.001"
+
+; not yet supported:
+; plugin "beancount.plugins.auto_accounts"
+
+2022-01-01 open Assets:Cash
+2022-01-01 open Expenses:Other-Expense
+
+2022-08-25 * "" "Re install gate"
+  Assets:Cash -3000000 IDR
+  Expenses:Other-Expense 204 USD @@ 3000000 IDR
