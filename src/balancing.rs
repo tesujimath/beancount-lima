@@ -7,12 +7,6 @@ use crate::types::WrappedSpannedElement;
 // https://beancount.github.io/docs/beancount_language_syntax.html#balancing-rule-the-weight-of-postings
 
 #[derive(Clone, Debug)]
-enum FallibleWeightBuilder<'a> {
-    Ok(WeightBuilder<'a>),
-    Err(&'static str),
-}
-
-#[derive(Clone, Debug)]
 struct WeightBuilder<'a> {
     number: Option<rust_decimal::Decimal>,
     currency: Option<&'a parser::Currency<'a>>,
@@ -74,21 +68,22 @@ impl<'a> WeightBuilder<'a> {
 }
 
 impl<'a>
-    From<(
+    TryFrom<(
         &'a parser::ScopedExprValue,
         Option<&'a parser::Currency<'a>>,
         Option<rust_decimal::Decimal>,
-    )> for FallibleWeightBuilder<'a>
+    )> for WeightBuilder<'a>
 {
-    fn from(
+    type Error = &'static str;
+
+    fn try_from(
         value: (
             &'a parser::ScopedExprValue,
             Option<&'a parser::Currency<'a>>,
             Option<rust_decimal::Decimal>,
         ),
-    ) -> Self {
+    ) -> Result<Self, Self::Error> {
         use parser::ScopedExprValue::*;
-        use FallibleWeightBuilder::*;
 
         match value {
             (PerUnit(expr), currency, Some(units)) => Ok(WeightBuilder::new(
@@ -106,12 +101,13 @@ impl<'a>
     }
 }
 
-impl<'a> From<(&'a parser::PriceSpec<'a>, Option<rust_decimal::Decimal>)>
-    for FallibleWeightBuilder<'a>
-{
-    fn from(value: (&'a parser::PriceSpec<'a>, Option<rust_decimal::Decimal>)) -> Self {
+impl<'a> TryFrom<(&'a parser::PriceSpec<'a>, Option<rust_decimal::Decimal>)> for WeightBuilder<'a> {
+    type Error = &'static str;
+
+    fn try_from(
+        value: (&'a parser::PriceSpec<'a>, Option<rust_decimal::Decimal>),
+    ) -> Result<Self, Self::Error> {
         use parser::PriceSpec::*;
-        use FallibleWeightBuilder::*;
 
         match value {
             (Unspecified, _) => Ok(WeightBuilder::new(None, None, WeightSource::Price)),
@@ -120,18 +116,18 @@ impl<'a> From<(&'a parser::PriceSpec<'a>, Option<rust_decimal::Decimal>)>
                 Some(currency),
                 WeightSource::Price,
             )),
-            (BareAmount(expr), units) => (expr, None, units).into(),
-            (CurrencyAmount(expr, currency), units) => (expr, Some(currency), units).into(),
+            (BareAmount(expr), units) => (expr, None, units).try_into(),
+            (CurrencyAmount(expr, currency), units) => (expr, Some(currency), units).try_into(),
         }
     }
 }
 
-impl<'a> From<(&'a parser::CostSpec<'a>, Option<rust_decimal::Decimal>)>
-    for FallibleWeightBuilder<'a>
-{
-    fn from(value: (&'a parser::CostSpec<'a>, Option<rust_decimal::Decimal>)) -> Self {
-        use FallibleWeightBuilder::*;
+impl<'a> TryFrom<(&'a parser::CostSpec<'a>, Option<rust_decimal::Decimal>)> for WeightBuilder<'a> {
+    type Error = &'static str;
 
+    fn try_from(
+        value: (&'a parser::CostSpec<'a>, Option<rust_decimal::Decimal>),
+    ) -> Result<Self, Self::Error> {
         match (
             value.0.per_unit().map(|per_unit| per_unit.item().value()),
             value.0.total().map(|total| total.item().value()),
@@ -154,10 +150,10 @@ impl<'a> From<(&'a parser::CostSpec<'a>, Option<rust_decimal::Decimal>)>
     }
 }
 
-impl<'a> From<&'a parser::Posting<'a>> for FallibleWeightBuilder<'a> {
-    fn from(value: &'a parser::Posting<'a>) -> Self {
-        use FallibleWeightBuilder::*;
+impl<'a> TryFrom<&'a parser::Posting<'a>> for WeightBuilder<'a> {
+    type Error = &'static str;
 
+    fn try_from(value: &'a parser::Posting<'a>) -> Result<Self, Self::Error> {
         match (
             value.amount().map(|amount| amount.item().value()),
             value.currency().map(|currency| currency.item()),
@@ -169,8 +165,8 @@ impl<'a> From<&'a parser::Posting<'a>> for FallibleWeightBuilder<'a> {
             (units, currency, None, None) => {
                 Ok(WeightBuilder::new(units, currency, WeightSource::Native))
             }
-            (units, _, Some(cost_spec), _) => (cost_spec, units).into(),
-            (units, _, None, Some(price_annotation)) => (price_annotation, units).into(),
+            (units, _, Some(cost_spec), _) => (cost_spec, units).try_into(),
+            (units, _, None, Some(price_annotation)) => (price_annotation, units).try_into(),
         }
     }
 }
@@ -188,12 +184,10 @@ pub(crate) fn determine_transaction_weight<'a>(
     // determine initial weights which may have multiple gaps, but must be uniquely fillable
     let mut weights = transaction
         .postings()
-        .map(
-            |posting| match Into::<FallibleWeightBuilder<'_>>::into(posting.item()) {
-                FallibleWeightBuilder::Ok(w) => Ok(w),
-                FallibleWeightBuilder::Err(e) => Err(posting.error(e).into()),
-            },
-        )
+        .map(|posting| {
+            TryInto::<WeightBuilder<'_>>::try_into(posting.item())
+                .map_err(|e| posting.error(e).into())
+        })
         .collect::<Result<Vec<WeightBuilder<'_>>, parser::AnnotatedError>>()?;
     println!("initial weights {:?}", &weights);
 

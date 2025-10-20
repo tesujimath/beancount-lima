@@ -1044,7 +1044,7 @@ fn convert_posting<'a>(
     let units = posting
         .amount()
         .map(|amt| amt.item().value())
-        .or_else(|| (weight.source == WeightSource::Native).then(|| weight.number))
+        .or_else(|| (weight.source == WeightSource::Native).then_some(weight.number))
         .ok_or(Into::<parser::AnnotatedError>::into(
             posting.error("can't infer amount"),
         ))?;
@@ -1057,7 +1057,7 @@ fn convert_posting<'a>(
                     cost_spec
                         .total()
                         .map_or_else(
-                            || (weight.source == WeightSource::Cost).then(|| weight.number),
+                            || (weight.source == WeightSource::Cost).then_some(weight.number),
                             |total| Some(total.item().value()),
                         )
                         .map(|total| total / units)
