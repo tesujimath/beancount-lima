@@ -1,6 +1,29 @@
 use beancount_parser_lima as parser;
+use rust_decimal::Decimal;
+use std::collections::HashMap;
 
 use crate::types::WrappedSpannedElement;
+
+#[derive(Debug)]
+pub(crate) struct InferredTolerance<'a> {
+    fallback: Option<Decimal>,
+    by_currency: HashMap<parser::Currency<'a>, Decimal>,
+
+    multiplier: Decimal,
+}
+
+impl<'a> InferredTolerance<'a> {
+    pub(crate) fn new(options: &'a parser::Options<'a>) -> Self {
+        Self {
+            fallback: options.inferred_tolerance_default_fallback(),
+            by_currency: options
+                .inferred_tolerance_defaults()
+                .filter_map(|(cur, value)| cur.map(|cur| (cur, value)))
+                .collect::<HashMap<_, _>>(),
+            multiplier: options.inferred_tolerance_multiplier(),
+        }
+    }
+}
 
 // Calculate weight of postings and balance transaction as per:
 //
@@ -171,9 +194,10 @@ impl<'a> TryFrom<&'a parser::Posting<'a>> for WeightBuilder<'a> {
     }
 }
 
-pub(crate) fn determine_transaction_weight<'a>(
+pub(crate) fn balance_transaction<'a>(
     transaction: &'a parser::Transaction<'a>,
-    element: WrappedSpannedElement,
+    inferred_tolerance: &InferredTolerance<'a>,
+    element: &WrappedSpannedElement,
 ) -> Result<Vec<Weight<'a>>, parser::AnnotatedError> {
     println!("transaction postings");
     let postings = transaction.postings().collect::<Vec<_>>();
@@ -208,7 +232,13 @@ pub(crate) fn determine_transaction_weight<'a>(
             }
         }
     }
-    println!("currency balance {:?}", &currency_balance);
+
+    let mut currency_balance =
+        ignore_tolerable_residuals(&weights, currency_balance, inferred_tolerance);
+    println!(
+        "currency balance ignoring tolerable residuals {:?}",
+        &currency_balance
+    );
 
     // and use this to infill missing values in the weights
     for (i, w) in weights.iter_mut().enumerate() {
@@ -223,18 +253,20 @@ pub(crate) fn determine_transaction_weight<'a>(
         }
     }
 
-    println!("after phase 1 weights are {:?}", &weights);
+    println!(
+        "after phase 1 weights are {:?}, currency_balance {:?}",
+        &weights, &currency_balance
+    );
 
     // all that can remain now are the weights with unspecified currency, at most one of which may have an unspecified number
-    let mut unused_currency_balance = currency_balance.drain().collect::<Vec<_>>();
     for (i, w) in weights.iter_mut().enumerate() {
         if let (Some(num_w), None) = (w.number, w.currency) {
-            if unused_currency_balance.len() == 1 {
-                let (cur, mut num) = unused_currency_balance.pop().unwrap();
+            if currency_balance.len() == 1 {
+                let (cur, mut num) = currency_balance.drain().next().unwrap();
                 w.currency = Some(cur);
                 num += num_w;
                 if !num.is_zero() {
-                    unused_currency_balance.push((cur, num));
+                    currency_balance.insert(cur, num);
                 }
             } else {
                 return Err(postings[i]
@@ -244,12 +276,20 @@ pub(crate) fn determine_transaction_weight<'a>(
         }
     }
 
+    println!(
+        "after phase 2 weights are {:?}, currency_balance {:?} len {}",
+        &weights,
+        &currency_balance,
+        currency_balance.len()
+    );
+
     for (i, w) in weights.iter_mut().enumerate() {
         if let (None, None) = (w.number, w.currency) {
-            if unused_currency_balance.len() == 1 {
-                let (cur, num) = unused_currency_balance.pop().unwrap();
+            if currency_balance.len() == 1 {
+                let (cur, num) = currency_balance.drain().next().unwrap();
                 w.currency = Some(cur);
                 w.number = Some(-num);
+                println!("allocated weight {i} {:?}", &w);
             } else {
                 return Err(postings[i]
                     .error(format!("can't infer anything{}", w.source.reason()))
@@ -258,9 +298,18 @@ pub(crate) fn determine_transaction_weight<'a>(
         }
     }
 
-    // check there's nothing left unused
-    if !unused_currency_balance.is_empty() {
-        return Err(element.error(format!("surplus balance {:?}", &unused_currency_balance)));
+    if !currency_balance.is_empty() {
+        // sort by currency so deterministic
+        let mut currencies = currency_balance.keys().copied().collect::<Vec<_>>();
+        currencies.sort();
+        return Err(element.error(format!(
+            "balancing error {}",
+            currencies
+                .into_iter()
+                .map(|cur| format!("{} {}", currency_balance.get(cur).unwrap(), cur))
+                .collect::<Vec<String>>()
+                .join(", ")
+        )));
     }
 
     // TODO remove this sanity check which can't fail
@@ -281,35 +330,97 @@ pub(crate) fn determine_transaction_weight<'a>(
     Ok(fully_specified)
 }
 
-/// For balancing a transaction we use the price if there is one, otherwise simply the amount.
-///
-// TODO: infer the price from a partial spec.
-pub(crate) fn get_posting_amount_for_balancing_transaction<'a, 'b>(
-    posting: &'b parser::Posting<'a>,
-) -> Option<(rust_decimal::Decimal, &'b parser::Currency<'a>)>
-where
-    'b: 'a,
-{
-    if let Some(price) = posting.price_annotation() {
-        use parser::PriceSpec::*;
-        use parser::ScopedExprValue::*;
+fn ignore_tolerable_residuals<'a>(
+    weights: &[WeightBuilder],
+    residual: hashbrown::HashMap<&'a parser::Currency<'a>, rust_decimal::Decimal>,
+    inferred_tolerance: &InferredTolerance<'a>,
+) -> hashbrown::HashMap<&'a parser::Currency<'a>, rust_decimal::Decimal> {
+    use hashbrown::hash_map::Entry::*;
 
-        match price.item() {
-            Unspecified => None,
-            BareCurrency(_price_currency) => None,
-            BareAmount(_price_amount) => None,
-            CurrencyAmount(PerUnit(price_amount), price_currency) => posting
-                .amount()
-                .map(|amount| (amount.value() * price_amount.value(), price_currency)),
-            CurrencyAmount(Total(price_amount), price_currency) => {
-                Some((price_amount.value(), price_currency))
+    // determine coarsest scale for each currency according to the weights we have accumulated
+    let mut coarsest_scale_for_tolerance = hashbrown::HashMap::<&parser::Currency, u32>::default();
+    for w in weights {
+        if let (Some(cur), Some(num)) = (w.currency, w.number) {
+            match coarsest_scale_for_tolerance.entry(cur) {
+                Occupied(mut entry) => {
+                    let coarsest_so_far = entry.get_mut();
+                    if num.scale() < *coarsest_so_far {
+                        *coarsest_so_far = num.scale();
+                    }
+                }
+                Vacant(entry) => {
+                    entry.insert(num.scale());
+                }
             }
         }
-    } else if let (Some(amount), Some(currency)) = (posting.amount(), posting.currency()) {
-        Some((amount.value(), currency.item()))
-    } else {
-        None
     }
+
+    // remove all but intolerable residuals
+    residual
+        .into_iter()
+        .filter_map(|(cur, num)| {
+            let abs_num = num.abs();
+
+            match coarsest_scale_for_tolerance.get(cur) {
+                coarsest_scale @ (Some(&0) | None) => {
+                    if coarsest_scale.is_some() {
+                        tracing::debug!(
+                            "no tolerance for residual {:?} for integer currency {:?}",
+                            abs_num,
+                            cur
+                        );
+                    } else {
+                        tracing::debug!(
+                            "can't infer local tolerance for residual {:?} for currency {:?}",
+                            abs_num,
+                            cur
+                        );
+                    }
+                    if let Some(tol) = inferred_tolerance
+                        .by_currency
+                        .get(cur)
+                        .or(inferred_tolerance.fallback.as_ref())
+                    {
+                        let intolerable = &abs_num > tol;
+
+                        tracing::debug!(
+                            "tolerance {} for {:?} {:?} against {:?}",
+                            if intolerable { "exceeded" } else { "ok" },
+                            abs_num,
+                            cur,
+                            tol,
+                        );
+
+                        intolerable.then_some((cur, num))
+                    } else {
+                        tracing::debug!(
+                            "no tolerance for residual {:?} for currency {:?}",
+                            abs_num,
+                            cur
+                        );
+                        (abs_num > Decimal::ZERO).then_some((cur, num))
+                    }
+                }
+
+                Some(coarsest_scale) => {
+                    let unit = Decimal::new(1, *coarsest_scale);
+                    let tol = unit * inferred_tolerance.multiplier;
+                    let intolerable = abs_num > tol;
+
+                    tracing::debug!(
+                    "tolerance {} for {:?} {:?} against unit = {:?}, multiplier = {:?}, tol = {:?}",
+                    if intolerable { "exceeded" } else { "ok" },
+                    abs_num,
+                    cur,
+                    unit,
+                    inferred_tolerance.multiplier,
+                    tol,
+                );
+                    intolerable.then_some((cur, num))
+                }
+            }
+        })
+        .collect::<hashbrown::HashMap<&parser::Currency<'a>, Decimal>>()
 }
 
 #[cfg(test)]

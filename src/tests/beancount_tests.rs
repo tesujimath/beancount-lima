@@ -3,12 +3,18 @@
 use std::path::Path;
 use test_generator::test_resources;
 
-use crate::{create_engine, register_args, report_test_failures, Ledger, LedgerBuilderConfig};
+use crate::{
+    create_engine, register_args, report_test_failures, tests::init_tracing, Ledger,
+    LedgerBuilderConfig,
+};
 
 use super::load_cog_path;
 
 #[test_resources("tests/beancount/**/*.beancount")]
 fn beancount_tests(beancount_relpath: &str) {
+    init_tracing();
+    tracing::debug!("hello beancount_tests");
+
     let cog_relpath = format!(
         "{}.scm",
         beancount_relpath.strip_suffix(".beancount").unwrap(),

@@ -22,7 +22,7 @@ use tabulator::{Align, Cell, Gap};
 use time::Date;
 
 use crate::{
-    balancing::{Weight, WeightSource},
+    balancing::{balance_transaction, InferredTolerance, Weight, WeightSource},
     config::LedgerBuilderConfig,
     types::*,
 };
@@ -65,9 +65,10 @@ impl Ledger {
             }) => {
                 sources.write_errors_or_warnings(error_w, warnings)?;
                 let mut builder = LedgerBuilder::new(&options, config);
+                let inferred_tolerance = InferredTolerance::new(&options);
 
                 for directive in directives {
-                    builder.directive(&directive);
+                    builder.directive(&directive, &inferred_tolerance);
                 }
                 Ok(builder)
             }
@@ -141,7 +142,6 @@ struct LedgerBuilder {
     closed_accounts: hashbrown::HashMap<String, Span>,
     accounts: HashMap<String, AccountBuilder>,
     currency_usage: hashbrown::HashMap<String, i32>,
-    inferred_tolerance: InferredTolerance,
     parser_options: SteelHashMap,
     config: LedgerBuilderConfig,
     errors: Vec<parser::AnnotatedError>,
@@ -160,7 +160,6 @@ impl LedgerBuilder {
             closed_accounts: hashbrown::HashMap::default(),
             accounts: HashMap::default(),
             currency_usage: hashbrown::HashMap::default(),
-            inferred_tolerance: InferredTolerance::new(options),
             parser_options,
             config,
             errors: Vec::default(),
@@ -209,14 +208,20 @@ impl LedgerBuilder {
         }
     }
 
-    fn directive(&mut self, directive: &Spanned<parser::Directive>) {
+    fn directive<'a>(
+        &mut self,
+        directive: &'a Spanned<parser::Directive<'a>>,
+        inferred_tolerance: &InferredTolerance<'a>,
+    ) {
         use parser::DirectiveVariant::*;
 
         let date = *directive.date().item();
         let element = Into::<WrappedSpannedElement>::into(directive);
 
         match directive.variant() {
-            Transaction(transaction) => self.transaction(transaction, date, element),
+            Transaction(transaction) => {
+                self.transaction(transaction, date, inferred_tolerance, element)
+            }
             Price(price) => self.price(price, date, element),
             Balance(balance) => self.balance(balance, date, element),
             Open(open) => self.open(open, date, element),
@@ -230,156 +235,64 @@ impl LedgerBuilder {
         };
     }
 
-    fn transaction(
+    fn transaction<'a>(
         &mut self,
         transaction: &parser::Transaction,
         date: Date,
+        inferred_tolerance: &InferredTolerance<'a>,
         element: WrappedSpannedElement,
     ) {
-        let mut postings = Vec::default();
+        match balance_transaction(transaction, inferred_tolerance, &element) {
+            Ok(weights) => {
+                let mut postings = Vec::default();
 
-        // determine auto-posting for at most one unspecified account
-        let mut residual = hashbrown::HashMap::<&parser::Currency<'_>, Decimal>::default();
-        let mut unspecified: Vec<&Spanned<parser::Posting<'_>>> = Vec::default();
+                for (posting, weight) in transaction.postings().zip(weights) {
+                    // TODO postings for costs, for now we just use the weights
+                    let amount = weight.number;
+                    let currency = weight.currency;
 
-        for posting in transaction.postings() {
-            use hashbrown::hash_map::Entry::*;
+                    let description = transaction.payee().map_or_else(
+                        || {
+                            transaction
+                                .narration()
+                                .map_or("post", |narration| narration.item())
+                        },
+                        |payee| payee.item(),
+                    );
 
-            if let Some((amount, currency)) =
-                // TODO move together
-                crate::balancing::get_posting_amount_for_balancing_transaction(posting)
-            {
-                match residual.entry(currency) {
-                    Occupied(mut residual_entry) => {
-                        let accumulated = residual_entry.get() + amount;
-                        if accumulated.is_zero() {
-                            residual_entry.remove_entry();
-                        } else {
-                            residual_entry.insert(accumulated);
-                        }
-                    }
-                    Vacant(residual_entry) => {
-                        residual_entry.insert(amount);
-                    }
-                }
-            } else {
-                unspecified.push(posting);
-            }
-        }
-
-        // record each posting for which we have both amount and currency
-        let mut coarsest_scale_for_tolerance =
-            hashbrown::HashMap::<&parser::Currency, u32>::default();
-
-        for posting in transaction
-            .postings()
-            .filter(|posting| posting.amount().is_some() && posting.currency().is_some())
-        {
-            let amount = posting.amount().unwrap().item().value();
-            let currency = posting.currency().unwrap().item();
-
-            // track coarsest scale so far by currency
-            use hashbrown::hash_map::Entry::*;
-            match coarsest_scale_for_tolerance.entry(currency) {
-                Occupied(mut entry) => {
-                    let coarsest_so_far = entry.get_mut();
-                    if amount.scale() < *coarsest_so_far {
-                        *coarsest_so_far = amount.scale();
+                    if let Some(posting) = self.post(
+                        posting.into(),
+                        date,
+                        &posting.account().to_string(),
+                        amount,
+                        currency.to_string(),
+                        posting.flag().map(|flag| flag.item().to_string()),
+                        None, // TODO posting.cost_spec().map(|cs| cs.item().into()),
+                        description,
+                    ) {
+                        postings.push(posting);
                     }
                 }
-                Vacant(entry) => {
-                    entry.insert(amount.scale());
-                }
-            }
 
-            let description = transaction.payee().map_or_else(
-                || {
-                    transaction
+                let transaction = Transaction {
+                    postings: postings.into(),
+                    flag: transaction.flag().to_string(),
+                    payee: transaction.payee().map(|payee| payee.to_string()),
+                    narration: transaction
                         .narration()
-                        .map_or("post", |narration| narration.item())
-                },
-                |payee| payee.item(),
-            );
+                        .map(|narration| narration.to_string()),
+                };
 
-            if let Some(posting) = self.post(
-                posting.into(),
-                date,
-                &posting.account().to_string(),
-                amount,
-                currency.to_string(),
-                posting.flag().map(|flag| flag.item().to_string()),
-                None, // TODO posting.cost_spec().map(|cs| cs.item().into()),
-                description,
-            ) {
-                postings.push(posting);
-            }
-        }
-
-        // auto-post if required
-        if let Some(unspecified) = unspecified.pop() {
-            for (currency, number) in residual {
-                let description = transaction.payee().map_or_else(
-                    || {
-                        transaction
-                            .narration()
-                            .map_or("post", |narration| narration.item())
-                    },
-                    |payee| payee.item(),
-                );
-
-                if let Some(posting) = self.post(
-                    unspecified.into(),
+                self.directives.push(Directive {
                     date,
-                    &unspecified.account().to_string(),
-                    -number,
-                    currency.to_string(),
-                    unspecified.flag().map(|flag| flag.item().to_string()),
-                    None, // TODO unspecified.cost_spec().map(|cs| cs.item().into()),
-                    description,
-                ) {
-                    postings.push(posting);
-                }
+                    element,
+                    variant: DirectiveVariant::Transaction(transaction),
+                })
             }
-        } else {
-            let residual = self
-                .inferred_tolerance
-                .remove_tolerated_residuals(residual, &coarsest_scale_for_tolerance);
-
-            if !residual.is_empty() {
-                // check if within tolerance
-                self.errors.push(element.error(format!(
-                            "unbalanced transaction, residual {}",
-                            residual
-                                .iter()
-                                .map(|(cur, number)| format!("{} {}", -number, cur))
-                                .collect::<Vec<String>>()
-                                .join(", ")
-                        )));
+            Err(e) => {
+                self.errors.push(e);
             }
         }
-        // any other unspecified postings are errors
-        for unspecified in unspecified.iter() {
-            self.errors.push(
-                unspecified
-                    .error("more than one posting without amount/currency")
-                    .into(),
-            );
-        }
-
-        let transaction = Transaction {
-            postings: postings.into(),
-            flag: transaction.flag().to_string(),
-            payee: transaction.payee().map(|payee| payee.to_string()),
-            narration: transaction
-                .narration()
-                .map(|narration| narration.to_string()),
-        };
-
-        self.directives.push(Directive {
-            date,
-            element,
-            variant: DirectiveVariant::Transaction(transaction),
-        })
     }
 
     // not without guilt, but oh well
@@ -939,89 +852,6 @@ impl LedgerBuilder {
                 content: query.content().item().to_string(),
             }),
         });
-    }
-}
-
-#[derive(Debug)]
-struct InferredTolerance {
-    fallback: Option<Decimal>,
-    by_currency: HashMap<String, Decimal>,
-
-    multiplier: Decimal,
-}
-
-impl InferredTolerance {
-    fn new(options: &parser::Options<'_>) -> Self {
-        Self {
-            fallback: options.inferred_tolerance_default_fallback(),
-            by_currency: options
-                .inferred_tolerance_defaults()
-                .filter_map(|(cur, value)| cur.map(|cur| (cur.to_string(), value)))
-                .collect::<HashMap<_, _>>(),
-            multiplier: options.inferred_tolerance_multiplier(),
-        }
-    }
-
-    // Beancount Precision & Tolerances, Martin Blais, May 2015, Updated May 2025
-    // https://docs.google.com/document/d/1lgHxUUEY-UVEgoF6cupz2f_7v7vEF7fiJyiSlYYlhOo
-    //
-    // Note that inferring tolerances from cost is not currently supported.
-    fn remove_tolerated_residuals<'a, 'b>(
-        &self,
-        residual: hashbrown::HashMap<&'a parser::Currency<'b>, Decimal>,
-        coarsest_scale_for_tolerance: &hashbrown::HashMap<&parser::Currency, u32>,
-    ) -> hashbrown::HashMap<&'a parser::Currency<'b>, Decimal> {
-        residual
-            .into_iter()
-            .filter(|(cur, value)| {
-                let abs_value = value.abs();
-
-                let coarsest_scale = coarsest_scale_for_tolerance.get(cur);
-                if coarsest_scale == Some(&0) {
-                    // this particular residual is for an integer currency, so no tolerance
-                    tracing::debug!("no tolerance for residual {:?} for integer currency {:?}", abs_value, cur);
-                    true
-                } else if let Some(tol) = self
-                    .by_currency
-                    .get(cur.as_ref())
-                    .or(self.fallback.as_ref())
-                {
-                    let intolerable =  &abs_value > tol;
-
-                    if intolerable {
-                        tracing::debug!(
-                            "tolerance {} for {:?} {:?} against {:?}",
-                            if intolerable { "exceeded" } else { "ok" },
-                            abs_value,
-                            cur,
-                            tol,
-                        );
-                    }
-
-                    intolerable
-                } else if let Some(coarsest_scale) = coarsest_scale {
-                    let unit = Decimal::new(1, *coarsest_scale);
-                    let tol = unit * self.multiplier;
-                    let intolerable =  abs_value > tol;
-
-                    if intolerable {
-                        tracing::debug!(
-                            "tolerance {} for {:?} {:?} against unit = {:?}, multiplier = {:?}, tol = {:?}",
-                            if intolerable { "exceeded" } else { "ok" },
-                            abs_value,
-                            cur,
-                            unit,
-                            self.multiplier,
-                            tol,
-                        );
-                    }
-
-                    intolerable
-                } else {
-                    true
-                }
-            })
-            .collect::<hashbrown::HashMap<_, _>>()
     }
 }
 
