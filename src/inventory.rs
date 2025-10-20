@@ -24,7 +24,7 @@ impl InventoryBuilder {
         Self(Shared::new(MutContainer::new(positions)))
     }
 
-    // TODO this should include CostSpec and the booking method
+    // TODO cost - this should include CostSpec and the booking method
     fn book(&mut self, position: Position) {
         // TODO cost
         let mut positions_by_currency = self.0.write();

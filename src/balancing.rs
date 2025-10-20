@@ -1,8 +1,9 @@
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
+use time::Date;
 
-use crate::types::WrappedSpannedElement;
+use crate::types::{Cost, WrappedSpannedElement};
 
 #[derive(Debug)]
 pub(crate) struct InferredTolerance<'a> {
@@ -33,21 +34,21 @@ impl<'a> InferredTolerance<'a> {
 struct WeightBuilder<'a> {
     number: Option<rust_decimal::Decimal>,
     currency: Option<&'a parser::Currency<'a>>,
-    source: WeightSource,
+    source: WeightSource<'a>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Weight<'a> {
     pub(crate) number: rust_decimal::Decimal,
     pub(crate) currency: &'a parser::Currency<'a>,
-    pub(crate) source: WeightSource,
+    pub(crate) source: WeightSource<'a>,
 }
 
 impl<'a> Weight<'a> {
     fn new(
         number: rust_decimal::Decimal,
         currency: &'a parser::Currency<'a>,
-        source: WeightSource,
+        source: WeightSource<'a>,
     ) -> Self {
         Self {
             number,
@@ -58,20 +59,47 @@ impl<'a> Weight<'a> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub(crate) enum WeightSource {
+pub(crate) enum WeightSource<'a> {
     Native,
-    Cost,
-    Price,
+    Cost(rust_decimal::Decimal, &'a parser::Currency<'a>),
+    Price(rust_decimal::Decimal, &'a parser::Currency<'a>),
 }
 
-impl WeightSource {
+impl<'a> WeightSource<'a> {
     fn reason(&self) -> &'static str {
         use WeightSource::*;
 
         match self {
             Native => "",
-            Cost => "for cost",
-            Price => "for price",
+            Cost(_, _) => "for cost",
+            Price(_, _) => "for price",
+        }
+    }
+}
+
+impl From<(Date, &parser::CostSpec<'_>, &Weight<'_>)> for Cost {
+    fn from(value: (Date, &parser::CostSpec<'_>, &Weight<'_>)) -> Self {
+        let (date, cs, w) = value;
+        let native_units = if let WeightSource::Cost(native_units, _) = &w.source {
+            native_units
+        } else {
+            panic!(
+                "impossible weight source {:?} for posting with cost",
+                &w.source
+            );
+        };
+        let per_unit = w.number / native_units;
+        let currency = w.currency.to_string();
+        let date = cs.date().map(|date| *date.item()).unwrap_or(date);
+        let label = cs.label().map(|label| label.item().to_string());
+        let merge = cs.merge();
+
+        Self {
+            per_unit,
+            currency,
+            date,
+            label,
+            merge,
         }
     }
 }
@@ -80,7 +108,7 @@ impl<'a> WeightBuilder<'a> {
     fn new(
         number: Option<rust_decimal::Decimal>,
         currency: Option<&'a parser::Currency<'a>>,
-        source: WeightSource,
+        source: WeightSource<'a>,
     ) -> Self {
         Self {
             number,
@@ -94,7 +122,8 @@ impl<'a>
     TryFrom<(
         &'a parser::ScopedExprValue,
         Option<&'a parser::Currency<'a>>,
-        Option<rust_decimal::Decimal>,
+        rust_decimal::Decimal,
+        &'a parser::Currency<'a>,
     )> for WeightBuilder<'a>
 {
     type Error = &'static str;
@@ -103,72 +132,115 @@ impl<'a>
         value: (
             &'a parser::ScopedExprValue,
             Option<&'a parser::Currency<'a>>,
-            Option<rust_decimal::Decimal>,
+            rust_decimal::Decimal,
+            &'a parser::Currency<'a>,
         ),
     ) -> Result<Self, Self::Error> {
         use parser::ScopedExprValue::*;
 
-        match value {
-            (PerUnit(expr), currency, Some(units)) => Ok(WeightBuilder::new(
-                Some(expr.value() * units),
-                currency,
-                WeightSource::Price,
+        let (price_expr, price_currency, native_units, native_currency) = value;
+
+        match (price_expr, price_currency) {
+            (PerUnit(price_expr), price_currency) => Ok(WeightBuilder::new(
+                Some(price_expr.value() * native_units),
+                price_currency,
+                WeightSource::Price(native_units, native_currency),
             )),
-            (PerUnit(_), _, None) => Err("can't have price per unit without units"),
-            (Total(expr), currency, _) => Ok(WeightBuilder::new(
-                Some(expr.value()),
-                currency,
-                WeightSource::Price,
+            (Total(price_expr), price_currency) => Ok(WeightBuilder::new(
+                Some(price_expr.value()),
+                price_currency,
+                WeightSource::Price(native_units, native_currency),
             )),
         }
     }
 }
 
-impl<'a> TryFrom<(&'a parser::PriceSpec<'a>, Option<rust_decimal::Decimal>)> for WeightBuilder<'a> {
+impl<'a>
+    TryFrom<(
+        &'a parser::PriceSpec<'a>,
+        rust_decimal::Decimal,
+        &'a parser::Currency<'a>,
+    )> for WeightBuilder<'a>
+{
     type Error = &'static str;
 
     fn try_from(
-        value: (&'a parser::PriceSpec<'a>, Option<rust_decimal::Decimal>),
+        value: (
+            &'a parser::PriceSpec<'a>,
+            rust_decimal::Decimal,
+            &'a parser::Currency<'a>,
+        ),
     ) -> Result<Self, Self::Error> {
         use parser::PriceSpec::*;
 
-        match value {
-            (Unspecified, _) => Ok(WeightBuilder::new(None, None, WeightSource::Price)),
-            (BareCurrency(currency), _) => Ok(WeightBuilder::new(
+        let (price, native_units, native_currency) = value;
+
+        match price {
+            Unspecified => Ok(WeightBuilder::new(
                 None,
-                Some(currency),
-                WeightSource::Price,
+                None,
+                WeightSource::Price(native_units, native_currency),
             )),
-            (BareAmount(expr), units) => (expr, None, units).try_into(),
-            (CurrencyAmount(expr, currency), units) => (expr, Some(currency), units).try_into(),
+            BareCurrency(price_currency) => Ok(WeightBuilder::new(
+                None,
+                Some(price_currency),
+                WeightSource::Price(native_units, native_currency),
+            )),
+            BareAmount(price_expr) => (price_expr, None, native_units, native_currency).try_into(),
+            CurrencyAmount(price_expr, price_currency) => (
+                price_expr,
+                Some(price_currency),
+                native_units,
+                native_currency,
+            )
+                .try_into(),
         }
     }
 }
 
-impl<'a> TryFrom<(&'a parser::CostSpec<'a>, Option<rust_decimal::Decimal>)> for WeightBuilder<'a> {
+impl<'a>
+    TryFrom<(
+        &'a parser::CostSpec<'a>,
+        rust_decimal::Decimal,
+        &'a parser::Currency<'a>,
+    )> for WeightBuilder<'a>
+{
     type Error = &'static str;
 
     fn try_from(
-        value: (&'a parser::CostSpec<'a>, Option<rust_decimal::Decimal>),
+        value: (
+            &'a parser::CostSpec<'a>,
+            rust_decimal::Decimal,
+            &'a parser::Currency<'a>,
+        ),
     ) -> Result<Self, Self::Error> {
+        let (cost_spec, native_units, native_currency) = value;
         match (
-            value.0.per_unit().map(|per_unit| per_unit.item().value()),
-            value.0.total().map(|total| total.item().value()),
-            value.0.currency().map(|currency| currency.item()),
-            value.1,
+            cost_spec
+                .per_unit()
+                .map(|cost_per_unit| cost_per_unit.item().value()),
+            cost_spec
+                .total()
+                .map(|cost_total| cost_total.item().value()),
+            cost_spec
+                .currency()
+                .map(|cost_currency| cost_currency.item()),
         ) {
-            (_, Some(total), currency, _) => Ok(WeightBuilder::new(
-                Some(total),
-                currency,
-                WeightSource::Cost,
+            (_, Some(cost_total), cost_currency) => Ok(WeightBuilder::new(
+                Some(cost_total),
+                cost_currency,
+                WeightSource::Cost(native_units, native_currency),
             )),
-            (Some(per_unit), _, currency, Some(units)) => Ok(WeightBuilder::new(
-                Some(per_unit * units),
-                currency,
-                WeightSource::Cost,
+            (Some(cost_per_unit), _, cost_currency) => Ok(WeightBuilder::new(
+                Some(cost_per_unit * native_units),
+                cost_currency,
+                WeightSource::Cost(native_units, native_currency),
             )),
-            (Some(_), _, _, None) => Err("can't have cost per-unit without units"),
-            (None, None, currency, _) => Ok(WeightBuilder::new(None, currency, WeightSource::Cost)),
+            (None, None, cost_currency) => Ok(WeightBuilder::new(
+                None,
+                cost_currency,
+                WeightSource::Cost(native_units, native_currency),
+            )),
         }
     }
 }
@@ -185,11 +257,19 @@ impl<'a> TryFrom<&'a parser::Posting<'a>> for WeightBuilder<'a> {
                 .price_annotation()
                 .map(|price_annotation| price_annotation.item()),
         ) {
-            (units, currency, None, None) => {
-                Ok(WeightBuilder::new(units, currency, WeightSource::Native))
+            (native_units, native_currency, None, None) => Ok(WeightBuilder::new(
+                native_units,
+                native_currency,
+                WeightSource::Native,
+            )),
+            (Some(native_units), Some(native_currency), Some(cost_spec), _) => {
+                (cost_spec, native_units, native_currency).try_into()
             }
-            (units, _, Some(cost_spec), _) => (cost_spec, units).try_into(),
-            (units, _, None, Some(price_annotation)) => (price_annotation, units).try_into(),
+            (_, _, Some(_), _) => Err("can't infer for posting with cost"),
+            (Some(native_units), Some(native_currency), None, Some(price_annotation)) => {
+                (price_annotation, native_units, native_currency).try_into()
+            }
+            (_, _, _, Some(_)) => Err("can't infer for posting with price"),
         }
     }
 }
@@ -313,7 +393,7 @@ pub(crate) fn balance_transaction<'a>(
         )));
     }
 
-    // TODO remove this sanity check which can't fail
+    // TODO consider removing this sanity check which can't fail
     if weights
         .iter()
         .any(|w| w.number.is_none() || w.currency.is_none())

@@ -19,7 +19,7 @@ pub(crate) struct Posting {
     pub(crate) account: String,
     pub(crate) amount: Amount,
     pub(crate) cost: Option<Cost>,
-    // TODO:
+    // TODO price:
     // If there's a price it is fully determined during balancing, i.e. before creating the Posting,
     // so we are able to hold here a fully specified price rather than a loosely defined price spec.  Later.
     // pub(crate) price: Option<Price>,

@@ -7,25 +7,43 @@ use test_case::test_case;
 use crate::tests::init_tracing;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub(crate) struct WeightWithCurrencyAsString {
+pub(crate) struct StaticWeight {
     pub(crate) number: rust_decimal::Decimal,
     pub(crate) currency: String,
-    pub(crate) source: WeightSource,
+    pub(crate) source: StaticWeightSource,
 }
 
-impl<'a> From<Weight<'a>> for WeightWithCurrencyAsString {
+impl<'a> From<Weight<'a>> for StaticWeight {
     fn from(value: Weight) -> Self {
-        WeightWithCurrencyAsString {
+        StaticWeight {
             number: value.number,
             currency: value.currency.to_string(),
-            source: value.source,
+            source: value.source.into(),
         }
     }
 }
 
-impl From<((rust_decimal::Decimal, &'static str), WeightSource)> for WeightWithCurrencyAsString {
-    fn from(value: ((rust_decimal::Decimal, &'static str), WeightSource)) -> Self {
-        WeightWithCurrencyAsString {
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub(crate) enum StaticWeightSource {
+    Native,
+    Cost(rust_decimal::Decimal, String),
+    Price(rust_decimal::Decimal, String),
+}
+
+impl<'a> From<WeightSource<'a>> for StaticWeightSource {
+    fn from(value: WeightSource<'a>) -> Self {
+        use StaticWeightSource::*;
+        match value {
+            WeightSource::Native => Native,
+            WeightSource::Cost(num, cur) => Cost(num, cur.to_string()),
+            WeightSource::Price(num, cur) => Price(num, cur.to_string()),
+        }
+    }
+}
+
+impl From<((rust_decimal::Decimal, &'static str), StaticWeightSource)> for StaticWeight {
+    fn from(value: ((rust_decimal::Decimal, &'static str), StaticWeightSource)) -> Self {
+        StaticWeight {
             number: value.0 .0,
             currency: value.0 .1.to_string(),
             source: value.1,
@@ -33,7 +51,7 @@ impl From<((rust_decimal::Decimal, &'static str), WeightSource)> for WeightWithC
     }
 }
 
-fn parse_txn_and_balance(src: &str) -> Result<Vec<WeightWithCurrencyAsString>, (String, String)> {
+fn parse_txn_and_balance(src: &str) -> Result<Vec<StaticWeight>, (String, String)> {
     let sources = BeancountSources::from(src);
     let parser = BeancountParser::new(&sources);
     let ParseSuccess {
@@ -51,7 +69,7 @@ fn parse_txn_and_balance(src: &str) -> Result<Vec<WeightWithCurrencyAsString>, (
             .map(|weights| {
                 weights
                     .into_iter()
-                    .map(Into::<WeightWithCurrencyAsString>::into)
+                    .map(Into::<StaticWeight>::into)
                     .collect::<Vec<_>>()
             })
             .map_err(|e| {
@@ -79,7 +97,7 @@ fn native_no_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, 
     let result = parse_txn_and_balance(src);
     let expected = expected
         .into_iter()
-        .map(|expected| Into::<WeightWithCurrencyAsString>::into((expected, WeightSource::Native)))
+        .map(|expected| Into::<StaticWeight>::into((expected, StaticWeightSource::Native)))
         .collect::<Vec<_>>();
     assert_eq!(&result.unwrap(), &expected);
 }
@@ -143,7 +161,7 @@ fn native_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, &'s
     let result = parse_txn_and_balance(src);
     let expected = expected
         .into_iter()
-        .map(|expected| Into::<WeightWithCurrencyAsString>::into((expected, WeightSource::Native)))
+        .map(|expected| Into::<StaticWeight>::into((expected, StaticWeightSource::Native)))
         .collect::<Vec<_>>();
     assert_eq!(&result.unwrap(), &expected);
 }
@@ -206,19 +224,19 @@ fn native_inference_errors(src: &str, expected_error: &str, expected_source: &st
   Assets:A2   -50.00 GBP @
 ",
     vec![
-        ((dec!(100.00), "NZD"), WeightSource::Native),
-        ((dec!(-100.00), "NZD"), WeightSource::Price ),
+        ((dec!(100.00), "NZD"), StaticWeightSource::Native),
+        ((dec!(-100.00), "NZD"), StaticWeightSource::Price(dec!(-50.00), "GBP".to_string()) ),
     ]
 )]
 fn price_inference(
     src: &'static str,
-    expected: Vec<((rust_decimal::Decimal, &'static str), WeightSource)>,
+    expected: Vec<((rust_decimal::Decimal, &'static str), StaticWeightSource)>,
 ) {
     init_tracing();
     let result = parse_txn_and_balance(src);
     let expected = expected
         .into_iter()
-        .map(Into::<WeightWithCurrencyAsString>::into)
+        .map(Into::<StaticWeight>::into)
         .collect::<Vec<_>>();
     assert_eq!(&result.unwrap(), &expected);
 }

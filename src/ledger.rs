@@ -22,7 +22,7 @@ use tabulator::{Align, Cell, Gap};
 use time::Date;
 
 use crate::{
-    balancing::{balance_transaction, InferredTolerance},
+    balancing::{balance_transaction, InferredTolerance, WeightSource},
     config::LedgerBuilderConfig,
     types::*,
 };
@@ -247,9 +247,12 @@ impl LedgerBuilder {
                 let mut postings = Vec::default();
 
                 for (posting, weight) in transaction.postings().zip(weights) {
-                    // TODO postings for costs, for now we just use the weights
-                    let amount = weight.number;
-                    let currency = weight.currency;
+                    use WeightSource::*;
+                    let (posting_amount, posting_currency) = match weight.source {
+                        Native => (weight.number, weight.currency),
+                        Cost(number, currency) => (number, currency),
+                        Price(number, currency) => (number, currency),
+                    };
 
                     let description = transaction.payee().map_or_else(
                         || {
@@ -264,10 +267,12 @@ impl LedgerBuilder {
                         posting.into(),
                         date,
                         &posting.account().to_string(),
-                        amount,
-                        currency.to_string(),
+                        posting_amount,
+                        posting_currency.to_string(),
                         posting.flag().map(|flag| flag.item().to_string()),
-                        None, // TODO posting.cost_spec().map(|cs| cs.item().into()),
+                        posting
+                            .cost_spec()
+                            .map(|cs| (date, cs.item(), &weight).into()),
                         description,
                     ) {
                         postings.push(posting);
@@ -367,7 +372,7 @@ impl LedgerBuilder {
                 });
 
                 Some(posting)
-            // TODO cost-or-costspec, price, flag, metadata
+            // TODO cost, price, flag, metadata
             } else {
                 self.errors.push(element.error_with_contexts(
                     "invalid currency for account",
@@ -869,7 +874,7 @@ struct AccountBuilder {
     currencies: HashSet<String>,
     inventory: hashbrown::HashMap<String, Decimal>, // only non-zero positions are maintained
     opened: Span,
-    // TODO
+    // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
     postings: Vec<Posting>,
     pad_idx: Option<usize>, // index in directives in LedgerBuilder
@@ -898,7 +903,7 @@ impl AccountBuilder {
 }
 
 /// Convert just those parser options that make sense to expose to Scheme.
-/// TODO incomplete
+/// TODO options
 fn convert_parser_options(
     options: &parser::Options<'_>,
 ) -> impl Iterator<Item = (&'static str, SteelVal)> {
