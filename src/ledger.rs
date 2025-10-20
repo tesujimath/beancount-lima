@@ -22,7 +22,7 @@ use tabulator::{Align, Cell, Gap};
 use time::Date;
 
 use crate::{
-    balancing::{balance_transaction, InferredTolerance, Weight, WeightSource},
+    balancing::{balance_transaction, InferredTolerance},
     config::LedgerBuilderConfig,
     types::*,
 };
@@ -853,85 +853,6 @@ impl LedgerBuilder {
             }),
         });
     }
-}
-
-fn convert_posting<'a>(
-    txn_date: Date,
-    posting: &'a parser::Spanned<parser::Posting<'a>>,
-    weight: Weight<'a>,
-) -> Result<Posting, parser::AnnotatedError> {
-    let flag = posting.flag().map(|flag| flag.item().to_string());
-    let account = posting.account().to_string();
-
-    let currency = posting
-        .currency()
-        .map(|cur| cur.item().to_string())
-        .or_else(|| (weight.source == WeightSource::Native).then(|| weight.currency.to_string()))
-        .ok_or(Into::<parser::AnnotatedError>::into(
-            posting.error("can't infer currency"),
-        ))?;
-
-    let units = posting
-        .amount()
-        .map(|amt| amt.item().value())
-        .or_else(|| (weight.source == WeightSource::Native).then_some(weight.number))
-        .ok_or(Into::<parser::AnnotatedError>::into(
-            posting.error("can't infer amount"),
-        ))?;
-
-    let cost = if let Some(cost_spec) = posting.cost_spec() {
-        let per_unit = cost_spec
-            .per_unit()
-            .map_or_else(
-                || {
-                    cost_spec
-                        .total()
-                        .map_or_else(
-                            || (weight.source == WeightSource::Cost).then_some(weight.number),
-                            |total| Some(total.item().value()),
-                        )
-                        .map(|total| total / units)
-                },
-                |per_unit| Some(per_unit.item().value()),
-            )
-            .ok_or(Into::<parser::AnnotatedError>::into(
-                posting.error("can't infer cost units"),
-            ))?;
-
-        let cost_currency = cost_spec
-            .currency()
-            .map_or_else(
-                || (weight.source == WeightSource::Cost).then(|| weight.currency.to_string()),
-                |currency| Some(currency.item().to_string()),
-            )
-            .ok_or(Into::<parser::AnnotatedError>::into(
-                posting.error("can't infer cost currency"),
-            ))?;
-
-        let cost_date = cost_spec
-            .date()
-            .map(|date| *date.item())
-            .unwrap_or(txn_date);
-        let label = cost_spec.label().map(|label| label.item().to_string());
-        let merge = cost_spec.merge();
-
-        Some(Cost {
-            per_unit,
-            currency: cost_currency,
-            date: cost_date,
-            label,
-            merge,
-        })
-    } else {
-        None
-    };
-
-    Ok(Posting {
-        flag,
-        account,
-        amount: (units, currency).into(),
-        cost,
-    })
 }
 
 #[derive(Debug)]

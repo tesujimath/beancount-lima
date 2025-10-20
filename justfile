@@ -3,4 +3,4 @@ build:
 
 test: build
     cargo test
-    ./import-tests.elv
+    ./run-import-tests

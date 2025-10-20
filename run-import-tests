@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -e
+
+# all import tests currently run with the same config
+LIMA_COGPATH="$(pwd)/tests/import.config:$LIMA_COGPATH"
+export LIMA_COGPATH
+
+cd tests/import
+
+exitcode=0
+
+for expected_beancount in *.expected.beancount; do
+    expected_base="${expected_beancount%.expected.beancount}"
+    ledger_path="${expected_base}.beancount"
+    output_path="${expected_base}.actual.beancount"
+    echo
+    echo lima -o standalone --ledger "$ledger_path" import "$expected_base"/*
+    lima -o standalone --ledger "$ledger_path" import "$expected_base"/* >"$output_path"
+    diff -w "$expected_beancount" "$output_path" || {
+        echo >&2 "Test failed: $ledger_path"
+        diff "$expected_beancount" "$output_path" || true
+        exitcode=1
+    }
+done
+
+exit $exitcode

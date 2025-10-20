@@ -199,10 +199,10 @@ pub(crate) fn balance_transaction<'a>(
     inferred_tolerance: &InferredTolerance<'a>,
     element: &WrappedSpannedElement,
 ) -> Result<Vec<Weight<'a>>, parser::AnnotatedError> {
-    println!("transaction postings");
+    tracing::debug!("transaction postings");
     let postings = transaction.postings().collect::<Vec<_>>();
     for posting in &postings {
-        println!("{:?}", posting.item());
+        tracing::debug!("{:?}", posting.item());
     }
 
     // determine initial weights which may have multiple gaps, but must be uniquely fillable
@@ -213,7 +213,7 @@ pub(crate) fn balance_transaction<'a>(
                 .map_err(|e| posting.error(e).into())
         })
         .collect::<Result<Vec<WeightBuilder<'_>>, parser::AnnotatedError>>()?;
-    println!("initial weights {:?}", &weights);
+    tracing::debug!("initial weights {:?}", &weights);
 
     let mut currency_balance =
         hashbrown::HashMap::<&parser::Currency, rust_decimal::Decimal>::default();
@@ -235,7 +235,7 @@ pub(crate) fn balance_transaction<'a>(
 
     let mut currency_balance =
         ignore_tolerable_residuals(&weights, currency_balance, inferred_tolerance);
-    println!(
+    tracing::debug!(
         "currency balance ignoring tolerable residuals {:?}",
         &currency_balance
     );
@@ -253,9 +253,10 @@ pub(crate) fn balance_transaction<'a>(
         }
     }
 
-    println!(
+    tracing::debug!(
         "after phase 1 weights are {:?}, currency_balance {:?}",
-        &weights, &currency_balance
+        &weights,
+        &currency_balance
     );
 
     // all that can remain now are the weights with unspecified currency, at most one of which may have an unspecified number
@@ -276,7 +277,7 @@ pub(crate) fn balance_transaction<'a>(
         }
     }
 
-    println!(
+    tracing::debug!(
         "after phase 2 weights are {:?}, currency_balance {:?} len {}",
         &weights,
         &currency_balance,
@@ -289,7 +290,7 @@ pub(crate) fn balance_transaction<'a>(
                 let (cur, num) = currency_balance.drain().next().unwrap();
                 w.currency = Some(cur);
                 w.number = Some(-num);
-                println!("allocated weight {i} {:?}", &w);
+                tracing::debug!("allocated weight {i} {:?}", &w);
             } else {
                 return Err(postings[i]
                     .error(format!("can't infer anything{}", w.source.reason()))
@@ -325,7 +326,7 @@ pub(crate) fn balance_transaction<'a>(
         .map(|w| Weight::new(w.number.unwrap(), w.currency.unwrap(), w.source))
         .collect::<Vec<_>>();
 
-    println!("fully specified {:?}", &fully_specified);
+    tracing::debug!("fully specified {:?}", &fully_specified);
 
     Ok(fully_specified)
 }

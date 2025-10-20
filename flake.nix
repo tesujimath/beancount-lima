@@ -42,7 +42,6 @@
             bashInteractive
             coreutils
             diffutils
-            elvish
             just
             rust-bin.stable.latest.default
             gcc
