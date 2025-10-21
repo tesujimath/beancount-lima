@@ -9,9 +9,7 @@ use steel::{gc::Gc, rvals::IntoSteelVal, SteelVal};
 
 use crate::{
     config::LoaderConfig,
-    loader::balancing::InferredTolerance,
-    loader::{LoadError, LoadSuccess, Loader},
-    prism::types as prism,
+    loader::{balancing::InferredTolerance, LoadError, LoadSuccess, Loader},
     prism::Ledger,
 };
 
@@ -22,7 +20,7 @@ where
     let sources = BeancountSources::try_from(path).wrap_err(format!("failed to read {path:?}"))?;
     let parser = BeancountParser::new(&sources);
 
-    let (builder, options) = match parser.parse() {
+    match parser.parse() {
         Ok(ParseSuccess {
             directives,
             options,
@@ -30,48 +28,48 @@ where
             warnings,
         }) => {
             sources.write_errors_or_warnings(error_w, warnings)?;
-            let mut builder = Loader::new(&options, config);
             let inferred_tolerance = InferredTolerance::new(&options);
+            let mut loader = Loader::new(inferred_tolerance, config);
 
-            for directive in directives {
-                builder.directive(&directive, &inferred_tolerance);
+            for directive in &directives {
+                loader.directive(directive);
             }
 
-            let options = convert_parser_options(&options)
-                .map(|(k, v)| (SteelVal::SymbolV(k.to_string().into()), v))
-                .collect::<steel::HashMap<SteelVal, SteelVal>>();
-            let options = Gc::new(options).into();
+            match loader.validate() {
+                Ok(LoadSuccess {
+                    directives,
+                    warnings,
+                }) => {
+                    if !warnings.is_empty() {
+                        sources.write_errors_or_warnings(error_w, warnings)?;
+                    }
 
-            Ok((builder, options))
+                    let prism_directives = conversions::convert_directives(directives);
+
+                    let options = convert_parser_options(&options)
+                        .map(|(k, v)| (SteelVal::SymbolV(k.to_string().into()), v))
+                        .collect::<steel::HashMap<SteelVal, SteelVal>>();
+                    let options = Gc::new(options).into();
+
+                    drop(parser);
+
+                    Ok(Ledger {
+                        sources: sources.into(),
+                        directives: prism_directives.into(),
+                        options,
+                    })
+                }
+                Err(LoadError { errors, .. }) => {
+                    sources.write_errors_or_warnings(error_w, errors)?;
+                    Err(eyre!("builder error"))
+                }
+            }
         }
 
         Err(ParseError { errors, warnings }) => {
             sources.write_errors_or_warnings(error_w, errors)?;
             sources.write_errors_or_warnings(error_w, warnings)?;
             Err(eyre! {"parse error"})
-        }
-    }?;
-
-    drop(parser);
-
-    match builder.validate() {
-        Ok(LoadSuccess {
-            directives,
-            warnings,
-        }) => {
-            if !warnings.is_empty() {
-                sources.write_errors_or_warnings(error_w, warnings)?;
-            }
-
-            Ok(Ledger {
-                sources: sources.into(),
-                directives: directives.into(),
-                options,
-            })
-        }
-        Err(LoadError { errors, .. }) => {
-            sources.write_errors_or_warnings(error_w, errors)?;
-            Err(eyre!("builder error"))
         }
     }
 }
@@ -122,3 +120,5 @@ pub(crate) fn convert_parser_options(
             .unwrap(),
     )))
 }
+
+mod conversions;

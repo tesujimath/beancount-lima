@@ -63,7 +63,7 @@ fn parse_txn_and_balance(src: &str) -> Result<Vec<StaticWeight>, (String, String
     let d = directives.first().unwrap();
     if let parser::DirectiveVariant::Transaction(txn) = d.variant() {
         let inferred_tolerance = InferredTolerance::new(&options);
-        let element = Into::<WrappedSpannedElement>::into(d);
+        let element = into_spanned_element(d);
 
         balance_transaction(txn, &inferred_tolerance, &element)
             .map(|weights| {

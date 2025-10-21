@@ -8,23 +8,7 @@ use steel::{
 };
 
 use super::core::*;
-
-#[derive(Clone, Debug)]
-pub struct Element {
-    element_type: &'static str,
-}
-
-impl Element {
-    pub(crate) fn new(element_type: &'static str, span: Span) -> Spanned<Self> {
-        parser::spanned(Element { element_type }, span)
-    }
-}
-
-impl parser::ElementType for Element {
-    fn element_type(&self) -> &'static str {
-        self.element_type
-    }
-}
+use crate::loader::types::Element;
 
 #[derive(Clone, Debug)]
 pub struct WrappedSpannedElement(CustomShared<Spanned<Element>>);
@@ -35,26 +19,15 @@ impl Custom for WrappedSpannedElement {
     }
 }
 
-impl<T> From<&Spanned<T>> for WrappedSpannedElement
-where
-    T: parser::ElementType,
-{
-    fn from(spanned_element: &Spanned<T>) -> Self {
-        WrappedSpannedElement(
-            parser::spanned(
-                Element {
-                    element_type: spanned_element.element_type(),
-                },
-                *spanned_element.span(),
-            )
-            .into(),
-        )
+impl parser::ElementType for WrappedSpannedElement {
+    fn element_type(&self) -> &'static str {
+        self.0.element_type()
     }
 }
 
-impl parser::ElementType for WrappedSpannedElement {
-    fn element_type(&self) -> &'static str {
-        self.0.element_type
+impl From<Spanned<Element>> for WrappedSpannedElement {
+    fn from(value: Spanned<Element>) -> Self {
+        WrappedSpannedElement(value.into())
     }
 }
 

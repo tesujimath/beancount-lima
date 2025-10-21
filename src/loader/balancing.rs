@@ -3,23 +3,23 @@ use rust_decimal::Decimal;
 use std::collections::HashMap;
 use time::Date;
 
-use crate::prism::types::{Cost, WrappedSpannedElement};
+use super::types::*;
 
 #[derive(Debug)]
-pub(crate) struct InferredTolerance<'a> {
+pub(crate) struct InferredTolerance {
     fallback: Option<Decimal>,
-    by_currency: HashMap<parser::Currency<'a>, Decimal>,
+    by_currency: HashMap<String, Decimal>,
 
     multiplier: Decimal,
 }
 
-impl<'a> InferredTolerance<'a> {
-    pub(crate) fn new(options: &'a parser::Options<'a>) -> Self {
+impl InferredTolerance {
+    pub(crate) fn new(options: &parser::Options<'_>) -> Self {
         Self {
             fallback: options.inferred_tolerance_default_fallback(),
             by_currency: options
                 .inferred_tolerance_defaults()
-                .filter_map(|(cur, value)| cur.map(|cur| (cur, value)))
+                .filter_map(|(cur, value)| cur.map(|cur| (cur.to_string(), value)))
                 .collect::<HashMap<_, _>>(),
             multiplier: options.inferred_tolerance_multiplier(),
         }
@@ -77,8 +77,8 @@ impl<'a> WeightSource<'a> {
     }
 }
 
-impl From<(Date, &parser::CostSpec<'_>, &Weight<'_>)> for Cost {
-    fn from(value: (Date, &parser::CostSpec<'_>, &Weight<'_>)) -> Self {
+impl<'a> From<(Date, &'a parser::CostSpec<'a>, &Weight<'a>)> for Cost<'a> {
+    fn from(value: (Date, &'a parser::CostSpec<'a>, &Weight<'a>)) -> Self {
         let (date, cs, w) = value;
         let native_units = if let WeightSource::Cost(native_units, _) = &w.source {
             native_units
@@ -89,9 +89,9 @@ impl From<(Date, &parser::CostSpec<'_>, &Weight<'_>)> for Cost {
             );
         };
         let per_unit = w.number / native_units;
-        let currency = w.currency.to_string();
+        let currency = w.currency;
         let date = cs.date().map(|date| *date.item()).unwrap_or(date);
-        let label = cs.label().map(|label| label.item().to_string());
+        let label = cs.label().map(|label| *label.item());
         let merge = cs.merge();
 
         Self {
@@ -276,8 +276,8 @@ impl<'a> TryFrom<&'a parser::Posting<'a>> for WeightBuilder<'a> {
 
 pub(crate) fn balance_transaction<'a>(
     transaction: &'a parser::Transaction<'a>,
-    inferred_tolerance: &InferredTolerance<'a>,
-    element: &WrappedSpannedElement,
+    inferred_tolerance: &InferredTolerance,
+    element: &parser::Spanned<Element>,
 ) -> Result<Vec<Weight<'a>>, parser::AnnotatedError> {
     tracing::debug!("transaction postings");
     let postings = transaction.postings().collect::<Vec<_>>();
@@ -383,14 +383,16 @@ pub(crate) fn balance_transaction<'a>(
         // sort by currency so deterministic
         let mut currencies = currency_balance.keys().copied().collect::<Vec<_>>();
         currencies.sort();
-        return Err(element.error(format!(
-            "balancing error {}",
-            currencies
-                .into_iter()
-                .map(|cur| format!("{} {}", currency_balance.get(cur).unwrap(), cur))
-                .collect::<Vec<String>>()
-                .join(", ")
-        )));
+        return Err(element
+            .error(format!(
+                "balancing error {}",
+                currencies
+                    .into_iter()
+                    .map(|cur| format!("{} {}", currency_balance.get(cur).unwrap(), cur))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ))
+            .into());
     }
 
     // TODO consider removing this sanity check which can't fail
@@ -414,7 +416,7 @@ pub(crate) fn balance_transaction<'a>(
 fn ignore_tolerable_residuals<'a>(
     weights: &[WeightBuilder],
     residual: hashbrown::HashMap<&'a parser::Currency<'a>, rust_decimal::Decimal>,
-    inferred_tolerance: &InferredTolerance<'a>,
+    inferred_tolerance: &InferredTolerance,
 ) -> hashbrown::HashMap<&'a parser::Currency<'a>, rust_decimal::Decimal> {
     use hashbrown::hash_map::Entry::*;
 
@@ -459,7 +461,7 @@ fn ignore_tolerable_residuals<'a>(
                     }
                     if let Some(tol) = inferred_tolerance
                         .by_currency
-                        .get(cur)
+                        .get(cur.as_ref())
                         .or(inferred_tolerance.fallback.as_ref())
                     {
                         let intolerable = &abs_num > tol;
