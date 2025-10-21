@@ -1,8 +1,8 @@
 use crate::{
-    args::register_args,
-    config::{get_config_string, LedgerBuilderConfig},
+    bridge::parse_from,
+    config::{get_config_string, LoaderConfig},
     import::{Context, Import},
-    ledger::Ledger,
+    prism::{args::register_args, Ledger},
 };
 use color_eyre::eyre::{eyre, Result};
 use std::path::PathBuf;
@@ -145,12 +145,8 @@ fn main() -> Result<()> {
     let ledger_path = cli
         .ledger
         .or(get_config_string(&mut steel_engine, &["ledger"])?.map(PathBuf::from));
-    let ledger = if let Some(ledger) = ledger_path.as_ref() {
-        Ledger::parse_from(
-            ledger,
-            LedgerBuilderConfig::get(&mut steel_engine)?,
-            error_w,
-        )?
+    let ledger = if let Some(ledger_path) = ledger_path.as_ref() {
+        parse_from(ledger_path, LoaderConfig::get(&mut steel_engine)?, error_w)?
     } else {
         Ledger::empty()
     };
@@ -200,11 +196,8 @@ fn main() -> Result<()> {
 
         Some(Command::Test { scheme_files }) => {
             if let Some(ledger_path) = ledger_path.as_ref() {
-                let ledger = Ledger::parse_from(
-                    ledger_path,
-                    LedgerBuilderConfig::get(&mut steel_engine)?,
-                    error_w,
-                )?;
+                let ledger =
+                    parse_from(ledger_path, LoaderConfig::get(&mut steel_engine)?, error_w)?;
                 ledger.register(&mut steel_engine);
             };
 
@@ -285,11 +278,8 @@ where
 }
 
 fn register_types(steel_engine: &mut Engine) {
-    types::register_types(steel_engine);
-    ledger::register_types(steel_engine);
+    prism::register_types(steel_engine);
     import::register_types(steel_engine);
-    inventory::register_types(steel_engine);
-    tabulate::register(steel_engine);
 }
 
 fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<()> {
@@ -305,16 +295,11 @@ fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<
     )
 }
 
-pub(crate) mod args;
-pub(crate) mod balancing;
-pub(crate) mod booking;
+pub(crate) mod bridge;
 pub(crate) mod config;
-pub(crate) mod format;
 pub(crate) mod import;
-pub(crate) mod inventory;
-pub(crate) mod ledger;
-pub(crate) mod tabulate;
-pub(crate) mod types;
+pub(crate) mod loader;
+pub(crate) mod prism;
 
 #[cfg(test)]
 mod tests;

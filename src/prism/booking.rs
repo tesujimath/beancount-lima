@@ -4,7 +4,7 @@ use beancount_parser_lima as parser;
 use std::{mem::take, ops::Deref};
 use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};
 
-use crate::types::*;
+use crate::prism::types as prism;
 
 /// A list of positions for a currency satisfying these invariants:
 /// 1. If there is a simple position without cost, it occurs first in the list
@@ -12,10 +12,10 @@ use crate::types::*;
 /// 3. Sort order of these is by date then currency then label.
 /// 4. All positions are non-empty.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct PositionsBuilder(Vec<Position>);
+pub(crate) struct PositionsBuilder(Vec<prism::Position>);
 
 impl Deref for PositionsBuilder {
-    type Target = Vec<Position>;
+    type Target = Vec<prism::Position>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -25,7 +25,7 @@ impl Deref for PositionsBuilder {
 impl PositionsBuilder {
     /// The booking algorithm
     // TODO handle cost
-    pub(crate) fn book(&mut self, position: Position, method: Booking) {
+    pub(crate) fn book(&mut self, position: prism::Position, method: Booking) {
         if position.cost.is_some() {
             panic!("cost not yet supported for booking")
         }
@@ -45,7 +45,7 @@ impl PositionsBuilder {
 
     fn remove_empty_positions(&mut self) {
         // first cheaply check there are any before building a new Vec
-        let any_empty = self.0.iter().any(Position::is_empty);
+        let any_empty = self.0.iter().any(prism::Position::is_empty);
         if any_empty {
             let non_empty = take(&mut self.0)
                 .into_iter()
@@ -56,13 +56,13 @@ impl PositionsBuilder {
     }
 }
 
-impl From<Position> for PositionsBuilder {
-    fn from(value: Position) -> Self {
+impl From<prism::Position> for PositionsBuilder {
+    fn from(value: prism::Position) -> Self {
         Self(vec![value])
     }
 }
 
-impl From<&PositionsBuilder> for Vec<Position> {
+impl From<&PositionsBuilder> for Vec<prism::Position> {
     fn from(value: &PositionsBuilder) -> Self {
         value.0.clone()
     }

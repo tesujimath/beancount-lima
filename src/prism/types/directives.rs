@@ -12,7 +12,7 @@ use steel::{
 use steel_derive::Steel;
 use time::Date;
 
-use crate::{booking::Booking, types::*};
+use super::{super::booking::Booking, *};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Directive {

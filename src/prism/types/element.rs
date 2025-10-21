@@ -7,7 +7,7 @@ use steel::{
     steel_vm::{engine::Engine, register_fn::RegisterFn},
 };
 
-use crate::types::core::*;
+use super::core::*;
 
 #[derive(Clone, Debug)]
 pub struct Element {

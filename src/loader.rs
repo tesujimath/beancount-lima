@@ -1,155 +1,41 @@
 // TODO remove:
 #![allow(dead_code, unused_variables)]
-use beancount_parser_lima::{
-    self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess, Span, Spanned,
-};
-use color_eyre::eyre::{eyre, Result, WrapErr};
+use beancount_parser_lima::{self as parser, Span, Spanned};
+use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
-use std::{
-    collections::{HashMap, HashSet},
-    io::Write,
-    iter::once,
-    path::Path,
-};
-use steel::{
-    gc::{Gc, Shared},
-    rvals::{IntoSteelVal, SteelHashMap},
-    steel_vm::{engine::Engine, register_fn::RegisterFn},
-    SteelVal,
-};
-use steel_derive::Steel;
+use std::collections::{HashMap, HashSet};
+use steel::{gc::Gc, rvals::SteelHashMap, SteelVal};
 use tabulator::{Align, Cell, Gap};
 use time::Date;
 
-use crate::{
-    balancing::{balance_transaction, InferredTolerance, WeightSource},
-    config::LedgerBuilderConfig,
-    types::*,
-};
-
-#[derive(Clone, Debug, Steel)]
-pub(crate) struct Ledger {
-    pub(crate) sources: CustomShared<BeancountSources>,
-    pub(crate) directives: Shared<Vec<Directive>>,
-    pub(crate) options: SteelHashMap,
-}
-
-impl Ledger {
-    /// Empty ledger
-    pub(crate) fn empty() -> Self {
-        Ledger {
-            sources: BeancountSources::from("").into(),
-            directives: Vec::default().into(),
-            options: Gc::new(steel::HashMap::default()).into(),
-        }
-    }
-
-    pub(crate) fn parse_from<W>(
-        path: &Path,
-        config: LedgerBuilderConfig,
-        error_w: W,
-    ) -> Result<Self>
-    where
-        W: Write + Copy,
-    {
-        let sources =
-            BeancountSources::try_from(path).wrap_err(format!("failed to read {path:?}"))?;
-        let parser = BeancountParser::new(&sources);
-
-        let mut builder = match parser.parse() {
-            Ok(ParseSuccess {
-                directives,
-                options,
-                plugins: _,
-                warnings,
-            }) => {
-                sources.write_errors_or_warnings(error_w, warnings)?;
-                let mut builder = LedgerBuilder::new(&options, config);
-                let inferred_tolerance = InferredTolerance::new(&options);
-
-                for directive in directives {
-                    builder.directive(&directive, &inferred_tolerance);
-                }
-                Ok(builder)
-            }
-
-            Err(ParseError { errors, warnings }) => {
-                sources.write_errors_or_warnings(error_w, errors)?;
-                sources.write_errors_or_warnings(error_w, warnings)?;
-                Err(eyre! {"parse error"})
-            }
-        }?;
-
-        drop(parser);
-
-        builder.validate();
-
-        builder.build(sources, error_w)
-    }
-
-    fn sources(&self) -> CustomShared<BeancountSources> {
-        self.sources.clone()
-    }
-
-    fn directives(&self) -> Vec<Directive> {
-        (*self.directives).clone()
-    }
-
-    fn options(&self) -> SteelVal {
-        SteelVal::HashMapV(self.options.clone())
-    }
-
-    pub(crate) fn register(self, steel_engine: &mut Engine) {
-        steel_engine
-            .register_external_value("*sources*", self.sources())
-            .unwrap(); // can't fail
-        steel_engine
-            .register_external_value("*directives*", self.directives())
-            .unwrap(); // can't fail
-        steel_engine
-            .register_external_value("*options*", self.options())
-            .unwrap(); // can't fail
-    }
-}
-
-fn write_ffi_error(sources: &CustomShared<BeancountSources>, error: WrappedError) {
-    tracing::debug!("write_ffi_error");
-
-    sources
-        .write_errors_or_warnings(&std::io::stderr(), vec![error.as_ref().clone()])
-        .unwrap();
-}
-
-fn write_ffi_errors(sources: &CustomShared<BeancountSources>, errors: Vec<WrappedError>) {
-    tracing::debug!("write_ffi_errors");
-
-    sources
-        .write_errors_or_warnings(
-            &std::io::stderr(),
-            errors
-                .iter()
-                .map(|e| e.as_ref().clone())
-                .collect::<Vec<_>>(),
-        )
-        .unwrap();
-}
+use crate::{bridge::convert_parser_options, config::LoaderConfig, prism::types as prism};
 
 #[derive(Debug)]
-struct LedgerBuilder {
-    directives: Vec<Directive>,
+pub(crate) struct Loader {
+    directives: Vec<prism::Directive>,
     // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
     open_accounts: hashbrown::HashMap<String, Span>,
     closed_accounts: hashbrown::HashMap<String, Span>,
     accounts: HashMap<String, AccountBuilder>,
     currency_usage: hashbrown::HashMap<String, i32>,
     parser_options: SteelHashMap,
-    config: LedgerBuilderConfig,
+    config: LoaderConfig,
     errors: Vec<parser::AnnotatedError>,
     warnings: Vec<parser::AnnotatedWarning>,
 }
 
-impl LedgerBuilder {
-    fn new(options: &parser::Options<'_>, config: LedgerBuilderConfig) -> Self {
+pub(crate) struct LoadSuccess {
+    pub(crate) directives: Vec<prism::Directive>,
+    pub(crate) warnings: Vec<parser::AnnotatedWarning>,
+}
+
+pub(crate) struct LoadError {
+    pub(crate) errors: Vec<parser::AnnotatedError>,
+    pub(crate) warnings: Vec<parser::AnnotatedWarning>,
+}
+
+impl Loader {
+    pub(crate) fn new(options: &parser::Options<'_>, config: LoaderConfig) -> Self {
         let parser_options = convert_parser_options(options)
             .map(|(k, v)| (SteelVal::SymbolV(k.to_string().into()), v))
             .collect::<steel::HashMap<SteelVal, SteelVal>>();
@@ -168,47 +54,35 @@ impl LedgerBuilder {
     }
 
     // generate any errors before building
-    fn validate(&mut self) {
-        // check for unused pad directives
-        for account in self.accounts.values() {
-            if let Some(pad_idx) = &account.pad_idx {
-                self.errors
-                    .push(self.directives[*pad_idx].element.error("unused"))
-            }
-        }
-    }
-
-    fn build<W>(self, sources: BeancountSources, error_w: W) -> Result<Ledger>
-    where
-        W: Write + Copy,
-    {
+    pub(crate) fn validate(self) -> Result<LoadSuccess, LoadError> {
         let Self {
             directives,
             accounts,
             currency_usage,
             parser_options,
-            errors,
+            mut errors,
             warnings,
             ..
         } = self;
 
-        if errors.is_empty() {
-            if !warnings.is_empty() {
-                sources.write_errors_or_warnings(error_w, warnings)?;
+        // check for unused pad directives
+        for account in accounts.values() {
+            if let Some(pad_idx) = &account.pad_idx {
+                errors.push(directives[*pad_idx].element.error("unused"))
             }
+        }
 
-            Ok(Ledger {
-                sources: sources.into(),
-                directives: directives.into(),
-                options: parser_options,
+        if errors.is_empty() {
+            Ok(LoadSuccess {
+                directives,
+                warnings,
             })
         } else {
-            sources.write_errors_or_warnings(error_w, errors)?;
-            Err(eyre!("builder error"))
+            Err(LoadError { errors, warnings })
         }
     }
 
-    fn directive<'a>(
+    pub(crate) fn directive<'a>(
         &mut self,
         directive: &'a Spanned<parser::Directive<'a>>,
         inferred_tolerance: &InferredTolerance<'a>,
@@ -216,7 +90,7 @@ impl LedgerBuilder {
         use parser::DirectiveVariant::*;
 
         let date = *directive.date().item();
-        let element = Into::<WrappedSpannedElement>::into(directive);
+        let element = Into::<prism::WrappedSpannedElement>::into(directive);
 
         match directive.variant() {
             Transaction(transaction) => {
@@ -240,7 +114,7 @@ impl LedgerBuilder {
         transaction: &parser::Transaction,
         date: Date,
         inferred_tolerance: &InferredTolerance<'a>,
-        element: WrappedSpannedElement,
+        element: prism::WrappedSpannedElement,
     ) {
         match balance_transaction(transaction, inferred_tolerance, &element) {
             Ok(weights) => {
@@ -279,7 +153,7 @@ impl LedgerBuilder {
                     }
                 }
 
-                let transaction = Transaction {
+                let transaction = prism::Transaction {
                     postings: postings.into(),
                     flag: transaction.flag().to_string(),
                     payee: transaction.payee().map(|payee| payee.to_string()),
@@ -288,10 +162,10 @@ impl LedgerBuilder {
                         .map(|narration| narration.to_string()),
                 };
 
-                self.directives.push(Directive {
+                self.directives.push(prism::Directive {
                     date,
                     element,
-                    variant: DirectiveVariant::Transaction(transaction),
+                    variant: prism::DirectiveVariant::Transaction(transaction),
                 })
             }
             Err(e) => {
@@ -305,15 +179,15 @@ impl LedgerBuilder {
     // accumulate the post and return its alist attrs, or record error and return None
     fn post<D>(
         &mut self,
-        element: WrappedSpannedElement,
+        element: prism::WrappedSpannedElement,
         date: Date,
         account_name: &str,
         amount: Decimal,
         currency: String,
         flag: Option<String>,
-        cost: Option<Cost>,
+        cost: Option<prism::Cost>,
         description: D,
-    ) -> Option<Posting>
+    ) -> Option<prism::Posting>
     where
         D: Into<String>,
     {
@@ -348,7 +222,7 @@ impl LedgerBuilder {
                     }
                 }
 
-                let amount: Amount = (amount, currency).into();
+                let amount: prism::Amount = (amount, currency).into();
 
                 // collate balance from inventory across all currencies, sorted so deterministic
                 let mut currencies = account.inventory.keys().collect::<Vec<_>>();
@@ -359,9 +233,9 @@ impl LedgerBuilder {
                         let amount = account.inventory.get(cur).unwrap();
                         (*amount, cur.clone()).into()
                     })
-                    .collect::<Vec<Amount>>();
+                    .collect::<Vec<prism::Amount>>();
 
-                let posting = Posting::new(account_name, amount.clone(), flag, cost);
+                let posting = prism::Posting::new(account_name, amount.clone(), flag, cost);
                 account.postings.push(posting.clone());
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
@@ -397,11 +271,11 @@ impl LedgerBuilder {
         }
     }
 
-    fn price(&mut self, price: &parser::Price, date: Date, element: WrappedSpannedElement) {
-        self.directives.push(Directive {
+    fn price(&mut self, price: &parser::Price, date: Date, element: prism::WrappedSpannedElement) {
+        self.directives.push(prism::Directive {
             date,
             element,
-            variant: DirectiveVariant::Price(Price {
+            variant: prism::DirectiveVariant::Price(prism::Price {
                 currency: price.currency().item().to_string(),
                 amount: price.amount().item().into(),
             }),
@@ -448,7 +322,12 @@ impl LedgerBuilder {
         }
     }
 
-    fn balance(&mut self, balance: &parser::Balance, date: Date, element: WrappedSpannedElement) {
+    fn balance(
+        &mut self,
+        balance: &parser::Balance,
+        date: Date,
+        element: prism::WrappedSpannedElement,
+    ) {
         let account_name = balance.account().item().to_string();
         let (margin, pad_idx) = if self.open_accounts.contains_key(&account_name) {
             // what's the gap between what we have and what the balance says we should have?
@@ -547,7 +426,7 @@ impl LedgerBuilder {
                     }
                 }
 
-                if let DirectiveVariant::Transaction(pad_transaction) =
+                if let prism::DirectiveVariant::Transaction(pad_transaction) =
                     &mut self.directives[pad_idx + 1].variant
                 {
                     pad_transaction.postings = pad_postings.into();
@@ -645,7 +524,7 @@ impl LedgerBuilder {
             balance: vec![balance.atol().amount().item().into()],
         });
 
-        let balance = Balance {
+        let balance = prism::Balance {
             account: account_name,
             amount: (
                 balance.atol().amount().number().value(),
@@ -657,14 +536,14 @@ impl LedgerBuilder {
                 .tolerance()
                 .map(|tolerance| (*tolerance.item())),
         };
-        self.directives.push(Directive {
+        self.directives.push(prism::Directive {
             date,
             element,
-            variant: DirectiveVariant::Balance(balance),
+            variant: prism::DirectiveVariant::Balance(balance),
         })
     }
 
-    fn open(&mut self, open: &parser::Open, date: Date, element: WrappedSpannedElement) {
+    fn open(&mut self, open: &parser::Open, date: Date, element: prism::WrappedSpannedElement) {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(open.account().item().to_string()) {
             Occupied(open_entry) => {
@@ -709,10 +588,10 @@ impl LedgerBuilder {
             .collect::<Vec<_>>();
         currencies.sort();
 
-        self.directives.push(Directive {
+        self.directives.push(prism::Directive {
             date,
             element,
-            variant: DirectiveVariant::Open(Open {
+            variant: prism::DirectiveVariant::Open(prism::Open {
                 account: open.account().item().to_string(),
                 currencies,
                 booking: open.booking().map(|booking| (*booking.item()).into()),
@@ -720,7 +599,7 @@ impl LedgerBuilder {
         })
     }
 
-    fn close(&mut self, close: &parser::Close, date: Date, element: WrappedSpannedElement) {
+    fn close(&mut self, close: &parser::Close, date: Date, element: prism::WrappedSpannedElement) {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(close.account().item().to_string()) {
             Occupied(open_entry) => {
@@ -746,10 +625,10 @@ impl LedgerBuilder {
             }
         }
 
-        self.directives.push(Directive {
+        self.directives.push(prism::Directive {
             date,
             element,
-            variant: DirectiveVariant::Close(Close {
+            variant: prism::DirectiveVariant::Close(prism::Close {
                 account: close.account().item().to_string(),
             }),
         })
@@ -759,18 +638,18 @@ impl LedgerBuilder {
         &mut self,
         commodity: &parser::Commodity,
         date: Date,
-        element: WrappedSpannedElement,
+        element: prism::WrappedSpannedElement,
     ) {
-        self.directives.push(Directive {
+        self.directives.push(prism::Directive {
             date,
             element,
-            variant: DirectiveVariant::Commodity(Commodity {
+            variant: prism::DirectiveVariant::Commodity(prism::Commodity {
                 currency: commodity.currency().item().to_string(),
             }),
         })
     }
 
-    fn pad(&mut self, pad: &parser::Pad, date: Date, element: WrappedSpannedElement) {
+    fn pad(&mut self, pad: &parser::Pad, date: Date, element: prism::WrappedSpannedElement) {
         let account_name = pad.account().item().to_string();
         if self.open_accounts.contains_key(&account_name) {
             let account = self.accounts.get_mut(&account_name).unwrap();
@@ -785,20 +664,20 @@ impl LedgerBuilder {
                     .push(self.directives[unused_pad_idx].element.error("unused"));
             }
 
-            self.directives.push(Directive {
+            self.directives.push(prism::Directive {
                 date,
                 element: element.clone(),
-                variant: DirectiveVariant::Pad(Pad {
+                variant: prism::DirectiveVariant::Pad(prism::Pad {
                     account: account_name,
                     source,
                 }),
             });
 
             // also need a transaction to be back-filled later with whatever got padded
-            self.directives.push(Directive {
+            self.directives.push(prism::Directive {
                 date,
                 element,
-                variant: DirectiveVariant::Transaction(Transaction {
+                variant: prism::DirectiveVariant::Transaction(prism::Transaction {
                     postings: Vec::default().into(),
                     flag: PAD_FLAG.into(),
                     payee: None,
@@ -814,58 +693,50 @@ impl LedgerBuilder {
         &mut self,
         document: &parser::Document,
         date: Date,
-        element: WrappedSpannedElement,
+        element: prism::WrappedSpannedElement,
     ) {
-        self.directives.push(Directive {
+        self.directives.push(prism::Directive {
             date,
             element: element.clone(),
-            variant: DirectiveVariant::Document(Document {
+            variant: prism::DirectiveVariant::Document(prism::Document {
                 account: document.account().item().to_string(),
                 path: document.path().item().to_string(),
             }),
         });
     }
 
-    fn note(&mut self, note: &parser::Note, date: Date, element: WrappedSpannedElement) {
-        self.directives.push(Directive {
+    fn note(&mut self, note: &parser::Note, date: Date, element: prism::WrappedSpannedElement) {
+        self.directives.push(prism::Directive {
             date,
             element: element.clone(),
-            variant: DirectiveVariant::Note(Note {
+            variant: prism::DirectiveVariant::Note(prism::Note {
                 account: note.account().item().to_string(),
                 comment: note.comment().item().to_string(),
             }),
         });
     }
 
-    fn event(&mut self, event: &parser::Event, date: Date, element: WrappedSpannedElement) {
-        self.directives.push(Directive {
+    fn event(&mut self, event: &parser::Event, date: Date, element: prism::WrappedSpannedElement) {
+        self.directives.push(prism::Directive {
             date,
             element: element.clone(),
-            variant: DirectiveVariant::Event(Event {
+            variant: prism::DirectiveVariant::Event(prism::Event {
                 event_type: event.event_type().item().to_string(),
                 description: event.description().item().to_string(),
             }),
         });
     }
 
-    fn query(&mut self, query: &parser::Query, date: Date, element: WrappedSpannedElement) {
-        self.directives.push(Directive {
+    fn query(&mut self, query: &parser::Query, date: Date, element: prism::WrappedSpannedElement) {
+        self.directives.push(prism::Directive {
             date,
             element: element.clone(),
-            variant: DirectiveVariant::Query(Query {
+            variant: prism::DirectiveVariant::Query(prism::Query {
                 name: query.name().item().to_string(),
                 content: query.content().item().to_string(),
             }),
         });
     }
-}
-
-#[derive(Debug)]
-struct BalanceDiagnostic {
-    date: Date,
-    description: Option<String>,
-    amount: Option<Amount>,
-    balance: Vec<Amount>,
 }
 
 #[derive(Debug)]
@@ -876,8 +747,8 @@ struct AccountBuilder {
     opened: Span,
     // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
-    postings: Vec<Posting>,
-    pad_idx: Option<usize>, // index in directives in LedgerBuilder
+    postings: Vec<prism::Posting>,
+    pad_idx: Option<usize>, // index in directives in Loader
     balance_diagnostics: Vec<BalanceDiagnostic>,
 }
 
@@ -902,56 +773,18 @@ impl AccountBuilder {
     }
 }
 
-/// Convert just those parser options that make sense to expose to Scheme.
-/// TODO options
-fn convert_parser_options(
-    options: &parser::Options<'_>,
-) -> impl Iterator<Item = (&'static str, SteelVal)> {
-    once((
-        "name_assets",
-        options
-            .account_type_name(parser::AccountType::Assets)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
-    ))
-    .chain(once((
-        "name_liabilities",
-        options
-            .account_type_name(parser::AccountType::Liabilities)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
-    )))
-    .chain(once((
-        "name_equity",
-        options
-            .account_type_name(parser::AccountType::Equity)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
-    )))
-    .chain(once((
-        "name_income",
-        options
-            .account_type_name(parser::AccountType::Income)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
-    )))
-    .chain(once((
-        "name_expenses",
-        options
-            .account_type_name(parser::AccountType::Expenses)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
-    )))
+#[derive(Debug)]
+struct BalanceDiagnostic {
+    date: Date,
+    description: Option<String>,
+    amount: Option<prism::Amount>,
+    balance: Vec<prism::Amount>,
 }
 
 const PAD_FLAG: &str = "'P";
 
-pub(crate) fn register_types(steel_engine: &mut Engine) {
-    steel_engine.register_fn("sources-write-ffi-error", write_ffi_error);
-    steel_engine.register_fn("sources-write-ffi-errors", write_ffi_errors);
-}
+pub(crate) mod balancing;
+use balancing::{balance_transaction, InferredTolerance, WeightSource};
+
+mod types;
+use types as loader;

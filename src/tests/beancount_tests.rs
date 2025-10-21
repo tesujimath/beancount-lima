@@ -4,8 +4,8 @@ use std::path::Path;
 use test_generator::test_resources;
 
 use crate::{
-    create_engine, register_args, report_test_failures, tests::init_tracing, Ledger,
-    LedgerBuilderConfig,
+    bridge::parse_from, create_engine, register_args, report_test_failures, tests::init_tracing,
+    LoaderConfig,
 };
 
 use super::load_cog_path;
@@ -20,9 +20,9 @@ fn beancount_tests(beancount_relpath: &str) {
         beancount_relpath.strip_suffix(".beancount").unwrap(),
     );
 
-    let ledger = Ledger::parse_from(
+    let ledger = parse_from(
         Path::new(beancount_relpath),
-        LedgerBuilderConfig::default(),
+        LoaderConfig::default(),
         &std::io::stderr(),
     )
     .unwrap();

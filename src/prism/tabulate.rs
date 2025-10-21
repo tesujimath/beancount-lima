@@ -8,7 +8,7 @@ use steel::{
 };
 use tabulator::{Align, Cell, Gap};
 
-use crate::types::{Amount, SteelDecimal};
+use super::types::{Amount, SteelDecimal};
 
 fn custom_to_cell<'a>(value: &GcMut<Box<dyn CustomType>>) -> Result<Cell<'a>, SteelErr> {
     use Align::Left;

@@ -3,7 +3,7 @@ use lazy_format::lazy_format;
 use std::fmt::{self, Display, Formatter};
 use time::Date;
 
-use crate::types::*;
+use super::types::*;
 
 // adapted from beancount-parser-lima
 

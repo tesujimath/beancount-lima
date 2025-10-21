@@ -11,7 +11,7 @@ use steel::{
 use tabulator::{Align, Cell, Gap};
 use time::Date;
 
-use crate::types::steel_decimal::SteelDecimal;
+use super::steel_decimal::SteelDecimal;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) struct Posting {

@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use std::collections::HashMap;
 use time::Date;
 
-use crate::types::{Cost, WrappedSpannedElement};
+use crate::prism::types::{Cost, WrappedSpannedElement};
 
 #[derive(Debug)]
 pub(crate) struct InferredTolerance<'a> {
