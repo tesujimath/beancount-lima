@@ -1,8 +1,8 @@
 use crate::{
-    bridge::parse_from,
+    bridge::load_from,
     config::{get_config_string, LoaderConfig},
     import::{Context, Import},
-    prism::{register_args, Ledger},
+    prism::{register_args, Prism},
 };
 use color_eyre::eyre::{eyre, Result};
 use std::path::PathBuf;
@@ -145,12 +145,12 @@ fn main() -> Result<()> {
     let ledger_path = cli
         .ledger
         .or(get_config_string(&mut steel_engine, &["ledger"])?.map(PathBuf::from));
-    let ledger = if let Some(ledger_path) = ledger_path.as_ref() {
-        parse_from(ledger_path, LoaderConfig::get(&mut steel_engine)?, error_w)?
+    let prism = if let Some(ledger_path) = ledger_path.as_ref() {
+        load_from(ledger_path, LoaderConfig::get(&mut steel_engine)?, error_w)?
     } else {
-        Ledger::empty()
+        Prism::empty()
     };
-    ledger.register(&mut steel_engine);
+    prism.register(&mut steel_engine);
 
     match &cli.command {
         None => (),
@@ -172,7 +172,7 @@ fn main() -> Result<()> {
                     .unwrap_or("narration2".to_string());
 
             let context = if let Some(ledger) = ledger_path.as_ref() {
-                Some(Context::parse_from(
+                Some(Context::load_from(
                     ledger,
                     vec![txnid_key, txnid2_key],
                     payee2_key,
@@ -196,9 +196,8 @@ fn main() -> Result<()> {
 
         Some(Command::Test { scheme_files }) => {
             if let Some(ledger_path) = ledger_path.as_ref() {
-                let ledger =
-                    parse_from(ledger_path, LoaderConfig::get(&mut steel_engine)?, error_w)?;
-                ledger.register(&mut steel_engine);
+                let prism = load_from(ledger_path, LoaderConfig::get(&mut steel_engine)?, error_w)?;
+                prism.register(&mut steel_engine);
             };
 
             set_test_mode(&mut steel_engine).unwrap();

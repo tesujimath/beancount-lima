@@ -10,10 +10,10 @@ use steel::{gc::Gc, rvals::IntoSteelVal, SteelVal};
 use crate::{
     config::LoaderConfig,
     loader::{InferredTolerance, LoadError, LoadSuccess, Loader},
-    prism::Ledger,
+    prism::Prism,
 };
 
-pub(crate) fn parse_from<W>(path: &Path, config: LoaderConfig, error_w: W) -> Result<Ledger>
+pub(crate) fn load_from<W>(path: &Path, config: LoaderConfig, error_w: W) -> Result<Prism>
 where
     W: Write + Copy,
 {
@@ -53,7 +53,7 @@ where
 
                     drop(parser);
 
-                    Ok(Ledger {
+                    Ok(Prism {
                         sources: sources.into(),
                         directives: prism_directives.into(),
                         options,
@@ -76,7 +76,7 @@ where
 
 /// Convert just those parser options that make sense to expose to Scheme.
 /// TODO options
-pub(crate) fn convert_parser_options(
+fn convert_parser_options(
     options: &parser::Options<'_>,
 ) -> impl Iterator<Item = (&'static str, SteelVal)> {
     once((

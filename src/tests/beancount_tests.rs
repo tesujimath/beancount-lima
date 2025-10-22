@@ -4,7 +4,7 @@ use std::path::Path;
 use test_generator::test_resources;
 
 use crate::{
-    bridge::parse_from, create_engine, register_args, report_test_failures, tests::init_tracing,
+    bridge::load_from, create_engine, register_args, report_test_failures, tests::init_tracing,
     LoaderConfig,
 };
 
@@ -20,7 +20,7 @@ fn beancount_tests(beancount_relpath: &str) {
         beancount_relpath.strip_suffix(".beancount").unwrap(),
     );
 
-    let ledger = parse_from(
+    let prism = load_from(
         Path::new(beancount_relpath),
         LoaderConfig::default(),
         &std::io::stderr(),
@@ -29,7 +29,7 @@ fn beancount_tests(beancount_relpath: &str) {
 
     let mut steel_engine = create_engine();
 
-    ledger.register(&mut steel_engine);
+    prism.register(&mut steel_engine);
     register_args(&mut steel_engine, Vec::default());
 
     load_cog_path(&mut steel_engine, &cog_relpath).unwrap();

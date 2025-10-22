@@ -21,7 +21,7 @@ pub(crate) struct Context {
 }
 
 impl Context {
-    pub(crate) fn parse_from<W>(
+    pub(crate) fn load_from<W>(
         path: &Path,
         txnid_keys: Vec<String>,
         payee2_key: String,

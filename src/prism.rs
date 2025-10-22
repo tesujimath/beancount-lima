@@ -10,16 +10,15 @@ use steel::{
 use steel_derive::Steel;
 
 #[derive(Clone, Debug, Steel)]
-pub(crate) struct Ledger {
+pub(crate) struct Prism {
     pub(crate) sources: CustomShared<BeancountSources>,
     pub(crate) directives: Shared<Vec<Directive>>,
     pub(crate) options: SteelHashMap,
 }
 
-impl Ledger {
-    /// Empty ledger
+impl Prism {
     pub(crate) fn empty() -> Self {
-        Ledger {
+        Prism {
             sources: BeancountSources::from("").into(),
             directives: Vec::default().into(),
             options: Gc::new(steel::HashMap::default()).into(),
