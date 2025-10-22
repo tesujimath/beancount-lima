@@ -3,7 +3,7 @@ use lazy_format::lazy_format;
 use std::fmt::{self, Display, Formatter};
 use time::Date;
 
-use super::types::*;
+use super::*;
 
 // adapted from beancount-parser-lima
 
@@ -155,7 +155,7 @@ impl Display for Posting {
     }
 }
 
-pub fn format<C, T, M, D>(
+pub(crate) fn format<C, T, M, D>(
     f: &mut Formatter<'_>,
     container: C,
     mapper: M,
@@ -185,7 +185,7 @@ where
 }
 
 /// Simple format with no mapper or separator
-pub fn simple_format<C, T>(
+pub(crate) fn simple_format<C, T>(
     f: &mut Formatter<'_>,
     container: C,
     prefix: Option<&'static str>,
@@ -198,7 +198,7 @@ where
 }
 
 /// Format plain.
-pub fn plain<S>(s: S) -> impl Display
+pub(crate) fn plain<S>(s: S) -> impl Display
 where
     S: Display,
 {
@@ -206,7 +206,7 @@ where
 }
 
 /// Format in double quotes.
-pub fn double_quoted<S>(s: S) -> impl Display
+pub(crate) fn double_quoted<S>(s: S) -> impl Display
 where
     S: Display,
 {
@@ -214,7 +214,7 @@ where
 }
 
 /// Format key/value.
-pub fn key_value<K, V>(kv: (K, V)) -> impl Display
+pub(crate) fn key_value<K, V>(kv: (K, V)) -> impl Display
 where
     K: Display,
     V: Display,
@@ -222,9 +222,9 @@ where
     lazy_format!("{}: {}", kv.0, kv.1)
 }
 
-pub const EMPTY: &str = "";
-pub const SPACE: &str = " ";
-pub const COMMA: &str = ",";
-pub const TILDE_SPACE: &str = " ~ ";
-pub const NEWLINE: &str = "\n";
-pub const NEWLINE_INDENT: &str = "\n  ";
+pub(crate) const EMPTY: &str = "";
+pub(crate) const SPACE: &str = " ";
+pub(crate) const COMMA: &str = ",";
+pub(crate) const TILDE_SPACE: &str = " ~ ";
+pub(crate) const NEWLINE: &str = "\n";
+pub(crate) const NEWLINE_INDENT: &str = "\n  ";

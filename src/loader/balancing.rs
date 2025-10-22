@@ -1,30 +1,8 @@
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
-use std::collections::HashMap;
 use time::Date;
 
-use super::types::*;
-
-#[derive(Debug)]
-pub(crate) struct InferredTolerance {
-    fallback: Option<Decimal>,
-    by_currency: HashMap<String, Decimal>,
-
-    multiplier: Decimal,
-}
-
-impl InferredTolerance {
-    pub(crate) fn new(options: &parser::Options<'_>) -> Self {
-        Self {
-            fallback: options.inferred_tolerance_default_fallback(),
-            by_currency: options
-                .inferred_tolerance_defaults()
-                .filter_map(|(cur, value)| cur.map(|cur| (cur.to_string(), value)))
-                .collect::<HashMap<_, _>>(),
-            multiplier: options.inferred_tolerance_multiplier(),
-        }
-    }
-}
+use super::*;
 
 // Calculate weight of postings and balance transaction as per:
 //

@@ -696,8 +696,8 @@ struct BalanceDiagnostic<'a> {
 
 pub(crate) const PAD_FLAG: &str = "'P";
 
-pub(crate) mod balancing;
-use balancing::{balance_transaction, InferredTolerance, WeightSource};
+mod balancing;
+use balancing::{balance_transaction, WeightSource};
 
-pub(crate) mod types;
-use types::*;
+mod types;
+pub(crate) use types::*;

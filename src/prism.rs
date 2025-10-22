@@ -81,10 +81,11 @@ pub(crate) fn register_types(steel_engine: &mut Engine) {
     steel_engine.register_fn("sources-write-ffi-errors", write_ffi_errors);
 }
 
-pub(crate) mod args;
-pub(crate) mod booking;
-pub(crate) mod format;
-pub(crate) mod inventory;
-pub(crate) mod tabulate;
-pub(crate) mod types;
-use types::*;
+mod args;
+pub(crate) use args::register_args;
+mod booking;
+mod format;
+mod inventory;
+mod tabulate;
+mod types;
+pub(crate) use types::*;

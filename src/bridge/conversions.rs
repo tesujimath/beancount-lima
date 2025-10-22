@@ -1,5 +1,5 @@
-use crate::loader::types::{self as loader, into_spanned_element};
-use crate::prism::types::{self as prism};
+use crate::loader::{self as loader, into_spanned_element};
+use crate::prism::{self as prism};
 
 pub(crate) fn convert_directives(
     loaded_directives: Vec<loader::Directive>,

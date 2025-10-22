@@ -2,7 +2,7 @@ use crate::{
     bridge::parse_from,
     config::{get_config_string, LoaderConfig},
     import::{Context, Import},
-    prism::{args::register_args, Ledger},
+    prism::{register_args, Ledger},
 };
 use color_eyre::eyre::{eyre, Result};
 use std::path::PathBuf;

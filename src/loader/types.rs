@@ -1,5 +1,6 @@
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
+use std::collections::HashMap;
 use tabulator::{Align, Cell, Gap};
 use time::Date;
 
@@ -80,8 +81,29 @@ impl<'a> From<Amount<'a>> for Cell<'static> {
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct InferredTolerance {
+    pub(crate) fallback: Option<Decimal>,
+    pub(crate) by_currency: HashMap<String, Decimal>,
+
+    pub(crate) multiplier: Decimal,
+}
+
+impl InferredTolerance {
+    pub(crate) fn new(options: &parser::Options<'_>) -> Self {
+        Self {
+            fallback: options.inferred_tolerance_default_fallback(),
+            by_currency: options
+                .inferred_tolerance_defaults()
+                .filter_map(|(cur, value)| cur.map(|cur| (cur.to_string(), value)))
+                .collect::<HashMap<_, _>>(),
+            multiplier: options.inferred_tolerance_multiplier(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
-pub struct Element {
+pub(crate) struct Element {
     element_type: &'static str,
 }
 
@@ -97,7 +119,7 @@ impl parser::ElementType for Element {
     }
 }
 
-pub fn into_spanned_element<T>(value: &parser::Spanned<T>) -> parser::Spanned<Element>
+pub(crate) fn into_spanned_element<T>(value: &parser::Spanned<T>) -> parser::Spanned<Element>
 where
     T: parser::ElementType,
 {

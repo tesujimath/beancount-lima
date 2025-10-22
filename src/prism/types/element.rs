@@ -8,10 +8,10 @@ use steel::{
 };
 
 use super::core::*;
-use crate::loader::types::Element;
+use crate::loader::Element;
 
 #[derive(Clone, Debug)]
-pub struct WrappedSpannedElement(CustomShared<Spanned<Element>>);
+pub(crate) struct WrappedSpannedElement(CustomShared<Spanned<Element>>);
 
 impl Custom for WrappedSpannedElement {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
@@ -76,7 +76,7 @@ impl WrappedSpannedElement {
 }
 
 #[derive(Clone, Debug)]
-pub struct WrappedError(CustomShared<parser::Error>);
+pub(crate) struct WrappedError(CustomShared<parser::Error>);
 
 impl Custom for WrappedError {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {

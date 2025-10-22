@@ -9,7 +9,7 @@ use steel::{gc::Gc, rvals::IntoSteelVal, SteelVal};
 
 use crate::{
     config::LoaderConfig,
-    loader::{balancing::InferredTolerance, LoadError, LoadSuccess, Loader},
+    loader::{InferredTolerance, LoadError, LoadSuccess, Loader},
     prism::Ledger,
 };
 

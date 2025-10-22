@@ -1,9 +1,9 @@
-use super::*;
 use beancount_parser_lima::{self as parser, BeancountParser, BeancountSources, ParseSuccess};
 use rust_decimal_macros::dec;
 use speculoos::prelude::*;
 use test_case::test_case;
 
+use super::{super::*, *};
 use crate::tests::init_tracing;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
