@@ -439,7 +439,7 @@ fn ignore_tolerable_residuals<'a>(
                     }
                     if let Some(tol) = inferred_tolerance
                         .by_currency
-                        .get(cur.as_ref())
+                        .get(cur)
                         .or(inferred_tolerance.fallback.as_ref())
                     {
                         let intolerable = &abs_num > tol;

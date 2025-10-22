@@ -118,7 +118,7 @@ pub(crate) fn convert_directives(
                                 .map(Into::<prism::Posting>::into)
                                 .collect::<Vec<_>>()
                                 .into(),
-                            flag: crate::loader::PAD_FLAG.into(),
+                            flag: crate::loader::pad_flag().to_string(),
                             payee: None,
                             narration: None,
                         }),

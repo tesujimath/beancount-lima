@@ -30,8 +30,8 @@ pub(crate) struct Pad<'a> {
 #[derive(Clone, Debug)]
 pub(crate) struct Posting<'a> {
     pub(crate) parsed: Option<&'a parser::Spanned<parser::Posting<'a>>>,
-    pub(crate) flag: Option<String>,
-    pub(crate) account: String,
+    pub(crate) flag: Option<parser::Flag>,
+    pub(crate) account: &'a str,
     pub(crate) amount: Decimal,
     pub(crate) currency: &'a parser::Currency<'a>,
     pub(crate) cost: Option<Cost<'a>>,
@@ -82,20 +82,20 @@ impl<'a> From<Amount<'a>> for Cell<'static> {
 }
 
 #[derive(Debug)]
-pub(crate) struct InferredTolerance {
+pub(crate) struct InferredTolerance<'a> {
     pub(crate) fallback: Option<Decimal>,
-    pub(crate) by_currency: HashMap<String, Decimal>,
+    pub(crate) by_currency: HashMap<parser::Currency<'a>, Decimal>,
 
     pub(crate) multiplier: Decimal,
 }
 
-impl InferredTolerance {
-    pub(crate) fn new(options: &parser::Options<'_>) -> Self {
+impl<'a> InferredTolerance<'a> {
+    pub(crate) fn new(options: &'a parser::Options<'a>) -> Self {
         Self {
             fallback: options.inferred_tolerance_default_fallback(),
             by_currency: options
                 .inferred_tolerance_defaults()
-                .filter_map(|(cur, value)| cur.map(|cur| (cur.to_string(), value)))
+                .filter_map(|(cur, value)| cur.map(|cur| (cur, value)))
                 .collect::<HashMap<_, _>>(),
             multiplier: options.inferred_tolerance_multiplier(),
         }

@@ -13,12 +13,12 @@ use crate::config::LoaderConfig;
 pub(crate) struct Loader<'a> {
     directives: Vec<Directive<'a>>,
     // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
-    open_accounts: hashbrown::HashMap<String, Span>,
-    closed_accounts: hashbrown::HashMap<String, Span>,
-    accounts: HashMap<String, AccountBuilder<'a>>,
+    open_accounts: hashbrown::HashMap<&'a str, Span>,
+    closed_accounts: hashbrown::HashMap<&'a str, Span>,
+    accounts: HashMap<&'a str, AccountBuilder<'a>>,
     currency_usage: hashbrown::HashMap<&'a parser::Currency<'a>, i32>,
     config: LoaderConfig,
-    inferred_tolerance: InferredTolerance,
+    inferred_tolerance: InferredTolerance<'a>,
     errors: Vec<parser::AnnotatedError>,
     warnings: Vec<parser::AnnotatedWarning>,
 }
@@ -34,7 +34,7 @@ pub(crate) struct LoadError {
 }
 
 impl<'a> Loader<'a> {
-    pub(crate) fn new(inferred_tolerance: InferredTolerance, config: LoaderConfig) -> Self {
+    pub(crate) fn new(inferred_tolerance: InferredTolerance<'a>, config: LoaderConfig) -> Self {
         Self {
             directives: Vec::default(),
             open_accounts: hashbrown::HashMap::default(),
@@ -134,10 +134,10 @@ impl<'a> Loader<'a> {
                         Some(posting),
                         into_spanned_element(posting),
                         date,
-                        &posting.account().to_string(),
+                        posting.account().item().as_ref(),
                         posting_amount,
                         posting_currency,
-                        posting.flag().map(|flag| flag.item().to_string()),
+                        posting.flag().map(|flag| *flag.item()),
                         posting
                             .cost_spec()
                             .map(|cs| (date, cs.item(), &weight).into()),
@@ -160,21 +160,18 @@ impl<'a> Loader<'a> {
     // not without guilt, but oh well
     #[allow(clippy::too_many_arguments)]
     // accumulate the post and return its alist attrs, or record error and return None
-    fn post<D>(
+    fn post(
         &mut self,
         parsed: Option<&'a parser::Spanned<parser::Posting<'a>>>,
         element: parser::Spanned<Element>,
         date: Date,
-        account_name: &str,
+        account_name: &'a str,
         number: Decimal,
         currency: &'a parser::Currency<'a>,
-        flag: Option<String>,
+        flag: Option<parser::Flag>,
         cost: Option<Cost>,
-        description: D,
-    ) -> Option<Posting<'a>>
-    where
-        D: Into<String>,
-    {
+        description: &'a str,
+    ) -> Option<Posting<'a>> {
         if self.open_accounts.contains_key(account_name) {
             let account = self.accounts.get_mut(account_name).unwrap();
 
@@ -222,7 +219,7 @@ impl<'a> Loader<'a> {
                 let posting = Posting {
                     parsed,
                     flag,
-                    account: account_name.to_string(),
+                    account: account_name,
                     amount: number,
                     currency,
                     cost: None,  // TODO cost
@@ -232,7 +229,7 @@ impl<'a> Loader<'a> {
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
                     date,
-                    description: Some(description.into()),
+                    description: Some(description),
                     amount: Some(amount_cur.clone()),
                     balance,
                 });
@@ -316,12 +313,12 @@ impl<'a> Loader<'a> {
         date: Date,
         element: parser::Spanned<Element>,
     ) -> Result<DirectiveVariant<'a>, ()> {
-        let account_name = balance.account().item().to_string();
+        let account_name = balance.account().item().as_ref();
         let (margin, pad_idx) = if self.open_accounts.contains_key(&account_name) {
             // what's the gap between what we have and what the balance says we should have?
             let mut inventory_has_balance_currency = false;
             let mut margin = self
-                .rollup_inventory(&account_name)
+                .rollup_inventory(account_name)
                 .into_iter()
                 .map(|(cur, number)| {
                     if balance.atol().amount().currency().item() == cur {
@@ -392,7 +389,7 @@ impl<'a> Loader<'a> {
                 let mut pad_postings = Vec::default();
 
                 for (cur, number) in &margin {
-                    let pad_flag = Some(PAD_FLAG.to_string());
+                    let flag = Some(pad_flag());
                     tracing::debug!(
                         "back-filling pad at {} {} {} {}",
                         pad_idx,
@@ -404,10 +401,10 @@ impl<'a> Loader<'a> {
                         None,
                         pad_element.clone(),
                         pad_date,
-                        &account_name,
+                        account_name,
                         *number,
                         cur,
-                        pad_flag,
+                        flag,
                         None,
                         "pad",
                     ) {
@@ -527,7 +524,7 @@ impl<'a> Loader<'a> {
         element: parser::Spanned<Element>,
     ) -> Result<DirectiveVariant<'a>, ()> {
         use hashbrown::hash_map::Entry::*;
-        match self.open_accounts.entry(open.account().item().to_string()) {
+        match self.open_accounts.entry(open.account().item().as_ref()) {
             Occupied(open_entry) => {
                 self.errors.push(
                     element
@@ -543,7 +540,7 @@ impl<'a> Loader<'a> {
                 open_entry.insert(*span);
 
                 // cannot reopen a closed account
-                if let Some(closed) = self.closed_accounts.get(&open.account().item().to_string()) {
+                if let Some(closed) = self.closed_accounts.get(&open.account().item().as_ref()) {
                     self.errors.push(
                         element
                             .error_with_contexts(
@@ -554,7 +551,7 @@ impl<'a> Loader<'a> {
                     );
                 } else {
                     self.accounts.insert(
-                        open.account().item().to_string(),
+                        open.account().item().as_ref(),
                         AccountBuilder::with_currencies(open.currencies().map(|c| c.item()), *span),
                     );
                 }
@@ -571,28 +568,19 @@ impl<'a> Loader<'a> {
             }
         }
 
-        let mut currencies = open
-            .currencies()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>();
-        currencies.sort();
-
         Ok(DirectiveVariant::NA)
     }
 
     fn close(
         &mut self,
-        close: &parser::Close,
+        close: &'a parser::Close,
         date: Date,
         element: parser::Spanned<Element>,
     ) -> Result<DirectiveVariant<'a>, ()> {
         use hashbrown::hash_map::Entry::*;
-        match self.open_accounts.entry(close.account().item().to_string()) {
+        match self.open_accounts.entry(close.account().item().as_ref()) {
             Occupied(open_entry) => {
-                match self
-                    .closed_accounts
-                    .entry(close.account().item().to_string())
-                {
+                match self.closed_accounts.entry(close.account().item().as_ref()) {
                     Occupied(closed_entry) => {
                         // cannot reclose a closed account
                         self.errors.push(
@@ -624,9 +612,9 @@ impl<'a> Loader<'a> {
         date: Date,
         element: parser::Spanned<Element>,
     ) -> Result<DirectiveVariant<'a>, ()> {
-        let account_name = pad.account().item().to_string();
-        if self.open_accounts.contains_key(&account_name) {
-            let account = self.accounts.get_mut(&account_name).unwrap();
+        let account_name = pad.account().item().as_ref();
+        if self.open_accounts.contains_key(account_name) {
+            let account = self.accounts.get_mut(account_name).unwrap();
             let source = pad.source().to_string();
 
             let unused_pad_idx = account.pad_idx.replace(self.directives.len());
@@ -689,12 +677,14 @@ impl<'a> AccountBuilder<'a> {
 #[derive(Debug)]
 struct BalanceDiagnostic<'a> {
     date: Date,
-    description: Option<String>,
+    description: Option<&'a str>,
     amount: Option<Amount<'a>>,
     balance: Vec<Amount<'a>>,
 }
 
-pub(crate) const PAD_FLAG: &str = "'P";
+pub(crate) fn pad_flag() -> parser::Flag {
+    parser::Flag::Letter(TryInto::<parser::FlagLetter>::try_into('P').unwrap())
+}
 
 mod balancing;
 use balancing::{balance_transaction, WeightSource};
