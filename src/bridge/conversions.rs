@@ -97,29 +97,38 @@ pub(crate) fn convert_directives(
                     currency: commodity.currency().item().to_string(),
                 }),
             }),
-            PDV::Pad(pad) => {
-                // TODO pad with transaction
-                directives.push(prism::Directive {
-                    date,
-                    element: element.clone(),
-                    variant: prism::DirectiveVariant::Pad(prism::Pad {
-                        account: pad.account().item().to_string(),
-                        source: pad.source().to_string(),
-                    }),
-                });
+            PDV::Pad(parsed_pad) => {
+                if let LDV::Pad(loaded) = directive.loaded {
+                    directives.push(prism::Directive {
+                        date,
+                        element: element.clone(),
+                        variant: prism::DirectiveVariant::Pad(prism::Pad {
+                            account: parsed_pad.account().item().to_string(),
+                            source: parsed_pad.source().to_string(),
+                        }),
+                    });
 
-                // also need a transaction to be back-filled later with whatever got padded
-                // TODO this should be after the pad
-                directives.push(prism::Directive {
-                    date,
-                    element,
-                    variant: prism::DirectiveVariant::Transaction(prism::Transaction {
-                        postings: Vec::default().into(),
-                        flag: crate::loader::PAD_FLAG.into(),
-                        payee: None,
-                        narration: None,
-                    }),
-                });
+                    directives.push(prism::Directive {
+                        date,
+                        element,
+                        variant: prism::DirectiveVariant::Transaction(prism::Transaction {
+                            postings: loaded
+                                .postings
+                                .into_iter()
+                                .map(Into::<prism::Posting>::into)
+                                .collect::<Vec<_>>()
+                                .into(),
+                            flag: crate::loader::PAD_FLAG.into(),
+                            payee: None,
+                            narration: None,
+                        }),
+                    });
+                } else {
+                    panic!(
+                        "mismatch between variants parsed pad {:?}, loaded {:?}",
+                        &parsed_pad, &directive.loaded
+                    );
+                }
             }
             PDV::Document(document) => directives.push(prism::Directive {
                 date,

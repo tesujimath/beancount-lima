@@ -415,12 +415,13 @@ impl<'a> Loader<'a> {
                     }
                 }
 
-                if let DirectiveVariant::Transaction(pad_transaction) =
-                    &mut self.directives[pad_idx + 1].loaded
-                {
-                    pad_transaction.postings = pad_postings;
+                if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded {
+                    pad.postings = pad_postings;
                 } else {
-                    panic!("directive at {} is not a transaction", pad_idx + 1);
+                    panic!(
+                        "directive at {pad_idx} is not a pad, is {:?}",
+                        &self.directives[pad_idx]
+                    );
                 }
             }
             (Some(margin), None) => {
@@ -641,7 +642,9 @@ impl<'a> Loader<'a> {
                 );
             }
 
-            Ok(DirectiveVariant::NA)
+            Ok(DirectiveVariant::Pad(Pad {
+                postings: Vec::default(),
+            }))
         } else {
             self.errors.push(element.error("account not open").into());
             Err(())

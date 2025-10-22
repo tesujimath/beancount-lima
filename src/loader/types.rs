@@ -13,10 +13,16 @@ pub(crate) struct Directive<'a> {
 pub(crate) enum DirectiveVariant<'a> {
     NA, // not applicable, as no extra data at load stage for this variant
     Transaction(Transaction<'a>),
+    Pad(Pad<'a>),
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct Transaction<'a> {
+    pub(crate) postings: Vec<Posting<'a>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Pad<'a> {
     pub(crate) postings: Vec<Posting<'a>>,
 }
 
