@@ -39,13 +39,41 @@ pub(crate) struct Posting<'a> {
     // pub(crate) metadata: Metadata<'a>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Cost<'a> {
     pub(crate) per_unit: Decimal,
     pub(crate) currency: &'a parser::Currency<'a>,
     pub(crate) date: Date,
     pub(crate) label: Option<&'a str>,
     pub(crate) merge: bool,
+}
+
+// costs with all the same non-numeric fields are equal if the per-unit is
+// equal, otherwise incomparable
+impl<'a> PartialOrd for Cost<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.date.partial_cmp(&other.date) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.currency.partial_cmp(other.currency) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.label.partial_cmp(&other.label) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        match self.merge.partial_cmp(&other.merge) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+
+        match self.per_unit.partial_cmp(&other.per_unit) {
+            equal @ Some(core::cmp::Ordering::Equal) => equal,
+            ord => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -130,3 +158,6 @@ where
         *value.span(),
     )
 }
+
+#[cfg(test)]
+mod tests;
