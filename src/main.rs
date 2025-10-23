@@ -296,6 +296,7 @@ fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<
 
 pub(crate) mod bridge;
 pub(crate) mod config;
+pub(crate) mod format;
 pub(crate) mod import;
 pub(crate) mod loader;
 pub(crate) mod prism;

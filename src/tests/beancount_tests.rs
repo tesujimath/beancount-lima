@@ -20,18 +20,23 @@ fn beancount_tests(beancount_relpath: &str) {
         beancount_relpath.strip_suffix(".beancount").unwrap(),
     );
 
-    let prism = load_from(
+    match load_from(
         Path::new(beancount_relpath),
         LoaderConfig::default(),
         &std::io::stderr(),
-    )
-    .unwrap();
+    ) {
+        Err(report) => {
+            panic!("Failed loading {}: {}", beancount_relpath, &report);
+        }
 
-    let mut steel_engine = create_engine();
+        Ok(prism) => {
+            let mut steel_engine = create_engine();
 
-    prism.register(&mut steel_engine);
-    register_args(&mut steel_engine, Vec::default());
+            prism.register(&mut steel_engine);
+            register_args(&mut steel_engine, Vec::default());
 
-    load_cog_path(&mut steel_engine, &cog_relpath).unwrap();
-    report_test_failures(&mut steel_engine, &cog_relpath).unwrap();
+            load_cog_path(&mut steel_engine, &cog_relpath).unwrap();
+            report_test_failures(&mut steel_engine, &cog_relpath).unwrap();
+        }
+    }
 }

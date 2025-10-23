@@ -8,6 +8,8 @@
 
 2016-03-01 open Assets:Wise
 
+2016-03-01 open Income:Foreign
+
 2016-03-01 open Equity:Unknown
 
 2017-01-01 pad Assets:Bank:Current Equity:Unknown
@@ -24,6 +26,17 @@
   Assets:Wise                                                          -1000.00 GBP @ 2.31164 NZD
   Assets:Wise
 
-2020-08-02 * "Move dollars from UK"
+2020-08-04 * "Move dollars from UK"
   Assets:Wise                                                          -2311.64 NZD
   Assets:Bank:Current
+
+2020-09-01 balance Assets:Bank:Current                                  7311.64 NZD
+2020-09-01 balance Assets:Bank:UK                                       1000.00 GBP
+
+2020-09-02 * "Move some more"
+  Assets:Bank:UK                                                        1328.00 GBP  @ 2.13294797687861 NZD
+  Income:Foreign                                                       -1155.00 GBP  @ 2.13294797687861 NZD
+  Assets:Bank:Current                                                   -369.00 NZD ; @ 0.4695
+
+2020-10-01 balance Assets:Bank:Current                                  6942.64 NZD
+2020-10-01 balance Assets:Bank:UK                                       2328.00 GBP

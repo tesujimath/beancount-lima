@@ -1,6 +1,5 @@
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
-use time::Date;
 
 use super::*;
 
@@ -34,6 +33,19 @@ impl<'a> Weight<'a> {
             source,
         }
     }
+
+    pub(crate) fn amount_for_post(&self) -> Amount<'a> {
+        use WeightSource::*;
+
+        match self.source {
+            Native => Amount {
+                number: self.number,
+                currency: self.currency,
+            },
+            Cost(number, currency) => Amount { number, currency },
+            Price(number, currency) => Amount { number, currency },
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -51,33 +63,6 @@ impl<'a> WeightSource<'a> {
             Native => "",
             Cost(_, _) => "for cost",
             Price(_, _) => "for price",
-        }
-    }
-}
-
-impl<'a> From<(Date, &'a parser::CostSpec<'a>, &Weight<'a>)> for Cost<'a> {
-    fn from(value: (Date, &'a parser::CostSpec<'a>, &Weight<'a>)) -> Self {
-        let (date, cs, w) = value;
-        let native_units = if let WeightSource::Cost(native_units, _) = &w.source {
-            native_units
-        } else {
-            panic!(
-                "impossible weight source {:?} for posting with cost",
-                &w.source
-            );
-        };
-        let per_unit = w.number / native_units;
-        let currency = w.currency;
-        let date = cs.date().map(|date| *date.item()).unwrap_or(date);
-        let label = cs.label().map(|label| *label.item());
-        let merge = cs.merge();
-
-        Self {
-            per_unit,
-            currency,
-            date,
-            label,
-            merge,
         }
     }
 }

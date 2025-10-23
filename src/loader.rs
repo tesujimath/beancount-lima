@@ -3,11 +3,16 @@
 use beancount_parser_lima::{self as parser, Span, Spanned};
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    ops::{Deref, DerefMut},
+};
 use tabulator::{Align, Cell, Gap};
 use time::Date;
 
 use crate::config::LoaderConfig;
+use crate::format::format;
 
 #[derive(Debug)]
 pub(crate) struct Loader<'a> {
@@ -18,6 +23,7 @@ pub(crate) struct Loader<'a> {
     accounts: HashMap<&'a str, AccountBuilder<'a>>,
     currency_usage: hashbrown::HashMap<&'a parser::Currency<'a>, i32>,
     config: LoaderConfig,
+    default_booking: parser::Booking,
     inferred_tolerance: InferredTolerance<'a>,
     errors: Vec<parser::AnnotatedError>,
     warnings: Vec<parser::AnnotatedWarning>,
@@ -34,7 +40,11 @@ pub(crate) struct LoadError {
 }
 
 impl<'a> Loader<'a> {
-    pub(crate) fn new(inferred_tolerance: InferredTolerance<'a>, config: LoaderConfig) -> Self {
+    pub(crate) fn new(
+        default_booking: parser::Booking,
+        inferred_tolerance: InferredTolerance<'a>,
+        config: LoaderConfig,
+    ) -> Self {
         Self {
             directives: Vec::default(),
             open_accounts: hashbrown::HashMap::default(),
@@ -42,6 +52,7 @@ impl<'a> Loader<'a> {
             accounts: HashMap::default(),
             currency_usage: hashbrown::HashMap::default(),
             config,
+            default_booking,
             inferred_tolerance,
             errors: Vec::default(),
             warnings: Vec::default(),
@@ -135,12 +146,9 @@ impl<'a> Loader<'a> {
                         into_spanned_element(posting),
                         date,
                         posting.account().item().as_ref(),
-                        posting_amount,
-                        posting_currency,
+                        &weight,
                         posting.flag().map(|flag| *flag.item()),
-                        posting
-                            .cost_spec()
-                            .map(|cs| (date, cs.item(), &weight).into()),
+                        posting.cost_spec().map(parser::Spanned::item),
                         description,
                     ) {
                         postings.push(posting);
@@ -166,34 +174,47 @@ impl<'a> Loader<'a> {
         element: parser::Spanned<Element>,
         date: Date,
         account_name: &'a str,
-        number: Decimal,
-        currency: &'a parser::Currency<'a>,
+        weight: &Weight<'a>,
         flag: Option<parser::Flag>,
-        cost: Option<Cost>,
+        cost_spec: Option<&'a parser::CostSpec>,
         description: &'a str,
     ) -> Option<Posting<'a>> {
+        tracing::debug!(
+            "post {description} {:?} for {} with weight {:?}, cost_spec {:?}",
+            parsed,
+            account_name,
+            weight,
+            cost_spec
+        );
         if self.open_accounts.contains_key(account_name) {
             let account = self.accounts.get_mut(account_name).unwrap();
+            let amount = weight.amount_for_post();
 
             use hashbrown::hash_map::Entry::*;
 
-            if account.is_currency_valid(currency) {
-                match account.inventory.entry(currency) {
+            if account.is_currency_valid(amount.currency) {
+                match account.inventory.entry(amount.currency) {
                     Occupied(mut position) => {
                         let value = position.get_mut();
-                        *value += number;
+                        value.book(date, &amount, cost_spec, account.booking);
 
-                        if value.is_zero() {
+                        if value.is_empty() {
                             position.remove_entry();
                         }
                     }
+
                     Vacant(position) => {
-                        position.insert(number);
+                        position.insert(CurrencyPositionsBuilder::default()).book(
+                            date,
+                            &amount,
+                            cost_spec,
+                            account.booking,
+                        );
                     }
                 }
 
                 // count currency usage
-                match self.currency_usage.entry(currency) {
+                match self.currency_usage.entry(amount.currency) {
                     Occupied(mut usage) => {
                         let usage = usage.get_mut();
                         *usage += 1;
@@ -203,16 +224,14 @@ impl<'a> Loader<'a> {
                     }
                 }
 
-                let amount_cur = Amount { number, currency };
-
                 // collate balance from inventory across all currencies, sorted so deterministic
                 let mut currencies = account.inventory.keys().copied().collect::<Vec<_>>();
                 currencies.sort();
                 let balance = currencies
                     .into_iter()
-                    .map(|cur| {
-                        let number = *account.inventory.get(cur).unwrap();
-                        Amount { number, currency }
+                    .map(|cur| Amount {
+                        number: account.inventory.get(cur).unwrap().units(),
+                        currency: amount.currency,
                     })
                     .collect::<Vec<Amount>>();
 
@@ -220,8 +239,8 @@ impl<'a> Loader<'a> {
                     parsed,
                     flag,
                     account: account_name,
-                    amount: number,
-                    currency,
+                    amount: amount.number,
+                    currency: amount.currency,
                     cost: None,  // TODO cost
                     price: None, // TODO price
                 }; // ::new(account_name, amount.clone(), flag, cost);
@@ -230,7 +249,7 @@ impl<'a> Loader<'a> {
                 account.balance_diagnostics.push(BalanceDiagnostic {
                     date,
                     description: Some(description),
-                    amount: Some(amount_cur.clone()),
+                    amount: Some(amount.clone()),
                     balance,
                 });
 
@@ -264,7 +283,7 @@ impl<'a> Loader<'a> {
     }
 
     // base account is known
-    fn rollup_inventory(
+    fn rollup_units(
         &self,
         base_account_name: &str,
     ) -> hashbrown::HashMap<&'a parser::Currency<'a>, Decimal> {
@@ -283,10 +302,10 @@ impl<'a> Loader<'a> {
                         match rollup_inventory.entry(cur) {
                             Occupied(mut entry) => {
                                 let existing_number = entry.get_mut();
-                                *existing_number += *number;
+                                *existing_number += number.units();
                             }
                             Vacant(entry) => {
-                                entry.insert(*number);
+                                entry.insert(number.units());
                             }
                         }
                     });
@@ -303,7 +322,9 @@ impl<'a> Loader<'a> {
                 .get(base_account_name)
                 .unwrap()
                 .inventory
-                .clone()
+                .iter()
+                .map(|(cur, positions)| (*cur, positions.units()))
+                .collect::<hashbrown::HashMap<_, _>>()
         }
     }
 
@@ -318,7 +339,7 @@ impl<'a> Loader<'a> {
             // what's the gap between what we have and what the balance says we should have?
             let mut inventory_has_balance_currency = false;
             let mut margin = self
-                .rollup_inventory(account_name)
+                .rollup_units(account_name)
                 .into_iter()
                 .map(|(cur, number)| {
                     if balance.atol().amount().currency().item() == cur {
@@ -397,13 +418,17 @@ impl<'a> Loader<'a> {
                         number,
                         cur
                     );
+                    let pad_weight = Weight {
+                        number: *number,
+                        currency: cur,
+                        source: WeightSource::Native,
+                    };
                     if let Some(posting) = self.post(
                         None,
                         pad_element.clone(),
                         pad_date,
                         account_name,
-                        *number,
-                        cur,
+                        &pad_weight,
                         flag,
                         None,
                         "pad",
@@ -429,12 +454,7 @@ impl<'a> Loader<'a> {
                     if account.inventory.is_empty() {
                         "zero".to_string()
                     } else {
-                        account
-                            .inventory
-                            .iter()
-                            .map(|(cur, number)| format!("{number} {cur}"))
-                            .collect::<Vec<String>>()
-                            .join(", ")
+                        account.inventory.to_string()
                     },
                     margin
                         .iter()
@@ -483,20 +503,23 @@ impl<'a> Loader<'a> {
                 );
 
                 // reset accumulated balance to what was asserted, to localise errors
-                for (k, v) in margin.into_iter() {
-                    match account.inventory.entry(k) {
+                for (cur, units) in margin.into_iter() {
+                    match account.inventory.entry(cur) {
                         hashbrown::hash_map::Entry::Occupied(mut entry) => {
                             let accumulated = entry.get_mut();
                             tracing::debug!(
-                                "adjusting inventory {} for balance by {}",
+                                "adjusting inventory {cur}.{:?} for {:?} by {}",
                                 accumulated,
-                                &v
+                                balance,
+                                &units
                             );
-                            *accumulated += v;
+                            accumulated.adjust_for_better_balance_violation_reporting(units);
                         }
                         hashbrown::hash_map::Entry::Vacant(entry) => {
-                            tracing::debug!("adjusting empty inventory for balance to {}", &v);
-                            entry.insert(v);
+                            tracing::debug!("adjusting empty inventory for balance to {}", &units);
+                            entry
+                                .insert(CurrencyPositionsBuilder::default())
+                                .adjust_for_better_balance_violation_reporting(units);
                         }
                     };
                 }
@@ -552,7 +575,13 @@ impl<'a> Loader<'a> {
                 } else {
                     self.accounts.insert(
                         open.account().item().as_ref(),
-                        AccountBuilder::with_currencies(open.currencies().map(|c| c.item()), *span),
+                        AccountBuilder::with_currencies(
+                            open.currencies().map(|c| c.item()),
+                            open.booking()
+                                .map(|booking| *booking.item())
+                                .unwrap_or(self.default_booking),
+                            *span,
+                        ),
                     );
                 }
             }
@@ -640,31 +669,66 @@ impl<'a> Loader<'a> {
     }
 }
 
+#[derive(Default, Debug)]
+struct Inventory<'a>(hashbrown::HashMap<&'a parser::Currency<'a>, CurrencyPositionsBuilder<'a>>); // only non-empty positions are maintained
+
+impl<'a> Deref for Inventory<'a> {
+    type Target = hashbrown::HashMap<&'a parser::Currency<'a>, CurrencyPositionsBuilder<'a>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> DerefMut for Inventory<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<'a> Display for Inventory<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // sort currencies for deterministic output
+        let mut sorted_currency_positions =
+            self.iter().map(|(cur, ps)| (*cur, ps)).collect::<Vec<_>>();
+        sorted_currency_positions.sort_by_key(|(cur, ps)| *cur);
+        format(
+            f,
+            &sorted_currency_positions,
+            |f1, (cur, ps)| ps.format(f1, cur),
+            ", ",
+            None,
+        )
+    }
+}
+
 #[derive(Debug)]
 struct AccountBuilder<'a> {
     // TODO support cost in inventory
     currencies: HashSet<&'a parser::Currency<'a>>,
-    inventory: hashbrown::HashMap<&'a parser::Currency<'a>, Decimal>, // only non-zero positions are maintained
+    inventory: Inventory<'a>,
     opened: Span,
     // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
     postings: Vec<Posting<'a>>,
     pad_idx: Option<usize>, // index in directives in Loader
     balance_diagnostics: Vec<BalanceDiagnostic<'a>>,
+    booking: parser::Booking,
 }
 
 impl<'a> AccountBuilder<'a> {
-    fn with_currencies<I>(currencies: I, opened: Span) -> Self
+    fn with_currencies<I>(currencies: I, booking: parser::Booking, opened: Span) -> Self
     where
         I: Iterator<Item = &'a parser::Currency<'a>>,
     {
         AccountBuilder {
             currencies: currencies.collect(),
-            inventory: hashbrown::HashMap::default(),
+            inventory: Inventory::default(),
             opened,
             postings: Vec::default(),
             pad_idx: None,
             balance_diagnostics: Vec::default(),
+            booking,
         }
     }
 
@@ -687,7 +751,10 @@ pub(crate) fn pad_flag() -> parser::Flag {
 }
 
 mod balancing;
-use balancing::{balance_transaction, WeightSource};
+use balancing::{balance_transaction, Weight, WeightSource};
+
+mod booking;
+use booking::CurrencyPositionsBuilder;
 
 mod types;
 pub(crate) use types::*;

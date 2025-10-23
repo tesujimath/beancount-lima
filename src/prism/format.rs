@@ -1,9 +1,9 @@
 use beancount_parser_lima as parser;
-use lazy_format::lazy_format;
 use std::fmt::{self, Display, Formatter};
 use time::Date;
 
 use super::*;
+use crate::format::*;
 
 // adapted from beancount-parser-lima
 
@@ -154,77 +154,3 @@ impl Display for Posting {
         Ok(())
     }
 }
-
-pub(crate) fn format<C, T, M, D>(
-    f: &mut Formatter<'_>,
-    container: C,
-    mapper: M,
-    separator: &'static str,
-    prefix: Option<&'static str>,
-) -> fmt::Result
-where
-    C: IntoIterator<Item = T>,
-    M: Fn(T) -> D,
-    D: Display,
-{
-    let mut container = container.into_iter();
-    if let Some(item) = container.by_ref().next() {
-        if let Some(prefix) = prefix {
-            f.write_str(prefix)?;
-        }
-
-        mapper(item).fmt(f)?;
-    }
-
-    for item in container {
-        f.write_str(separator)?;
-        mapper(item).fmt(f)?;
-    }
-
-    Ok(())
-}
-
-/// Simple format with no mapper or separator
-pub(crate) fn simple_format<C, T>(
-    f: &mut Formatter<'_>,
-    container: C,
-    prefix: Option<&'static str>,
-) -> fmt::Result
-where
-    C: IntoIterator<Item = T>,
-    T: Display,
-{
-    format(f, container, plain, EMPTY, prefix)
-}
-
-/// Format plain.
-pub(crate) fn plain<S>(s: S) -> impl Display
-where
-    S: Display,
-{
-    lazy_format!("{s}")
-}
-
-/// Format in double quotes.
-pub(crate) fn double_quoted<S>(s: S) -> impl Display
-where
-    S: Display,
-{
-    lazy_format!("\"{s}\"")
-}
-
-/// Format key/value.
-pub(crate) fn key_value<K, V>(kv: (K, V)) -> impl Display
-where
-    K: Display,
-    V: Display,
-{
-    lazy_format!("{}: {}", kv.0, kv.1)
-}
-
-pub(crate) const EMPTY: &str = "";
-pub(crate) const SPACE: &str = " ";
-pub(crate) const COMMA: &str = ",";
-pub(crate) const TILDE_SPACE: &str = " ~ ";
-pub(crate) const NEWLINE: &str = "\n";
-pub(crate) const NEWLINE_INDENT: &str = "\n  ";
