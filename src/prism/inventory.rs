@@ -12,26 +12,22 @@ use steel_derive::Steel;
 
 use super::{booking::*, types::*};
 
-// TODO include commodities held at cost
 #[derive(Clone, Steel, Default, Debug)]
-pub(crate) struct InventoryBuilder(SharedMut<HashMap<String, PositionsBuilder>>); // indexed by currency
+pub(crate) struct InventoryAccumulator(SharedMut<HashMap<String, PositionsAccumulator>>); // indexed by currency
 
-impl InventoryBuilder {
-    fn with_initial_position(position: Position) -> InventoryBuilder {
+impl InventoryAccumulator {
+    fn with_initial_position(position: Position) -> InventoryAccumulator {
         let mut positions = HashMap::default();
         positions.insert(position.units.currency.to_string(), position.into());
 
         Self(Shared::new(MutContainer::new(positions)))
     }
 
-    // TODO cost - this should include CostSpec and the booking method
-    fn book(&mut self, position: Position) {
-        // TODO cost
+    fn accumulate(&mut self, position: Position) {
         let mut positions_by_currency = self.0.write();
         let empty = match positions_by_currency.get_mut(position.units.currency.as_str()) {
             Some(positions) => {
-                // TODO booking method
-                positions.book(position, Booking::Strict);
+                positions.accumulate(position);
                 positions.is_empty()
             }
             None => {
@@ -81,10 +77,10 @@ impl Inventory {
 }
 
 // precondition: not empty, otherwise will panic
-impl From<&InventoryBuilder> for Inventory {
-    fn from(value: &InventoryBuilder) -> Self {
+impl From<&InventoryAccumulator> for Inventory {
+    fn from(value: &InventoryAccumulator) -> Self {
         // return positions sorted by currency
-        let InventoryBuilder(positions_by_currency) = value;
+        let InventoryAccumulator(positions_by_currency) = value;
         let positions_by_currency = positions_by_currency.read();
         // sorted by currency for determinism
         let mut currencies = positions_by_currency
@@ -133,7 +129,7 @@ impl Custom for Inventory {
 #[derive(Clone, Default, Debug)]
 /// An Accumulator is a collector for postings for building inventory
 pub(crate) struct Cumulator {
-    accounts: SharedMut<HashMap<String, InventoryBuilder>>, // indexed by account name
+    accounts: SharedMut<HashMap<String, InventoryAccumulator>>, // indexed by account name
     currency_usage: SharedMut<HashMap<String, i32>>,
 }
 
@@ -162,11 +158,11 @@ impl Cumulator {
 
                 let mut accounts = self.accounts.write();
                 match accounts.get_mut(account_name) {
-                    Some(invb) => invb.book(position),
+                    Some(invb) => invb.accumulate(position),
                     None => {
                         accounts.insert(
                             account_name.to_string(),
-                            InventoryBuilder::with_initial_position(position),
+                            InventoryAccumulator::with_initial_position(position),
                         );
                     }
                 }

@@ -141,7 +141,7 @@ impl<'a> Loader<'a> {
                         |payee| payee.item(),
                     );
 
-                    if let Some(posting) = self.post(
+                    match self.post(
                         Some(posting),
                         into_spanned_element(posting),
                         date,
@@ -151,7 +151,12 @@ impl<'a> Loader<'a> {
                         posting.cost_spec().map(parser::Spanned::item),
                         description,
                     ) {
-                        postings.push(posting);
+                        Ok(posting) => {
+                            postings.push(posting);
+                        }
+                        Err(e) => {
+                            self.errors.push(e);
+                        }
                     }
                 }
 
@@ -178,7 +183,7 @@ impl<'a> Loader<'a> {
         flag: Option<parser::Flag>,
         cost_spec: Option<&'a parser::CostSpec>,
         description: &'a str,
-    ) -> Option<Posting<'a>> {
+    ) -> Result<Posting<'a>, parser::AnnotatedError> {
         tracing::debug!(
             "post {description} {:?} for {} with weight {:?}, cost_spec {:?}",
             parsed,
@@ -193,25 +198,25 @@ impl<'a> Loader<'a> {
             use hashbrown::hash_map::Entry::*;
 
             if account.is_currency_valid(amount.currency) {
-                match account.inventory.entry(amount.currency) {
-                    Occupied(mut position) => {
-                        let value = position.get_mut();
-                        value.book(date, &amount, cost_spec, account.booking);
+                let booked =
+                    match account.inventory.entry(amount.currency) {
+                        Occupied(mut position) => {
+                            let value = position.get_mut();
+                            let booked =
+                                value.book(date, amount.number, cost_spec, account.booking);
 
-                        if value.is_empty() {
-                            position.remove_entry();
+                            if value.is_empty() {
+                                position.remove_entry();
+                            }
+
+                            booked
                         }
-                    }
 
-                    Vacant(position) => {
-                        position.insert(CurrencyPositionsBuilder::default()).book(
-                            date,
-                            &amount,
-                            cost_spec,
-                            account.booking,
-                        );
+                        Vacant(position) => position
+                            .insert(CurrencyPositionsBuilder::default())
+                            .book(date, amount.number, cost_spec, account.booking),
                     }
-                }
+                    .map_err(|message| element.error(message))?;
 
                 // count currency usage
                 match self.currency_usage.entry(amount.currency) {
@@ -253,32 +258,22 @@ impl<'a> Loader<'a> {
                     balance,
                 });
 
-                Some(posting)
+                Ok(posting)
             // TODO cost, price, flag, metadata
             } else {
-                self.errors.push(
-                    element
-                        .error_with_contexts(
-                            "invalid currency for account",
-                            vec![("open".to_string(), account.opened)],
-                        )
-                        .into(),
-                );
-
-                None
+                Err(element
+                    .error_with_contexts(
+                        "invalid currency for account",
+                        vec![("open".to_string(), account.opened)],
+                    )
+                    .into())
             }
         } else if let Some(closed) = self.closed_accounts.get(account_name) {
-            self.errors.push(
-                element
-                    .error_with_contexts("account was closed", vec![("close".to_string(), *closed)])
-                    .into(),
-            );
-
-            None
+            Err(element
+                .error_with_contexts("account was closed", vec![("close".to_string(), *closed)])
+                .into())
         } else {
-            self.errors.push(element.error("account not open").into());
-
-            None
+            Err(element.error("account not open").into())
         }
     }
 
@@ -423,7 +418,8 @@ impl<'a> Loader<'a> {
                         currency: cur,
                         source: WeightSource::Native,
                     };
-                    if let Some(posting) = self.post(
+
+                    match self.post(
                         None,
                         pad_element.clone(),
                         pad_date,
@@ -433,7 +429,12 @@ impl<'a> Loader<'a> {
                         None,
                         "pad",
                     ) {
-                        pad_postings.push(posting);
+                        Ok(posting) => {
+                            pad_postings.push(posting);
+                        }
+                        Err(e) => {
+                            self.errors.push(e);
+                        }
                     }
                 }
 

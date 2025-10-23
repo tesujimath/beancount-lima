@@ -12,9 +12,9 @@ use super::*;
 /// 3. Sort order of these is by date then currency then label.
 /// 4. All positions are non-empty.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub(crate) struct PositionsBuilder(Vec<Position>);
+pub(crate) struct PositionsAccumulator(Vec<Position>);
 
-impl Deref for PositionsBuilder {
+impl Deref for PositionsAccumulator {
     type Target = Vec<Position>;
 
     fn deref(&self) -> &Self::Target {
@@ -22,12 +22,12 @@ impl Deref for PositionsBuilder {
     }
 }
 
-impl PositionsBuilder {
-    /// The booking algorithm
-    // TODO handle cost
-    pub(crate) fn book(&mut self, position: Position, method: Booking) {
+impl PositionsAccumulator {
+    /// Simple position accumulation.  The booking algorithm proper is in the loader
+    pub(crate) fn accumulate(&mut self, position: Position) {
+        // TODO handle cost
         if position.cost.is_some() {
-            panic!("cost not yet supported for booking")
+            panic!("cost not yet supported for position accumulation")
         }
 
         // insert or combine with existing
@@ -56,14 +56,14 @@ impl PositionsBuilder {
     }
 }
 
-impl From<Position> for PositionsBuilder {
+impl From<Position> for PositionsAccumulator {
     fn from(value: Position) -> Self {
         Self(vec![value])
     }
 }
 
-impl From<&PositionsBuilder> for Vec<Position> {
-    fn from(value: &PositionsBuilder) -> Self {
+impl From<&PositionsAccumulator> for Vec<Position> {
+    fn from(value: &PositionsAccumulator) -> Self {
         value.0.clone()
     }
 }
