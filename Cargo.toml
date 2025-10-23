@@ -14,8 +14,8 @@ path = "src/main.rs"
 
 [dependencies]
 abi_stable = "0.11.3"
-beancount-parser-lima = "0.12.0"
-# beancount-parser-lima = { version = "0.12.0", path = "../beancount-parser-lima" }
+beancount-parser-lima = "0.13.0"
+# beancount-parser-lima = { version = "0.13.0", path = "../beancount-parser-lima" }
 # steel-core = "0.7.0"
 # steel-repl = "0.7.0"
 # steel-derive = "0.6.0"
@@ -41,7 +41,6 @@ regex = "1.11.1"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 color-eyre = "0.6.5"
-lazy_format = "2.0.3"
 strum = "0.27.2"
 strum_macros = "0.27.2"
 joinery = "3.1.0"
@@ -56,6 +55,7 @@ rust_decimal_macros = "1.37.2"
 speculoos = "0.13.0"
 test-case = "3.3.1"
 test-generator = "0.3.1"
+time = { version = "0.3.41", features = ["macros"] }
 
 [build-dependencies]
 build-deps = "0.1.4"

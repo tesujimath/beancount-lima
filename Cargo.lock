@@ -271,7 +271,6 @@ dependencies = [
  "csv",
  "hashbrown 0.15.4",
  "joinery",
- "lazy_format",
  "regex",
  "rust_decimal",
  "rust_decimal_macros",
@@ -295,9 +294,9 @@ dependencies = [
 
 [[package]]
 name = "beancount-parser-lima"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a485dcf38fc17e2237ab8c654fae738d064f8d18707dd426eab60ef26e72f81"
+checksum = "b387b054e2dd83b053dde60ecb869e9a813d45eaa209cbd98bfebc2b82ee38ba"
 dependencies = [
  "anyhow",
  "ariadne",
