@@ -60,7 +60,7 @@ impl<'a> Loader<'a> {
     }
 
     // generate any errors before building
-    pub(crate) fn validate(self) -> Result<LoadSuccess<'a>, LoadError> {
+    fn validate(self) -> Result<LoadSuccess<'a>, LoadError> {
         let Self {
             directives,
             accounts,
@@ -87,7 +87,18 @@ impl<'a> Loader<'a> {
         }
     }
 
-    pub(crate) fn directive(&mut self, directive: &'a Spanned<parser::Directive<'a>>) {
+    pub(crate) fn collect<I>(mut self, directives: I) -> Result<LoadSuccess<'a>, LoadError>
+    where
+        I: IntoIterator<Item = &'a Spanned<parser::Directive<'a>>>,
+    {
+        for directive in directives {
+            self.directive(directive);
+        }
+
+        self.validate()
+    }
+
+    fn directive(&mut self, directive: &'a Spanned<parser::Directive<'a>>) {
         use parser::DirectiveVariant::*;
 
         let date = *directive.date().item();

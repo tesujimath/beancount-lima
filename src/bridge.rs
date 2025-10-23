@@ -29,13 +29,10 @@ where
         }) => {
             sources.write_errors_or_warnings(error_w, warnings)?;
             let inferred_tolerance = InferredTolerance::new(&options);
-            let mut loader = Loader::new(options.booking_method(), inferred_tolerance, config);
 
-            for directive in &directives {
-                loader.directive(directive);
-            }
-
-            match loader.validate() {
+            match Loader::new(options.booking_method(), inferred_tolerance, config)
+                .collect(&directives)
+            {
                 Ok(LoadSuccess {
                     directives,
                     warnings,
