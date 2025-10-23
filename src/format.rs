@@ -58,14 +58,14 @@ where
     write!(f, "\"{s}\"")
 }
 
-/// Format key/value.
-pub(crate) fn key_value<K, V>(f: &mut Formatter<'_>, kv: (K, V)) -> fmt::Result
-where
-    K: Display,
-    V: Display,
-{
-    write!(f, "{}: {}", kv.0, kv.1)
-}
+// Format key/value.
+// pub(crate) fn key_value<K, V>(f: &mut Formatter<'_>, kv: (K, V)) -> fmt::Result
+// where
+//     K: Display,
+//     V: Display,
+// {
+//     write!(f, "{}: {}", kv.0, kv.1)
+// }
 
 pub(crate) const EMPTY: &str = "";
 pub(crate) const SPACE: &str = " ";
