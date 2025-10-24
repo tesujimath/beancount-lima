@@ -260,7 +260,8 @@ impl<'a> Loader<'a> {
                     cost: None,  // TODO cost
                     price: None, // TODO price
                 }; // ::new(account_name, amount.clone(), flag, cost);
-                account.postings.push(posting.clone());
+                   // TODO pass through units and cost currency from CurrenciedPosting, also should not be optional?
+                account.post(posting.clone(), Some(amount.currency), None);
 
                 account.balance_diagnostics.push(BalanceDiagnostic {
                     date,
@@ -587,7 +588,7 @@ impl<'a> Loader<'a> {
                 } else {
                     self.accounts.insert(
                         open.account().item().as_ref(),
-                        AccountBuilder::with_currencies(
+                        AccountBuilder::new(
                             open.currencies().map(|c| c.item()),
                             open.booking()
                                 .map(|booking| *booking.item())
@@ -717,7 +718,9 @@ impl<'a> Display for Inventory<'a> {
 #[derive(Debug)]
 struct AccountBuilder<'a> {
     // TODO support cost in inventory
-    currencies: HashSet<&'a parser::Currency<'a>>,
+    allowed_currencies: HashSet<&'a parser::Currency<'a>>,
+    units_currencies: HashSet<&'a parser::Currency<'a>>,
+    cost_currencies: HashSet<&'a parser::Currency<'a>>,
     inventory: Inventory<'a>,
     opened: Span,
     // TODO booking
@@ -729,12 +732,14 @@ struct AccountBuilder<'a> {
 }
 
 impl<'a> AccountBuilder<'a> {
-    fn with_currencies<I>(currencies: I, booking: parser::Booking, opened: Span) -> Self
+    fn new<I>(allowed_currencies: I, booking: parser::Booking, opened: Span) -> Self
     where
         I: Iterator<Item = &'a parser::Currency<'a>>,
     {
         AccountBuilder {
-            currencies: currencies.collect(),
+            allowed_currencies: allowed_currencies.collect(),
+            units_currencies: HashSet::default(),
+            cost_currencies: HashSet::default(),
             inventory: Inventory::default(),
             opened,
             postings: Vec::default(),
@@ -746,7 +751,40 @@ impl<'a> AccountBuilder<'a> {
 
     /// all currencies are valid unless any were specified during open
     fn is_currency_valid(&self, currency: &parser::Currency<'_>) -> bool {
-        self.currencies.is_empty() || self.currencies.contains(currency)
+        self.allowed_currencies.is_empty() || self.allowed_currencies.contains(currency)
+    }
+
+    fn post(
+        &mut self,
+        posting: Posting<'a>,
+        units_currency: Option<&'a parser::Currency<'a>>,
+        cost_currency: Option<&'a parser::Currency<'a>>,
+    ) {
+        self.postings.push(posting);
+        if let Some(units_currency) = units_currency {
+            self.units_currencies.insert(units_currency);
+        }
+        if let Some(cost_currency) = cost_currency {
+            self.cost_currencies.insert(cost_currency);
+        }
+    }
+}
+
+impl<'a> booking::AccountCurrency<'a> for AccountBuilder<'a> {
+    fn units(&self, account: &'a str) -> Option<&'a beancount_parser_lima::Currency<'a>> {
+        if self.units_currencies.len() == 1 {
+            Some(*self.units_currencies.iter().next().unwrap())
+        } else {
+            None
+        }
+    }
+
+    fn cost(&self, account: &'a str) -> Option<&'a beancount_parser_lima::Currency<'a>> {
+        if self.cost_currencies.len() == 1 {
+            Some(*self.cost_currencies.iter().next().unwrap())
+        } else {
+            None
+        }
     }
 }
 
@@ -770,3 +808,5 @@ use booking::CurrencyPositionsBuilder;
 
 mod types;
 pub(crate) use types::*;
+
+mod util;

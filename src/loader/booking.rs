@@ -304,3 +304,6 @@ enum Operation {
     Augmentation,
     Reduction,
 }
+
+mod categorize;
+pub(crate) use categorize::AccountCurrency;
