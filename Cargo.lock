@@ -285,7 +285,6 @@ dependencies = [
  "strum",
  "strum_macros",
  "tabulator",
- "test-case",
  "time",
  "tracing",
  "tracing-subscriber",

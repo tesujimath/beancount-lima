@@ -54,7 +54,6 @@ tabulator = { version = "0.3.0", features = ["num-bigint", "rust_decimal"] }
 rstest = "0.26.1"
 rust_decimal_macros = "1.37.2"
 speculoos = "0.13.0"
-test-case = "3.3.1"
 time = { version = "0.3.41", features = ["macros"] }
 
 [build-dependencies]

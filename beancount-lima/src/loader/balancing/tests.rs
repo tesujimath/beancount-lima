@@ -1,7 +1,7 @@
 use beancount_parser_lima::{self as parser, BeancountParser, BeancountSources, ParseSuccess};
+use rstest::rstest;
 use rust_decimal_macros::dec;
 use speculoos::prelude::*;
-use test_case::test_case;
 
 use super::{super::*, *};
 use crate::tests::init_tracing;
@@ -81,7 +81,8 @@ fn parse_txn_and_balance(src: &str) -> Result<Vec<StaticWeight>, (String, String
     }
 }
 
-#[test_case(
+#[rstest]
+#[case(
     "
 2025-01-01 txn
   Assets:A1   100.00 USD
@@ -92,7 +93,10 @@ fn parse_txn_and_balance(src: &str) -> Result<Vec<StaticWeight>, (String, String
         (dec!(-100.00), "USD"),
     ]
 )]
-fn native_no_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, &'static str)>) {
+fn native_no_inference(
+    #[case] src: &'static str,
+    #[case] expected: Vec<(rust_decimal::Decimal, &'static str)>,
+) {
     init_tracing();
     let result = parse_txn_and_balance(src);
     let expected = expected
@@ -102,7 +106,8 @@ fn native_no_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, 
     assert_eq!(&result.unwrap(), &expected);
 }
 
-#[test_case(
+#[rstest]
+#[case(
     "
 2025-01-01 txn
   Assets:A1   100.00 USD
@@ -113,7 +118,7 @@ fn native_no_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, 
         (dec!(-100.00), "USD"),
     ]
 )]
-#[test_case(
+#[case(
     "
 2025-01-01 txn
   Assets:A1   -100.00 USD
@@ -126,7 +131,7 @@ fn native_no_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, 
         (dec!(25.00), "USD"),
     ]
 )]
-#[test_case(
+#[case(
     "
 2025-01-01 txn
   Assets:A1   100.00 USD
@@ -141,7 +146,7 @@ fn native_no_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, 
         (dec!(-50.00), "NZD"),
     ]
 )]
-#[test_case(
+#[case(
     "
 2025-01-01 txn
   Assets:A1   100.00 USD
@@ -156,7 +161,10 @@ fn native_no_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, 
         (dec!(-50.00), "NZD"),
     ]
 )]
-fn native_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, &'static str)>) {
+fn native_inference(
+    #[case] src: &'static str,
+    #[case] expected: Vec<(rust_decimal::Decimal, &'static str)>,
+) {
     init_tracing();
     let result = parse_txn_and_balance(src);
     let expected = expected
@@ -166,7 +174,8 @@ fn native_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, &'s
     assert_eq!(&result.unwrap(), &expected);
 }
 
-#[test_case(
+#[rstest]
+#[case(
     "
 2025-01-01 txn
   Assets:A1    100.00 USD
@@ -176,7 +185,7 @@ fn native_inference(src: &'static str, expected: Vec<(rust_decimal::Decimal, &'s
 ",
     "invalid transaction (balancing error -1.00 NZD, 1.00 USD)"
 )]
-fn native_balancing_errors(src: &str, expected_error: &str) {
+fn native_balancing_errors(#[case] src: &str, #[case] expected_error: &str) {
     init_tracing();
     let result = parse_txn_and_balance(src);
     if let Err((error, _source)) = result {
@@ -186,27 +195,27 @@ fn native_balancing_errors(src: &str, expected_error: &str) {
     }
 }
 
-#[test_case(
+#[rstest]
+#[case(
     "
 2025-01-01 txn
   Assets:A1   100.00 USD
   Assets:A2    50.00 NZD
   Expenses:E1 100.00
 ",
-    "can't infer currency",
-    "Expenses:E1 100.00"
+    ("can't infer currency", "Expenses:E1 100.00")
 )]
-#[test_case(
+#[case(
     "
 2025-01-01 txn
   Assets:A1   100.00 USD
   Assets:A2    50.00 NZD
   Expenses:E1
 ",
-    "can't infer anything",
-    "Expenses:E1"
+    ("can't infer anything", "Expenses:E1")
 )]
-fn native_inference_errors(src: &str, expected_error: &str, expected_source: &str) {
+fn native_inference_errors(#[case] src: &str, #[case] expected: (&str, &str)) {
+    let (expected_error, expected_source) = expected;
     init_tracing();
     let result = parse_txn_and_balance(src);
     if let Err((error, source)) = result {
@@ -217,7 +226,8 @@ fn native_inference_errors(src: &str, expected_error: &str, expected_source: &st
     }
 }
 
-#[test_case(
+#[rstest]
+#[case(
     "
 2025-01-01 txn
   Assets:A1   100.00 NZD
@@ -229,8 +239,8 @@ fn native_inference_errors(src: &str, expected_error: &str, expected_source: &st
     ]
 )]
 fn price_inference(
-    src: &'static str,
-    expected: Vec<((rust_decimal::Decimal, &'static str), StaticWeightSource)>,
+    #[case] src: &'static str,
+    #[case] expected: Vec<((rust_decimal::Decimal, &'static str), StaticWeightSource)>,
 ) {
     init_tracing();
     let result = parse_txn_and_balance(src);
