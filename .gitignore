@@ -1,6 +1,6 @@
 /.direnv/
-/target/
+target/
 /steel/
 /*log
-/tests/**/*.actual.beancount
+**/tests/**/*.actual.beancount
 /result

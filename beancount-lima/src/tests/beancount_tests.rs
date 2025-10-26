@@ -1,7 +1,8 @@
 #![cfg(test)]
 
+use rstest::rstest;
 use std::path::Path;
-use test_generator::test_resources;
+use std::path::PathBuf;
 
 use crate::{
     bridge::load_from, create_engine, register_args, report_test_failures, tests::init_tracing,
@@ -10,23 +11,22 @@ use crate::{
 
 use super::load_cog_path;
 
-#[test_resources("tests/beancount/**/*.beancount")]
-fn beancount_tests(beancount_relpath: &str) {
+#[rstest]
+fn beancount_tests(#[files("tests/beancount/**/*.beancount")] beancount_relpath: PathBuf) {
     init_tracing();
     tracing::debug!("hello beancount_tests");
 
-    let cog_relpath = format!(
-        "{}.scm",
-        beancount_relpath.strip_suffix(".beancount").unwrap(),
-    );
+    let beancount_reldir = beancount_relpath.parent().unwrap();
+    let cog_relpath = beancount_reldir
+        .join(Path::new(beancount_relpath.file_stem().unwrap()).with_extension("scm"));
 
     match load_from(
-        Path::new(beancount_relpath),
+        &beancount_relpath,
         LoaderConfig::default(),
         &std::io::stderr(),
     ) {
         Err(report) => {
-            panic!("Failed loading {}: {}", beancount_relpath, &report);
+            panic!("Failed loading {:?}: {}", &beancount_relpath, &report);
         }
 
         Ok(prism) => {

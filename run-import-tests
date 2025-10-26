@@ -3,10 +3,10 @@
 set -e
 
 # all import tests currently run with the same config
-LIMA_COGPATH="$(pwd)/tests/import.config:$LIMA_COGPATH"
+LIMA_COGPATH="$(pwd)/beancount-lima/tests/import.config:$LIMA_COGPATH"
 export LIMA_COGPATH
 
-cd tests/import
+cd beancount-lima/tests/import
 
 exitcode=0
 

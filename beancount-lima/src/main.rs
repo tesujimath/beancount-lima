@@ -5,7 +5,7 @@ use crate::{
     prism::{register_args, Prism},
 };
 use color_eyre::eyre::{eyre, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use steel::{steel_vm::engine::Engine, SteelVal};
 use steel_repl::run_repl;
 use tracing_subscriber::EnvFilter;
@@ -281,15 +281,19 @@ fn register_types(steel_engine: &mut Engine) {
     import::register_types(steel_engine);
 }
 
-fn report_test_failures(steel_engine: &mut Engine, cog_relpath: &str) -> Result<()> {
+fn report_test_failures<P>(steel_engine: &mut Engine, cog_relpath: P) -> Result<()>
+where
+    P: AsRef<Path>,
+{
     run_emitting_error_discarding_result(
         steel_engine,
         "",
         format!(
             r#"
                 (require "steel/tests/unit-test.scm")
-                (when (not (empty? (hash-get (get-test-stats) 'failures))) (error! "test failures in {cog_relpath}"))
-            "#
+                (when (not (empty? (hash-get (get-test-stats) 'failures))) (error! "test failures in {}"))
+            "#,
+            cog_relpath.as_ref().to_string_lossy()
         ),
     )
 }

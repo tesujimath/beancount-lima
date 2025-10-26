@@ -1,0 +1,61 @@
+[package]
+name = "beancount-lima"
+version = "0.5.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Beancount frontend using Steel Scheme and Lima parser"
+homepage = "https://github.com/tesujimath/beancount-lima"
+repository = "https://github.com/tesujimath/beancount-lima"
+readme = "README.md"
+
+[[bin]]
+name = "lima"
+path = "src/main.rs"
+
+[dependencies]
+abi_stable = "0.11.3"
+beancount-parser-lima = "0.13.0"
+# beancount-parser-lima = { version = "0.13.0", path = "../beancount-parser-lima" }
+# steel-core = "0.7.0"
+# steel-repl = "0.7.0"
+# steel-derive = "0.6.0"
+steel-core = { git = "https://github.com/mattwparas/steel" }
+steel-repl = { git = "https://github.com/mattwparas/steel" }
+steel-derive = { git = "https://github.com/mattwparas/steel" }
+# steel-core = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
+# steel-repl = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
+# steel-derive = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
+# steel-core = { path = "../../third-party/steel/crates/steel-core" }
+# steel-repl = { path = "../../third-party/steel/crates/steel-repl" }
+# steel-derive = { path = "../../third-party/steel/crates/steel-derive" }
+rust_decimal = "1.37.2"
+hashbrown = "0.15.4"
+time = { version = "0.3.41", features = ["local-offset", "parsing"] }
+clap = { version = "4.5.42", features = ["derive"] }
+csv = "1.3.1"
+slugify = "0.1.0"
+sgmlish = "0.2.0"
+serde = { version = "1.0.219", features = ["derive"] }
+xdg = "3.0.0"
+regex = "1.11.1"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+color-eyre = "0.6.5"
+strum = "0.27.2"
+strum_macros = "0.27.2"
+joinery = "3.1.0"
+tabulator = { version = "0.3.0", features = ["num-bigint", "rust_decimal"] }
+# tabulator = { path = "../tabulator-rs", features = [
+#   "num-bigint",
+#   "rust_decimal",
+# ] }
+
+[dev-dependencies]
+rstest = "0.26.1"
+rust_decimal_macros = "1.37.2"
+speculoos = "0.13.0"
+test-case = "3.3.1"
+time = { version = "0.3.41", features = ["macros"] }
+
+[build-dependencies]
+build-deps = "0.1.4"
