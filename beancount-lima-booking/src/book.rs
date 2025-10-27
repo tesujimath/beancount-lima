@@ -15,9 +15,9 @@ pub fn book<'a, 'b, P, D, A, N, C, L, T, I>(
 where
     P: Posting<D, A, N, C, L> + 'a,
     D: Eq + Ord + Clone + Debug,
-    A: Eq + Ord + Debug,
+    A: Eq + Hash + Clone + Debug,
     N: Copy + Debug,
-    C: Eq + Ord + Clone + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
     T: Tolerance<N, C>,
     I: Inventory<D, A, N, C, L, T> + 'b,
@@ -25,6 +25,8 @@ where
 {
     let postings = postings.collect::<Vec<_>>();
     let mut updated_inventory = HashMap::<A, Vec<Position<D, N, C, L>>>::default();
+
+    let categorized = categorize_by_currency(&postings, initial_inventory)?;
 
     Ok(updated_inventory.into_iter())
 }
@@ -64,29 +66,20 @@ impl<D, N, C, L> CurrencyPosition<D, N, C, L> {
 
 // See OG Beancount function of the same name
 fn categorize_by_currency<'a, 'b, P, D, A, N, C, L, T, I>(
-    postings: &'b [P],
-    initial_inventory: I,
+    postings: &'b [&'a P],
+    initial_inventory: &'b I,
 ) -> Result<CategorizedPostings<'a, P, C>, Vec<BookingError>>
 where
     P: Posting<D, A, N, C, L> + 'a,
-    D: Eq + Ord + Clone + Debug,
-    A: Eq + Hash + Ord + Debug,
-    N: Copy + Debug,
+    A: Eq + Hash + Clone + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
-    L: Eq + Ord + Clone + Debug,
-    T: Tolerance<N, C>,
     I: Inventory<D, A, N, C, L, T>,
     'b: 'a,
 {
     let mut groups = CategorizedPostings::default();
     let mut auto_postings = Vec::default();
     let mut unknown = Vec::default();
-    let mut account_currencies = HashMap::<A, HashSet<C>>::default();
-    // let lookup_account_currency = |acc| account_currencies.get(acc).unwrap_or_else(|| {
-    //     for positions in initial_inventory.account_positions(acc) {
-
-    //     }
-    // });
+    let mut account_currency_lookup = HashMap::<A, Option<C>>::default();
 
     for (i_posting, posting) in postings.iter().enumerate() {
         let units_currency = posting.currency();
@@ -145,8 +138,11 @@ where
         let u_account = u.posting.account();
         let inferred = CurrenciedPosting {
             posting: u.posting,
-            units_currency: u.units_currency,
-            // TODO .or(account_currency_lookup.units(u_account)),
+            units_currency: u.units_currency.or(account_currency(
+                u_account,
+                initial_inventory,
+                &mut account_currency_lookup,
+            )),
             cost_currency: u.cost_currency, // TODO .or(account_currency_lookup.cost(u_account)),
             price_currency: u.price_currency,
         };
@@ -160,7 +156,41 @@ where
         }
     }
 
-    Ok(groups)
+    Err(Vec::default())
+    // Ok(groups) TODO
+}
+
+// lookup account currency with memoization
+fn account_currency<D, A, N, C, L, T, I>(
+    account: A,
+    inventory: &I,
+    account_currency: &mut HashMap<A, Option<C>>,
+) -> Option<C>
+where
+    I: Inventory<D, A, N, C, L, T>,
+    A: Eq + Hash + Clone,
+    C: Eq + Hash + Clone,
+{
+    account_currency.get(&account).cloned().unwrap_or_else(|| {
+        let currency = if let Some(positions) = inventory.account_positions(&account) {
+            let currencies = positions
+                .iter()
+                .map(|pos| pos.currency.clone())
+                .collect::<HashSet<C>>();
+
+            if currencies.len() == 1 {
+                currencies.iter().next().cloned()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        account_currency.insert(account.clone(), currency.clone());
+
+        currency
+    })
 }
 
 #[derive(Debug)]

@@ -40,7 +40,7 @@ pub struct Cost<D, N, C, L> {
 }
 
 pub trait Inventory<D, A, N, C, L, T> {
-    fn account_positions(&self, account: A) -> Vec<Position<D, N, C, L>>;
+    fn account_positions(&self, account: &A) -> Option<&Vec<Position<D, N, C, L>>>;
 }
 
 pub trait Tolerance<N, C> {
