@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+beancount-parser-lima = { workspace = true, optional = true }
 rust_decimal = { workspace = true, optional = true }
 hashbrown = { workspace = true }
+time = { workspace = true }
 
 [features]
-default = ["rust_decimal"]
-rust_decimal = ["dep:rust_decimal"]
+default = ["lima-parser-types", "rust-decimal"]
+rust-decimal = ["dep:rust_decimal"]
+lima-parser-types = ["dep:beancount-parser-lima", "dep:rust_decimal"]

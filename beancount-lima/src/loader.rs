@@ -771,24 +771,6 @@ impl<'a> AccountBuilder<'a> {
     }
 }
 
-impl<'a> booking::AccountCurrency<'a> for AccountBuilder<'a> {
-    fn units(&self, account: &'a str) -> Option<&'a beancount_parser_lima::Currency<'a>> {
-        if self.units_currencies.len() == 1 {
-            Some(*self.units_currencies.iter().next().unwrap())
-        } else {
-            None
-        }
-    }
-
-    fn cost(&self, account: &'a str) -> Option<&'a beancount_parser_lima::Currency<'a>> {
-        if self.cost_currencies.len() == 1 {
-            Some(*self.cost_currencies.iter().next().unwrap())
-        } else {
-            None
-        }
-    }
-}
-
 #[derive(Debug)]
 struct BalanceDiagnostic<'a> {
     date: Date,

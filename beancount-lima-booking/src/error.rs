@@ -28,7 +28,7 @@ impl Error for TransactionBookingError {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum PostingBookingError {
-    Inference, // TODO
+    FailedToCategorize,
 }
 
 impl Display for PostingBookingError {
@@ -36,7 +36,7 @@ impl Display for PostingBookingError {
         use PostingBookingError::*;
 
         match self {
-            Inference => f.write_str("can't infer anything"),
+            FailedToCategorize => f.write_str("failed to categorize posting"),
         }
     }
 }

@@ -4,8 +4,11 @@ pub use book::book;
 mod error;
 pub use error::{BookingError, PostingBookingError, TransactionBookingError};
 
-#[cfg(feature = "rust_decimal")]
+#[cfg(feature = "lima-parser-types")]
+mod lima_parser_types;
+
+#[cfg(feature = "rust-decimal")]
 mod rust_decimal;
 
 mod types;
-pub use types::{CurrencyPosition, Inventory, Number, Posting, Tolerance};
+pub use types::{Cost, Inventory, Number, Position, Posting, Tolerance};

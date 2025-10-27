@@ -3,5 +3,8 @@ resolver = "3"
 members = ["beancount-lima", "beancount-lima-booking"]
 
 [workspace.dependencies]
+beancount-parser-lima = "0.13.0"
+# beancount-parser-lima = { version = "0.13.0", path = "../beancount-parser-lima" }
 hashbrown = "0.15.4"
 rust_decimal = "1.37.2"
+time = "0.3.41"
