@@ -1,5 +1,6 @@
-// TODO remove:
+// TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
+
 use beancount_parser_lima::ElementType;
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;

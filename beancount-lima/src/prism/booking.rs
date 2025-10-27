@@ -1,5 +1,6 @@
-// TODO remove:
+// TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
+
 use beancount_parser_lima as parser;
 use std::{mem::take, ops::Deref};
 use strum_macros::{Display, EnumIter, EnumString, IntoStaticStr};

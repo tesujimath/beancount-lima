@@ -1,5 +1,6 @@
-// TODO remove:
+// TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
+
 use joinery::JoinableIterator;
 use std::{collections::HashMap, fmt::Display};
 use steel::{

@@ -292,6 +292,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "beancount-lima-booking"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.15.4",
+ "rust_decimal",
+]
+
+[[package]]
 name = "beancount-parser-lima"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

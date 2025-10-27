@@ -1,5 +1,6 @@
-// TODO remove:
+// TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
+
 use std::ops::Deref;
 use steel::{gc::Shared, rvals::Custom};
 

@@ -1,5 +1,6 @@
-// TODO remove:
+// TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
+
 use steel::steel_vm::engine::Engine;
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {

@@ -1,4 +1,6 @@
+// TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
+
 use beancount_parser_lima as parser;
 
 pub(crate) fn cost_spec_currency<'a>(
