@@ -3,7 +3,13 @@ use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
 use time::Date;
 
-impl<'a> Posting<Date, &'a str, Decimal, &'a str, &'a str> for &'a parser::Posting<'a> {
+impl<'a> Posting for &'a parser::Posting<'a> {
+    type Date = time::Date;
+    type Account = &'a str;
+    type Currency = &'a str;
+    type Number = Decimal;
+    type Label = &'a str;
+
     fn account(&self) -> &'a str {
         parser::Posting::account(self).item().as_ref()
     }

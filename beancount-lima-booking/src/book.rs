@@ -4,29 +4,33 @@
 use hashbrown::{hash_map::Entry, HashMap, HashSet};
 use std::{fmt::Debug, hash::Hash, ops::Deref};
 
-use super::{BookingError, Cost, Inventory, Number, Position, Posting, Tolerance};
+use super::{BookingError, Cost, Number, Position, Posting, Tolerance};
 
-pub fn book<'a, 'b, P, D, A, N, C, L, T, I>(
-    date: D,
-    postings: impl Iterator<Item = &'a P>,
+pub fn book<'p, 'i, P, T, I>(
+    date: P::Date,
+    postings: impl Iterator<Item = &'p P>,
     tolerance: T,
-    initial_inventory: &'b I,
-) -> Result<impl Iterator<Item = (A, Vec<Position<D, N, C, L>>)>, Vec<BookingError>>
+    inventory: I,
+) -> Result<
+    impl Iterator<
+        Item = (
+            P::Account,
+            Vec<Position<P::Date, P::Number, P::Currency, P::Label>>,
+        ),
+    >,
+    Vec<BookingError>,
+>
 where
-    P: Posting<D, A, N, C, L> + 'a,
-    D: Eq + Ord + Clone + Debug,
-    A: Eq + Hash + Clone + Debug,
-    N: Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
-    L: Eq + Ord + Clone + Debug,
-    T: Tolerance<N, C>,
-    I: Inventory<D, A, N, C, L, T> + 'b,
-    'b: 'a,
+    P: Posting + 'p + 'i,
+    T: Tolerance,
+    I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+        + Copy, // 'i for inventory
 {
     let postings = postings.collect::<Vec<_>>();
-    let mut updated_inventory = HashMap::<A, Vec<Position<D, N, C, L>>>::default();
+    let mut updated_inventory =
+        HashMap::<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>::default();
 
-    let categorized = categorize_by_currency(&postings, initial_inventory)?;
+    let categorized = categorize_by_currency(&postings, inventory)?;
 
     Ok(updated_inventory.into_iter())
 }
@@ -65,21 +69,23 @@ impl<D, N, C, L> CurrencyPosition<D, N, C, L> {
 }
 
 // See OG Beancount function of the same name
-fn categorize_by_currency<'a, 'b, P, D, A, N, C, L, T, I>(
-    postings: &'b [&'a P],
-    initial_inventory: &'b I,
-) -> Result<CategorizedPostings<'a, P, C>, Vec<BookingError>>
+fn categorize_by_currency<'p, 'b, 'i, P, I>(
+    postings: &'b [&'p P],
+    inventory: I,
+) -> Result<CategorizedPostings<'p, P, P::Currency>, Vec<BookingError>>
 where
-    P: Posting<D, A, N, C, L> + 'a,
-    A: Eq + Hash + Clone + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
-    I: Inventory<D, A, N, C, L, T>,
-    'b: 'a,
+    P: Posting,
+    I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+        + Copy, // 'i for inventory
+    P::Date: 'i,
+    P::Number: 'i,
+    P::Currency: 'i,
+    P::Label: 'i,
 {
     let mut groups = CategorizedPostings::default();
     let mut auto_postings = Vec::default();
     let mut unknown = Vec::default();
-    let mut account_currency_lookup = HashMap::<A, Option<C>>::default();
+    let mut account_currency_lookup = HashMap::<P::Account, Option<P::Currency>>::default();
 
     for (i_posting, posting) in postings.iter().enumerate() {
         let units_currency = posting.currency();
@@ -95,7 +101,7 @@ where
             .or(posting_cost_currency);
 
         let p = CurrenciedPosting {
-            posting,
+            posting: *posting,
             units_currency,
             cost_currency,
             price_currency,
@@ -140,7 +146,7 @@ where
             posting: u.posting,
             units_currency: u.units_currency.or(account_currency(
                 u_account,
-                initial_inventory,
+                inventory,
                 &mut account_currency_lookup,
             )),
             cost_currency: u.cost_currency, // TODO .or(account_currency_lookup.cost(u_account)),
@@ -156,23 +162,25 @@ where
         }
     }
 
-    Err(Vec::default())
-    // Ok(groups) TODO
+    Ok(groups)
 }
 
 // lookup account currency with memoization
-fn account_currency<D, A, N, C, L, T, I>(
+fn account_currency<'i, A, D, N, C, L, I>(
     account: A,
-    inventory: &I,
+    inventory: I,
     account_currency: &mut HashMap<A, Option<C>>,
 ) -> Option<C>
 where
-    I: Inventory<D, A, N, C, L, T>,
     A: Eq + Hash + Clone,
-    C: Eq + Hash + Clone,
+    D: 'i,
+    N: 'i,
+    C: Eq + Hash + Clone + 'i,
+    L: 'i,
+    I: Fn(A) -> Option<&'i Vec<Position<D, N, C, L>>> + Copy, // 'i for inventory
 {
     account_currency.get(&account).cloned().unwrap_or_else(|| {
-        let currency = if let Some(positions) = inventory.account_positions(&account) {
+        let currency = if let Some(positions) = inventory(account.clone()) {
             let currencies = positions
                 .iter()
                 .map(|pos| pos.currency.clone())
@@ -194,7 +202,7 @@ where
 }
 
 #[derive(Debug)]
-pub(crate) struct CategorizedPostings<'a, P, C>(HashMap<C, Vec<CurrenciedPosting<'a, P, C>>>);
+struct CategorizedPostings<'a, P, C>(HashMap<C, Vec<CurrenciedPosting<'a, P, C>>>);
 
 // TODO why couldn't I derive this?
 impl<'a, P, C> Default for CategorizedPostings<'a, P, C> {
@@ -230,7 +238,7 @@ impl<'a, P, C> Deref for CategorizedPostings<'a, P, C> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CurrenciedPosting<'a, P, C> {
+struct CurrenciedPosting<'a, P, C> {
     posting: &'a P,
     units_currency: Option<C>,
     cost_currency: Option<C>,

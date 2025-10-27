@@ -11,4 +11,4 @@ mod lima_parser_types;
 mod rust_decimal;
 
 mod types;
-pub use types::{Cost, Inventory, Number, Position, Posting, Tolerance};
+pub use types::{Cost, Number, Position, Posting, Tolerance};
