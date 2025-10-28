@@ -298,7 +298,9 @@ dependencies = [
  "beancount-parser-lima",
  "hashbrown 0.15.4",
  "rust_decimal",
+ "strum_macros",
  "time",
+ "tracing",
 ]
 
 [[package]]

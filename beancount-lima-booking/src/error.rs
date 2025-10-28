@@ -3,6 +3,8 @@ use std::{
     fmt::{Debug, Display},
 };
 
+use super::Booking;
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum BookingError {
     Transaction(TransactionBookingError),
@@ -11,7 +13,7 @@ pub enum BookingError {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum TransactionBookingError {
-    Unbalanced, // TODO
+    UnsupportedBookingMethod(Booking, String),
 }
 
 impl Display for TransactionBookingError {
@@ -19,7 +21,9 @@ impl Display for TransactionBookingError {
         use TransactionBookingError::*;
 
         match self {
-            Unbalanced => f.write_str("unbalanced transaction"),
+            UnsupportedBookingMethod(booking, account) => {
+                write!(f, "unsupported booking method {booking} for {account}")
+            }
         }
     }
 }
@@ -29,6 +33,7 @@ impl Error for TransactionBookingError {}
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum PostingBookingError {
     FailedToCategorize,
+    MultipleCostSpecMatches,
 }
 
 impl Display for PostingBookingError {
@@ -37,6 +42,7 @@ impl Display for PostingBookingError {
 
         match self {
             FailedToCategorize => f.write_str("failed to categorize posting"),
+            MultipleCostSpecMatches => f.write_str("multiple cost spec matches against inventory"),
         }
     }
 }

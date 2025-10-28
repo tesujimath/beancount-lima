@@ -2,15 +2,18 @@
 #![allow(dead_code, unused_variables)]
 
 use hashbrown::{hash_map::Entry, HashMap, HashSet};
-use std::{fmt::Debug, hash::Hash, ops::Deref};
+use std::{fmt::Debug, hash::Hash, iter::once, ops::Deref};
 
-use super::{BookingError, Cost, Number, Position, Posting, Tolerance};
+use crate::{PostingBookingError, TransactionBookingError};
 
-pub fn book<'p, 'i, P, T, I>(
+use super::{Booking, BookingError, Cost, Number, Position, Posting, Tolerance};
+
+pub fn book<'p, 'i, P, T, I, M>(
     date: P::Date,
     postings: impl Iterator<Item = &'p P>,
-    tolerance: T,
+    tolerance: &T,
     inventory: I,
+    method: M,
 ) -> Result<
     impl Iterator<
         Item = (
@@ -18,13 +21,14 @@ pub fn book<'p, 'i, P, T, I>(
             Vec<Position<P::Date, P::Number, P::Currency, P::Label>>,
         ),
     >,
-    Vec<BookingError>,
+    BookingError,
 >
 where
-    P: Posting + 'p + 'i,
-    T: Tolerance,
+    P: Posting + Debug + 'p + 'i,
+    T: Tolerance<Currency = P::Currency, Number = P::Number>,
     I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
         + Copy, // 'i for inventory
+    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let postings = postings.collect::<Vec<_>>();
     let mut updated_inventory =
@@ -32,8 +36,182 @@ where
 
     let categorized = categorize_by_currency(&postings, inventory)?;
 
+    for (cur, annotated_postings) in categorized {
+        let costed = book_reductions(date, cur, annotated_postings, tolerance, inventory, method)?;
+    }
+
     Ok(updated_inventory.into_iter())
 }
+
+struct Reductions<'p, P>
+where
+    P: Posting,
+{
+    updated_inventory:
+        HashMap<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>,
+    costed_postings: Vec<CostedPosting<'p, P, P::Number, P::Currency>>,
+}
+
+fn book_reductions<'p, 'i, 'b, P, T, I, M>(
+    date: P::Date,
+    currency: P::Currency,
+    annotateds: Vec<AnnotatedPosting<'p, P, P::Currency>>,
+    tolerance: &T,
+    inventory: I,
+    method: M,
+) -> Result<Reductions<'p, P>, BookingError>
+where
+    P: Posting + Debug + 'p + 'i,
+    T: Tolerance<Currency = P::Currency, Number = P::Number>,
+    I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+        + Copy, // 'i for inventory
+    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+{
+    use CostedPosting::*;
+
+    let mut updated_inventory = HashMap::default();
+
+    let costed_postings = annotateds
+        .into_iter()
+        .map(|annotated| {
+            let account = annotated.posting.account();
+
+            match (
+                &annotated.cost_currency,
+                annotated.posting.units(),
+                updated_inventory
+                    .get(&account)
+                    .or_else(|| inventory(account.clone())),
+            ) {
+                (Some(posting_cost_currency), Some(posting_units), Some(previous_positions)) => {
+                    let posting = &annotated.posting;
+                    let method = method(account.clone());
+
+                    // TODO booking methods other than strict
+                    if method != Booking::Strict {
+                        Err(BookingError::Transaction(
+                            TransactionBookingError::UnsupportedBookingMethod(
+                                method,
+                                account.to_string(),
+                            ),
+                        ))
+                    } else if let Some(posting_units) = posting.units()
+                        && let Some(ann_sign) = posting_units.sign()
+                        && previous_positions
+                            .iter()
+                            .filter(|pos| pos.currency == currency && pos.cost.is_some())
+                            .any(|pos| {
+                                pos.units
+                                    .sign()
+                                    .is_some_and(|pos_sign| pos_sign != ann_sign)
+                            })
+                    {
+                        // we found a position with cost and sign opposite to ours, so we have a reduction
+
+                        // find positions whose costs match what we have
+                        let matched_positions = previous_positions
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, pos)| {
+                                pos.cost.as_ref().and_then(|pos_cost| {
+                                    posting.matches_cost(date, pos_cost).then_some((i, pos))
+                                })
+                            })
+                            .collect::<Vec<_>>();
+
+                        tracing::debug!(
+                            "book_reductions matched {:?} with {:?}",
+                            &annotated,
+                            &matched_positions
+                        );
+
+                        if matched_positions.is_empty() {
+                            Ok(Unbooked(annotated))
+                        } else if matched_positions.len() == 1 {
+                            let (i_matched, _) = matched_positions.into_iter().next().unwrap();
+                            // Book 'em, Danno!
+                            tracing::debug!(
+                                "cost-matched unique position at {}: {:?}",
+                                i_matched,
+                                &previous_positions[i_matched]
+                            );
+
+                            let updated_positions = previous_positions
+                                .iter()
+                                .enumerate()
+                                .map(|(i, pos)| {
+                                    if i == i_matched {
+                                        pos.with_accumulated(posting_units)
+                                    } else {
+                                        pos.clone()
+                                    }
+                                })
+                                .collect::<Vec<_>>();
+                            tracing::debug!(
+                                "updated positions for {:?}: {:?}",
+                                &account,
+                                &updated_positions
+                            );
+                            updated_inventory.insert(account.clone(), updated_positions);
+
+                            Ok(Booked(BookedAtCostPosting {
+                                posting: annotated.posting,
+                                idx: annotated.idx,
+                                units: posting_units,
+                                currency: currency.clone(),
+                                price_currency: annotated.price_currency,
+                            }))
+                        } else if tolerance.sum_is_tolerably_close_to_zero(
+                            previous_positions
+                                .iter()
+                                .filter_map(|pos| pos.cost.is_some().then_some(pos.units))
+                                .chain(once(posting_units)),
+                            &currency,
+                        ) {
+                            // this is "sell everything", that is, existing positions at cost together with this one sum to zero-ish
+                            // updated_inventory
+
+                            let matched_positions = matched_positions
+                                .iter()
+                                .map(|(i, _)| *i)
+                                .collect::<HashSet<_>>();
+                            let updated_positions = previous_positions
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(i, pos)| {
+                                    matched_positions.contains(&i).then_some(pos.clone())
+                                })
+                                .collect::<Vec<_>>();
+                            updated_inventory.insert(account.clone(), updated_positions);
+
+                            Ok(Booked(BookedAtCostPosting {
+                                posting: annotated.posting,
+                                idx: annotated.idx,
+                                units: posting_units,
+                                currency: currency.clone(),
+                                price_currency: annotated.price_currency,
+                            }))
+                        } else {
+                            Err(BookingError::Posting(
+                                annotated.idx,
+                                PostingBookingError::MultipleCostSpecMatches,
+                            ))
+                        }
+                    } else {
+                        Ok(Unbooked(annotated))
+                    }
+                }
+                _ => Ok(Unbooked(annotated)),
+            }
+        })
+        .collect::<Result<Vec<_>, BookingError>>()?;
+
+    Ok(Reductions {
+        updated_inventory,
+        costed_postings,
+    })
+}
+
 ///
 /// A list of positions for a currency satisfying these invariants:
 /// 1. If there is a simple position without cost, it occurs first in the list
@@ -41,9 +219,20 @@ where
 /// 3. Sort order of these is by date then currency then label.
 /// 4. All positions are non-empty.
 #[derive(PartialEq, Eq, Default, Debug)]
-struct CurrencyPositions<D, N, C, L>(Vec<CurrencyPosition<D, N, C, L>>);
+struct CurrencyPositions<D, N, C, L>(Vec<CurrencyPosition<D, N, C, L>>)
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone;
 
-impl<D, N, C, L> Deref for CurrencyPositions<D, N, C, L> {
+impl<D, N, C, L> Deref for CurrencyPositions<D, N, C, L>
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone,
+{
     type Target = Vec<CurrencyPosition<D, N, C, L>>;
 
     fn deref(&self) -> &Self::Target {
@@ -53,12 +242,24 @@ impl<D, N, C, L> Deref for CurrencyPositions<D, N, C, L> {
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 /// CurrencyPosition for implicit currency, which is kept externally
-struct CurrencyPosition<D, N, C, L> {
+struct CurrencyPosition<D, N, C, L>
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone,
+{
     units: N,
     cost: Option<Cost<D, N, C, L>>,
 }
 
-impl<D, N, C, L> CurrencyPosition<D, N, C, L> {
+impl<D, N, C, L> CurrencyPosition<D, N, C, L>
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone,
+{
     fn is_below(&self, threshold: N) -> bool
     where
         N: Number + Ord,
@@ -72,7 +273,7 @@ impl<D, N, C, L> CurrencyPosition<D, N, C, L> {
 fn categorize_by_currency<'p, 'b, 'i, P, I>(
     postings: &'b [&'p P],
     inventory: I,
-) -> Result<CategorizedPostings<'p, P, P::Currency>, Vec<BookingError>>
+) -> Result<HashMapOfVec<P::Currency, AnnotatedPosting<'p, P, P::Currency>>, BookingError>
 where
     P: Posting,
     I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
@@ -82,12 +283,12 @@ where
     P::Currency: 'i,
     P::Label: 'i,
 {
-    let mut groups = CategorizedPostings::default();
+    let mut groups = HashMapOfVec::default();
     let mut auto_postings = Vec::default();
     let mut unknown = Vec::default();
     let mut account_currency_lookup = HashMap::<P::Account, Option<P::Currency>>::default();
 
-    for (i_posting, posting) in postings.iter().enumerate() {
+    for (idx, posting) in postings.iter().enumerate() {
         let units_currency = posting.currency();
         let posting_cost_currency = posting.cost_currency();
         let posting_price_currency = posting.price_currency();
@@ -100,8 +301,9 @@ where
             .cloned()
             .or(posting_cost_currency);
 
-        let p = CurrenciedPosting {
+        let p = AnnotatedPosting {
             posting: *posting,
+            idx,
             units_currency,
             cost_currency,
             price_currency,
@@ -110,9 +312,9 @@ where
         if posting.units().is_none() && posting.currency().is_none() {
             auto_postings.push(p);
         } else if let Some(bucket) = p.bucket() {
-            groups.insert(bucket, p);
+            groups.push_or_insert(bucket, p);
         } else {
-            unknown.push((i_posting, p));
+            unknown.push((idx, p));
         }
     }
 
@@ -120,9 +322,10 @@ where
     // infer that for the unknown
     if unknown.len() == 1 && groups.len() == 1 {
         let only_bucket = groups.keys().next().as_ref().cloned().unwrap().clone();
-        let (i_u, u) = unknown.drain(..).next().unwrap();
-        let inferred = CurrenciedPosting {
+        let (idx, u) = unknown.drain(..).next().unwrap();
+        let inferred = AnnotatedPosting {
             posting: u.posting,
+            idx,
             units_currency: if u.price_currency.is_none() && u.cost_currency.is_none() {
                 Some(only_bucket.clone())
             } else {
@@ -135,15 +338,15 @@ where
                 .or(Some(only_bucket.clone())),
             price_currency: u.price_currency.or(Some(only_bucket.clone())),
         };
-        groups.insert(only_bucket.clone(), inferred);
+        groups.push_or_insert(only_bucket.clone(), inferred);
     }
 
     // infer all other unknown postings from account inference
-    let mut errors = Vec::<BookingError>::default();
-    for (i_u, u) in unknown {
+    for (idx, u) in unknown {
         let u_account = u.posting.account();
-        let inferred = CurrenciedPosting {
+        let inferred = AnnotatedPosting {
             posting: u.posting,
+            idx,
             units_currency: u.units_currency.or(account_currency(
                 u_account,
                 inventory,
@@ -153,10 +356,10 @@ where
             price_currency: u.price_currency,
         };
         if let Some(bucket) = inferred.bucket() {
-            groups.insert(bucket, inferred);
+            groups.push_or_insert(bucket, inferred);
         } else {
-            errors.push(BookingError::Posting(
-                i_u,
+            return Err(BookingError::Posting(
+                idx,
                 crate::PostingBookingError::FailedToCategorize,
             ));
         }
@@ -173,10 +376,10 @@ fn account_currency<'i, A, D, N, C, L, I>(
 ) -> Option<C>
 where
     A: Eq + Hash + Clone,
-    D: 'i,
-    N: 'i,
+    D: 'i + Copy,
+    N: 'i + Copy,
     C: Eq + Hash + Clone + 'i,
-    L: 'i,
+    L: 'i + Clone,
     I: Fn(A) -> Option<&'i Vec<Position<D, N, C, L>>> + Copy, // 'i for inventory
 {
     account_currency.get(&account).cloned().unwrap_or_else(|| {
@@ -202,35 +405,43 @@ where
 }
 
 #[derive(Debug)]
-struct CategorizedPostings<'a, P, C>(HashMap<C, Vec<CurrenciedPosting<'a, P, C>>>);
+struct HashMapOfVec<K, V>(HashMap<K, Vec<V>>);
 
-// TODO why couldn't I derive this?
-impl<'a, P, C> Default for CategorizedPostings<'a, P, C> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<'a, P, C> CategorizedPostings<'a, P, C> {
-    fn insert(&mut self, bucket: C, p: CurrenciedPosting<'a, P, C>)
+impl<K, V> HashMapOfVec<K, V> {
+    fn push_or_insert(&mut self, k: K, v: V)
     where
-        C: Eq + Hash,
+        K: Eq + Hash,
     {
         use Entry::*;
 
-        match self.0.entry(bucket) {
+        match self.0.entry(k) {
             Occupied(mut occupied) => {
-                occupied.get_mut().push(p);
+                occupied.get_mut().push(v);
             }
             Vacant(vacant) => {
-                vacant.insert(vec![p]);
+                vacant.insert(vec![v]);
             }
         }
     }
 }
 
-impl<'a, P, C> Deref for CategorizedPostings<'a, P, C> {
-    type Target = HashMap<C, Vec<CurrenciedPosting<'a, P, C>>>;
+impl<K, V> Default for HashMapOfVec<K, V> {
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<K, V> IntoIterator for HashMapOfVec<K, V> {
+    type Item = (K, Vec<V>);
+    type IntoIter = hashbrown::hash_map::IntoIter<K, Vec<V>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<K, V> Deref for HashMapOfVec<K, V> {
+    type Target = HashMap<K, Vec<V>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -238,14 +449,21 @@ impl<'a, P, C> Deref for CategorizedPostings<'a, P, C> {
 }
 
 #[derive(Clone, Debug)]
-struct CurrenciedPosting<'a, P, C> {
+struct AnnotatedPosting<'a, P, C>
+where
+    C: Clone,
+{
     posting: &'a P,
+    idx: usize,
     units_currency: Option<C>,
     cost_currency: Option<C>,
     price_currency: Option<C>,
 }
 
-impl<'a, P, C> CurrenciedPosting<'a, P, C> {
+impl<'a, P, C> AnnotatedPosting<'a, P, C>
+where
+    C: Clone,
+{
     fn bucket(&self) -> Option<C>
     where
         C: Clone,
@@ -256,4 +474,27 @@ impl<'a, P, C> CurrenciedPosting<'a, P, C> {
             .or(self.price_currency.as_ref().cloned())
             .or(self.units_currency.as_ref().cloned())
     }
+}
+
+#[derive(Clone, Debug)]
+enum CostedPosting<'p, P, N, C>
+where
+    N: Copy,
+    C: Clone,
+{
+    Booked(BookedAtCostPosting<'p, P, N, C>),
+    Unbooked(AnnotatedPosting<'p, P, C>),
+}
+
+#[derive(Clone, Debug)]
+struct BookedAtCostPosting<'p, P, N, C>
+where
+    N: Copy,
+    C: Clone,
+{
+    posting: &'p P,
+    idx: usize,
+    units: N,
+    currency: C,
+    price_currency: Option<C>,
 }

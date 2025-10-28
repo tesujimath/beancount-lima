@@ -1,4 +1,4 @@
-use super::Posting;
+use super::{Booking, Cost, Posting, Tolerance};
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
 use time::Date;
@@ -58,6 +58,32 @@ impl<'a> Posting for &'a parser::Posting<'a> {
         self.cost_spec().map(|cost_spec| cost_spec.merge())
     }
 
+    fn matches_cost(
+        &self,
+        default_date: Self::Date,
+        cost: &Cost<Self::Date, Self::Number, Self::Currency, Self::Label>,
+    ) -> bool {
+        self.has_cost()
+            && !(
+                self.cost_date().unwrap_or(default_date) != cost.date
+                    || self
+                        .cost_currency()
+                        .is_some_and(|posting_cost_currency| posting_cost_currency != cost.currency)
+                    || self
+                        .cost_per_unit()
+                        .is_some_and(|posting_cost_units| posting_cost_units != cost.per_unit)
+                    || self
+                        .cost_currency()
+                        .is_some_and(|posting_cost_currency| posting_cost_currency != cost.currency)
+                    || self.cost_label().is_some_and(|cost_label| {
+                        cost.label
+                            .as_ref()
+                            .is_some_and(|posting_cost_label| *posting_cost_label != cost_label)
+                    })
+                // TODO merge
+            )
+    }
+
     fn has_price(&self) -> bool {
         self.price_annotation().is_some()
     }
@@ -98,5 +124,80 @@ impl<'a> Posting for &'a parser::Posting<'a> {
                 _ => None,
             }
         })
+    }
+}
+
+struct SumWithMinNonZeroScale {
+    sum: Decimal,
+    min_nonzero_scale: Option<u32>,
+}
+
+impl FromIterator<Decimal> for SumWithMinNonZeroScale {
+    fn from_iter<T: IntoIterator<Item = Decimal>>(iter: T) -> Self {
+        let mut sum = Decimal::ZERO;
+        let mut min_nonzero_scale = None;
+        for value in iter {
+            sum += value;
+            if value.scale() > 0 {
+                if min_nonzero_scale.is_none() {
+                    min_nonzero_scale = Some(value.scale());
+                } else if let Some(scale) = min_nonzero_scale
+                    && value.scale() < scale
+                {
+                    min_nonzero_scale = Some(value.scale());
+                }
+            }
+        }
+
+        Self {
+            sum,
+            min_nonzero_scale,
+        }
+    }
+}
+
+impl<'a> Tolerance for parser::Options<'a> {
+    type Currency = &'a str;
+    type Number = Decimal;
+
+    // Beancount Precision & Tolerances
+    // https://docs.google.com/document/d/1lgHxUUEY-UVEgoF6cupz2f_7v7vEF7fiJyiSlYYlhOo
+    fn sum_is_tolerably_close_to_zero(
+        &self,
+        values: impl Iterator<Item = Self::Number>,
+        cur: &Self::Currency,
+    ) -> bool {
+        let multiplier = self.inferred_tolerance_multiplier();
+        let s = values.collect::<SumWithMinNonZeroScale>();
+        let residual = s.sum.abs();
+
+        if let Some(min_nonzero_scale) = s.min_nonzero_scale.as_ref() {
+            residual < Decimal::new(1, *min_nonzero_scale) * multiplier
+        } else {
+            // TODO should we have kept currency as a parser::Currency all along, to avoid extra validation here??
+            let cur = TryInto::<parser::Currency>::try_into(*cur).unwrap();
+            let tolerance = self
+                .inferred_tolerance_default(&cur)
+                .or(self.inferred_tolerance_default_fallback());
+
+            tolerance.is_some_and(|tolerance| residual < tolerance)
+        }
+    }
+}
+
+impl From<parser::Booking> for Booking {
+    fn from(value: parser::Booking) -> Self {
+        use parser::Booking as parser;
+        use Booking::*;
+
+        match value {
+            parser::Strict => Strict,
+            parser::StrictWithSize => StrictWithSize,
+            parser::None => None,
+            parser::Average => Average,
+            parser::Fifo => Fifo,
+            parser::Lifo => Lifo,
+            parser::Hifo => Hifo,
+        }
     }
 }

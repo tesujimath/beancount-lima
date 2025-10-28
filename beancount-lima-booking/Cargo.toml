@@ -7,7 +7,9 @@ edition = "2024"
 beancount-parser-lima = { workspace = true, optional = true }
 rust_decimal = { workspace = true, optional = true }
 hashbrown = { workspace = true }
+strum_macros = { workspace = true }
 time = { workspace = true }
+tracing = { workspace = true }
 
 [features]
 default = ["lima-parser-types", "rust-decimal"]

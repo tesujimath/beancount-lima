@@ -37,11 +37,11 @@ sgmlish = "0.2.0"
 serde = { version = "1.0.219", features = ["derive"] }
 xdg = "3.0.0"
 regex = "1.11.1"
-tracing = "0.1.41"
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 color-eyre = "0.6.5"
 strum = "0.27.2"
-strum_macros = "0.27.2"
+strum_macros = { workspace = true }
 joinery = "3.1.0"
 tabulator = { version = "0.3.0", features = ["num-bigint", "rust_decimal"] }
 # tabulator = { path = "../tabulator-rs", features = [
