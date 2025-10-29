@@ -34,10 +34,32 @@ where
     let mut updated_inventory =
         HashMap::<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>::default();
 
-    let categorized = categorize_by_currency(&postings, inventory)?;
+    let currency_groups = categorize_by_currency(&postings, inventory)?;
 
-    for (cur, annotated_postings) in categorized {
-        let costed = book_reductions(date, cur, annotated_postings, tolerance, inventory, method)?;
+    for (cur, annotated_postings) in currency_groups {
+        let Reductions {
+            updated_inventory: updated_inventory_for_cur,
+            costed_postings,
+        } = book_reductions(
+            date,
+            cur.clone(),
+            annotated_postings,
+            tolerance,
+            |account| {
+                updated_inventory
+                    .get(&account)
+                    .or_else(|| inventory(account.clone()))
+            },
+            method,
+        )?;
+
+        tracing::debug!("book reductions {:?} {:?}", &cur, updated_inventory_for_cur);
+        for (account, positions) in updated_inventory_for_cur {
+            updated_inventory.insert(account, positions);
+        }
+
+        // TODO weights/interpolation/other booking
+        // interpolate_units
     }
 
     Ok(updated_inventory.into_iter())
@@ -84,7 +106,6 @@ where
                     .or_else(|| inventory(account.clone())),
             ) {
                 (Some(posting_cost_currency), Some(posting_units), Some(previous_positions)) => {
-                    let posting = &annotated.posting;
                     let method = method(account.clone());
 
                     // TODO booking methods other than strict
@@ -95,8 +116,7 @@ where
                                 account.to_string(),
                             ),
                         ))
-                    } else if let Some(posting_units) = posting.units()
-                        && let Some(ann_sign) = posting_units.sign()
+                    } else if let Some(ann_sign) = posting_units.sign()
                         && previous_positions
                             .iter()
                             .filter(|pos| pos.currency == currency && pos.cost.is_some())
@@ -114,7 +134,10 @@ where
                             .enumerate()
                             .filter_map(|(i, pos)| {
                                 pos.cost.as_ref().and_then(|pos_cost| {
-                                    posting.matches_cost(date, pos_cost).then_some((i, pos))
+                                    annotated
+                                        .posting
+                                        .matches_cost(date, pos_cost)
+                                        .then_some((i, pos))
                                 })
                             })
                             .collect::<Vec<_>>();
@@ -128,13 +151,17 @@ where
                         if matched_positions.is_empty() {
                             Ok(Unbooked(annotated))
                         } else if matched_positions.len() == 1 {
-                            let (i_matched, _) = matched_positions.into_iter().next().unwrap();
+                            let (i_matched, matched_pos) =
+                                matched_positions.into_iter().next().unwrap();
                             // Book 'em, Danno!
                             tracing::debug!(
                                 "cost-matched unique position at {}: {:?}",
                                 i_matched,
-                                &previous_positions[i_matched]
+                                &matched_pos
                             );
+                            let cost_currency = matched_pos.currency.clone();
+                            let cost_units =
+                                matched_pos.cost.as_ref().unwrap().per_unit * posting_units;
 
                             let updated_positions = previous_positions
                                 .iter()
@@ -157,9 +184,8 @@ where
                             Ok(Booked(BookedAtCostPosting {
                                 posting: annotated.posting,
                                 idx: annotated.idx,
-                                units: posting_units,
-                                currency: currency.clone(),
-                                price_currency: annotated.price_currency,
+                                units: cost_units,
+                                currency: cost_currency,
                             }))
                         } else if tolerance.sum_is_tolerably_close_to_zero(
                             previous_positions
@@ -170,27 +196,46 @@ where
                         ) {
                             // this is "sell everything", that is, existing positions at cost together with this one sum to zero-ish
                             // updated_inventory
-
-                            let matched_positions = matched_positions
+                            let cost_currencies = matched_positions
                                 .iter()
-                                .map(|(i, _)| *i)
+                                .map(|(_i, pos)| pos.cost.as_ref().unwrap().currency.clone())
                                 .collect::<HashSet<_>>();
-                            let updated_positions = previous_positions
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(i, pos)| {
-                                    matched_positions.contains(&i).then_some(pos.clone())
-                                })
-                                .collect::<Vec<_>>();
-                            updated_inventory.insert(account.clone(), updated_positions);
 
-                            Ok(Booked(BookedAtCostPosting {
-                                posting: annotated.posting,
-                                idx: annotated.idx,
-                                units: posting_units,
-                                currency: currency.clone(),
-                                price_currency: annotated.price_currency,
-                            }))
+                            if cost_currencies.len() == 1 {
+                                let cost_currency = cost_currencies.into_iter().next().unwrap();
+                                let cost_units: P::Number = matched_positions
+                                    .iter()
+                                    .map(|(_i, pos)| {
+                                        pos.cost.as_ref().unwrap().per_unit * posting_units
+                                    })
+                                    .sum();
+
+                                let matched_positions = matched_positions
+                                    .iter()
+                                    .map(|(i, _)| *i)
+                                    .collect::<HashSet<_>>();
+
+                                let updated_positions = previous_positions
+                                    .iter()
+                                    .enumerate()
+                                    .filter_map(|(i, pos)| {
+                                        matched_positions.contains(&i).then_some(pos.clone())
+                                    })
+                                    .collect::<Vec<_>>();
+                                updated_inventory.insert(account.clone(), updated_positions);
+
+                                Ok(Booked(BookedAtCostPosting {
+                                    posting: annotated.posting,
+                                    idx: annotated.idx,
+                                    units: cost_units,
+                                    currency: cost_currency,
+                                }))
+                            } else {
+                                Err(BookingError::Posting(
+                                    annotated.idx,
+                                    PostingBookingError::MultipleCostCurrenciesMatch,
+                                ))
+                            }
                         } else {
                             Err(BookingError::Posting(
                                 annotated.idx,
@@ -283,8 +328,9 @@ where
     P::Currency: 'i,
     P::Label: 'i,
 {
-    let mut groups = HashMapOfVec::default();
-    let mut auto_postings = Vec::default();
+    let mut currency_groups = HashMapOfVec::default();
+    let mut auto_postings =
+        HashMap::<Option<P::Currency>, AnnotatedPosting<'p, P, P::Currency>>::default();
     let mut unknown = Vec::default();
     let mut account_currency_lookup = HashMap::<P::Account, Option<P::Currency>>::default();
 
@@ -308,11 +354,18 @@ where
             cost_currency,
             price_currency,
         };
+        let bucket = p.bucket();
 
         if posting.units().is_none() && posting.currency().is_none() {
-            auto_postings.push(p);
-        } else if let Some(bucket) = p.bucket() {
-            groups.push_or_insert(bucket, p);
+            if auto_postings.contains_key(&bucket) {
+                return Err(BookingError::Posting(
+                    idx,
+                    PostingBookingError::AmbiguousAutoPost,
+                ));
+            }
+            auto_postings.insert(bucket, p);
+        } else if let Some(bucket) = bucket {
+            currency_groups.push_or_insert(bucket, p);
         } else {
             unknown.push((idx, p));
         }
@@ -320,8 +373,14 @@ where
 
     // if we have a single unknown posting and all others are of the same currency,
     // infer that for the unknown
-    if unknown.len() == 1 && groups.len() == 1 {
-        let only_bucket = groups.keys().next().as_ref().cloned().unwrap().clone();
+    if unknown.len() == 1 && currency_groups.len() == 1 {
+        let only_bucket = currency_groups
+            .keys()
+            .next()
+            .as_ref()
+            .cloned()
+            .unwrap()
+            .clone();
         let (idx, u) = unknown.drain(..).next().unwrap();
         let inferred = AnnotatedPosting {
             posting: u.posting,
@@ -338,7 +397,7 @@ where
                 .or(Some(only_bucket.clone())),
             price_currency: u.price_currency.or(Some(only_bucket.clone())),
         };
-        groups.push_or_insert(only_bucket.clone(), inferred);
+        currency_groups.push_or_insert(only_bucket.clone(), inferred);
     }
 
     // infer all other unknown postings from account inference
@@ -356,7 +415,7 @@ where
             price_currency: u.price_currency,
         };
         if let Some(bucket) = inferred.bucket() {
-            groups.push_or_insert(bucket, inferred);
+            currency_groups.push_or_insert(bucket, inferred);
         } else {
             return Err(BookingError::Posting(
                 idx,
@@ -365,7 +424,28 @@ where
         }
     }
 
-    Ok(groups)
+    if let Some(auto_posting) = auto_postings.remove(&None) {
+        if !auto_postings.is_empty() {
+            return Err(BookingError::Posting(
+                auto_posting.idx,
+                PostingBookingError::AmbiguousAutoPost,
+            ));
+        }
+
+        // add auto_posting to each currency group
+        let all_buckets = currency_groups.keys().cloned().collect::<Vec<_>>();
+        for bucket in all_buckets {
+            currency_groups.push_or_insert(bucket, auto_posting.clone());
+        }
+    } else {
+        for (bucket, auto_posting) in auto_postings.into_iter() {
+            let bucket = bucket.unwrap();
+
+            currency_groups.push_or_insert(bucket, auto_posting);
+        }
+    }
+
+    Ok(currency_groups)
 }
 
 // lookup account currency with memoization
@@ -496,5 +576,4 @@ where
     idx: usize,
     units: N,
     currency: C,
-    price_currency: Option<C>,
 }

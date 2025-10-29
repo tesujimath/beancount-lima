@@ -1,17 +1,16 @@
 use std::{
-    ops::{Add, Sub},
-    {
-        fmt::{Debug, Display},
-        hash::Hash,
-    },
+    fmt::{Debug, Display},
+    hash::Hash,
+    iter::Sum,
+    ops::{Add, Mul},
 };
 use strum_macros::Display;
 
-pub trait Posting {
+pub trait Posting: Clone {
     type Date: Eq + Ord + Copy + Debug;
     type Account: Eq + Hash + Clone + Display + Debug;
     type Currency: Eq + Hash + Ord + Clone + Debug;
-    type Number: Number + Add<Output = Self::Number> + Eq + Copy + Debug;
+    type Number: Number + Eq + Copy + Debug;
     type Label: Eq + Ord + Clone + Debug;
 
     fn account(&self) -> Self::Account;
@@ -100,7 +99,7 @@ pub trait Tolerance {
     ) -> bool;
 }
 
-pub trait Number: Add + Sub + Sized {
+pub trait Number: Add<Output = Self> + Mul<Output = Self> + Sum + Sized {
     fn abs(&self) -> Self;
 
     // zero is neither positive nor negative
