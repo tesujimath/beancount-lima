@@ -303,6 +303,7 @@ pub(crate) mod config;
 pub(crate) mod format;
 pub(crate) mod import;
 pub(crate) mod loader;
+pub(crate) mod options;
 pub(crate) mod prism;
 
 #[cfg(test)]
