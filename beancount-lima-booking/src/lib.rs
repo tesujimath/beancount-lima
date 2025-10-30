@@ -6,6 +6,9 @@ pub use errors::{BookingError, PostingBookingError, TransactionBookingError};
 
 mod features;
 
+mod interpolate;
+pub(crate) use interpolate::interpolate;
+
 mod internal_types;
 pub(crate) use internal_types::*;
 

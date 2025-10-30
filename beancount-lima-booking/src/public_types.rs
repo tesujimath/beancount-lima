@@ -2,7 +2,7 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     iter::Sum,
-    ops::{Add, Mul},
+    ops::{Add, Mul, Neg},
 };
 use strum_macros::Display;
 
@@ -10,7 +10,7 @@ pub trait Posting: Clone {
     type Date: Eq + Ord + Copy + Debug;
     type Account: Eq + Hash + Clone + Display + Debug;
     type Currency: Eq + Hash + Ord + Clone + Debug;
-    type Number: Number + Eq + Copy + Debug;
+    type Number: Number + Eq + Copy + Display + Debug;
     type Label: Eq + Ord + Clone + Debug;
 
     fn account(&self) -> Self::Account;
@@ -91,19 +91,23 @@ pub trait Tolerance {
     type Currency;
     type Number;
 
-    /// do the values in the specified currency sum to something tolerably small?
-    fn sum_is_tolerably_close_to_zero(
+    /// compute residual, ignoring sums which are tolerably small
+    fn residual(
         &self,
         values: impl Iterator<Item = Self::Number>,
         cur: &Self::Currency,
-    ) -> bool;
+    ) -> Option<Self::Number>;
 }
 
-pub trait Number: Add<Output = Self> + Mul<Output = Self> + Sum + Sized {
+pub trait Number:
+    Add<Output = Self> + Neg<Output = Self> + Mul<Output = Self> + Sum + Sized
+{
     fn abs(&self) -> Self;
 
     // zero is neither positive nor negative
     fn sign(&self) -> Option<Sign>;
+
+    fn zero() -> Self;
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Display, Debug)]

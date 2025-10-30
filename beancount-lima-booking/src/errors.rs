@@ -14,6 +14,9 @@ pub enum BookingError {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum TransactionBookingError {
     UnsupportedBookingMethod(Booking, String),
+    TooManyMissingNumbers,
+    NoResidualForInterpolation,
+    Unbalanced(String),
 }
 
 impl Display for TransactionBookingError {
@@ -24,6 +27,9 @@ impl Display for TransactionBookingError {
             UnsupportedBookingMethod(booking, account) => {
                 write!(f, "unsupported booking method {booking} for {account}")
             }
+            TooManyMissingNumbers => f.write_str("too many missing numbers for interpolation"),
+            NoResidualForInterpolation => f.write_str("no residual for interpolation"),
+            Unbalanced(residual) => write!(f, "unbalanced transaction with residual {residual}"),
         }
     }
 }

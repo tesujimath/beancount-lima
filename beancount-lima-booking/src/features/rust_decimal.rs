@@ -16,4 +16,8 @@ impl Number for rust_decimal::Decimal {
             Some(Positive)
         }
     }
+
+    fn zero() -> Self {
+        rust_decimal::Decimal::ZERO
+    }
 }

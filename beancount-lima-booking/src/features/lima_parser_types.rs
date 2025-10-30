@@ -162,20 +162,21 @@ impl<'a> Tolerance for parser::Options<'a> {
 
     // Beancount Precision & Tolerances
     // https://docs.google.com/document/d/1lgHxUUEY-UVEgoF6cupz2f_7v7vEF7fiJyiSlYYlhOo
-    fn sum_is_tolerably_close_to_zero(
+    fn residual(
         &self,
         values: impl Iterator<Item = Self::Number>,
         cur: &Self::Currency,
-    ) -> bool {
+    ) -> Option<Self::Number> {
         let multiplier = self
             .inferred_tolerance_multiplier()
             .map(|m| *m.item())
             .unwrap_or(default_inferred_tolerance_multiplier());
         let s = values.collect::<SumWithMinNonZeroScale>();
-        let residual = s.sum.abs();
+        let residual = s.sum;
+        let abs_residual = residual.abs();
 
         if let Some(min_nonzero_scale) = s.min_nonzero_scale.as_ref() {
-            residual < Decimal::new(1, *min_nonzero_scale) * multiplier
+            (abs_residual >= Decimal::new(1, *min_nonzero_scale) * multiplier).then_some(residual)
         } else {
             // TODO should we have kept currency as a parser::Currency all along, to avoid extra validation here??
             let cur = TryInto::<parser::Currency>::try_into(*cur).unwrap();
@@ -183,7 +184,11 @@ impl<'a> Tolerance for parser::Options<'a> {
                 .inferred_tolerance_default(&cur)
                 .or(self.inferred_tolerance_default_fallback());
 
-            tolerance.is_some_and(|tolerance| residual < tolerance)
+            if let Some(tolerance) = tolerance {
+                (abs_residual >= tolerance).then_some(residual)
+            } else {
+                (!residual.is_zero()).then_some(residual)
+            }
         }
     }
 }

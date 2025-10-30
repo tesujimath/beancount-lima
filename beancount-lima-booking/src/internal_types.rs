@@ -4,7 +4,7 @@
 use hashbrown::{hash_map::Entry, HashMap};
 use std::{fmt::Debug, hash::Hash, ops::Deref};
 
-use super::{Cost, Number};
+use super::{Cost, Number, Posting};
 
 ///
 /// A list of positions for a currency satisfying these invariants:
@@ -145,6 +145,21 @@ where
     Unbooked(AnnotatedPosting<'p, P, C>),
 }
 
+impl<'p, P, C> CostedPosting<'p, P, P::Number, C>
+where
+    P: Posting,
+    C: Clone,
+{
+    pub(crate) fn weight(&self) -> Option<P::Number> {
+        use CostedPosting::*;
+
+        match self {
+            Booked(booked) => Some(booked.units),
+            Unbooked(unbooked) => unbooked.posting.units(),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct BookedAtCostPosting<'p, P, N, C>
 where
@@ -155,4 +170,17 @@ where
     pub(crate) idx: usize,
     pub(crate) units: N,
     pub(crate) currency: C,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct WeightedPosting<'a, P, N, C>
+where
+    N: Copy,
+    C: Clone,
+{
+    pub(crate) posting: &'a P,
+    pub(crate) idx: usize,
+    pub(crate) units: N,
+    pub(crate) cost_currency: Option<C>,
+    pub(crate) price_currency: Option<C>,
 }

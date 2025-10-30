@@ -5,8 +5,8 @@ use hashbrown::{HashMap, HashSet};
 use std::{fmt::Debug, hash::Hash, iter::once};
 
 use super::{
-    AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, CostedPosting, HashMapOfVec,
-    Number, Position, Posting, PostingBookingError, Tolerance,
+    interpolate, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, CostedPosting,
+    HashMapOfVec, Number, Position, Posting, PostingBookingError, Tolerance, WeightedPosting,
 };
 
 pub fn book<'p, 'i, P, T, I, M>(
@@ -60,12 +60,14 @@ where
         }
 
         // TODO weights/interpolation/other booking
-        // interpolate_units
+        let weights = interpolate(&cur, costed_postings, tolerance)?;
+        tracing::debug!("weights {:?}", &weights);
     }
 
     Ok(updated_inventory.into_iter())
 }
 
+#[derive(Debug)]
 struct Reductions<'p, P>
 where
     P: Posting,
@@ -189,13 +191,16 @@ where
                                 units: cost_units,
                                 currency: cost_currency,
                             }))
-                        } else if tolerance.sum_is_tolerably_close_to_zero(
-                            previous_positions
-                                .iter()
-                                .filter_map(|pos| pos.cost.is_some().then_some(pos.units))
-                                .chain(once(posting_units)),
-                            &currency,
-                        ) {
+                        } else if tolerance
+                            .residual(
+                                previous_positions
+                                    .iter()
+                                    .filter_map(|pos| pos.cost.is_some().then_some(pos.units))
+                                    .chain(once(posting_units)),
+                                &currency,
+                            )
+                            .is_none()
+                        {
                             // this is "sell everything", that is, existing positions at cost together with this one sum to zero-ish
                             // updated_inventory
                             let cost_currencies = matched_positions
@@ -426,5 +431,35 @@ where
         account_currency.insert(account.clone(), currency.clone());
 
         currency
+    })
+}
+
+#[derive(Debug)]
+struct Augmentations<P>
+where
+    P: Posting,
+{
+    updated_inventory:
+        HashMap<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>,
+}
+
+fn book_augmentations<'p, 'i, 'b, P, T, I, M>(
+    date: P::Date,
+    currency: P::Currency,
+    annotateds: Vec<WeightedPosting<'p, P, P::Number, P::Currency>>,
+    tolerance: &T,
+    inventory: I,
+    method: M,
+) -> Result<Augmentations<P>, BookingError>
+where
+    P: Posting + Debug + 'p + 'i,
+    T: Tolerance<Currency = P::Currency, Number = P::Number>,
+    I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+        + Copy, // 'i for inventory
+    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+{
+    // TODO augmentations
+    Ok(Augmentations {
+        updated_inventory: HashMap::default(),
     })
 }
