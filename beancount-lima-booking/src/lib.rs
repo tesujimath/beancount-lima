@@ -1,14 +1,13 @@
 mod book;
 pub use book::book;
 
-mod error;
-pub use error::{BookingError, PostingBookingError, TransactionBookingError};
+mod errors;
+pub use errors::{BookingError, PostingBookingError, TransactionBookingError};
 
-#[cfg(feature = "lima-parser-types")]
-mod lima_parser_types;
+mod features;
 
-#[cfg(feature = "rust-decimal")]
-mod rust_decimal;
+mod internal_types;
+pub(crate) use internal_types::*;
 
-mod types;
-pub use types::{Booking, Cost, Number, Position, Posting, Sign, Tolerance};
+mod public_types;
+pub use public_types::{Booking, Cost, Number, Position, Posting, Sign, Tolerance};

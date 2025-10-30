@@ -1,12 +1,13 @@
 // TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
 
-use hashbrown::{hash_map::Entry, HashMap, HashSet};
-use std::{fmt::Debug, hash::Hash, iter::once, ops::Deref};
+use hashbrown::{HashMap, HashSet};
+use std::{fmt::Debug, hash::Hash, iter::once};
 
-use crate::PostingBookingError;
-
-use super::{Booking, BookingError, Cost, Number, Position, Posting, Tolerance};
+use super::{
+    AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, CostedPosting, HashMapOfVec,
+    Number, Position, Posting, PostingBookingError, Tolerance,
+};
 
 pub fn book<'p, 'i, P, T, I, M>(
     date: P::Date,
@@ -258,63 +259,6 @@ where
     })
 }
 
-///
-/// A list of positions for a currency satisfying these invariants:
-/// 1. If there is a simple position without cost, it occurs first in the list
-/// 2. All other positions are unique w.r.t cost.(currency, date, label)
-/// 3. Sort order of these is by date then currency then label.
-/// 4. All positions are non-empty.
-#[derive(PartialEq, Eq, Default, Debug)]
-struct CurrencyPositions<D, N, C, L>(Vec<CurrencyPosition<D, N, C, L>>)
-where
-    D: Copy,
-    N: Copy,
-    C: Clone,
-    L: Clone;
-
-impl<D, N, C, L> Deref for CurrencyPositions<D, N, C, L>
-where
-    D: Copy,
-    N: Copy,
-    C: Clone,
-    L: Clone,
-{
-    type Target = Vec<CurrencyPosition<D, N, C, L>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(PartialEq, Eq, Clone, Debug)]
-/// CurrencyPosition for implicit currency, which is kept externally
-struct CurrencyPosition<D, N, C, L>
-where
-    D: Copy,
-    N: Copy,
-    C: Clone,
-    L: Clone,
-{
-    units: N,
-    cost: Option<Cost<D, N, C, L>>,
-}
-
-impl<D, N, C, L> CurrencyPosition<D, N, C, L>
-where
-    D: Copy,
-    N: Copy,
-    C: Clone,
-    L: Clone,
-{
-    fn is_below(&self, threshold: N) -> bool
-    where
-        N: Number + Ord,
-    {
-        // TODO ensure that costs are not left below threshold
-        self.units.abs() <= threshold && self.cost.is_none()
-    }
-}
-
 // See OG Beancount function of the same name
 fn categorize_by_currency<'p, 'b, 'i, P, I>(
     postings: &'b [&'p P],
@@ -483,98 +427,4 @@ where
 
         currency
     })
-}
-
-#[derive(Debug)]
-struct HashMapOfVec<K, V>(HashMap<K, Vec<V>>);
-
-impl<K, V> HashMapOfVec<K, V> {
-    fn push_or_insert(&mut self, k: K, v: V)
-    where
-        K: Eq + Hash,
-    {
-        use Entry::*;
-
-        match self.0.entry(k) {
-            Occupied(mut occupied) => {
-                occupied.get_mut().push(v);
-            }
-            Vacant(vacant) => {
-                vacant.insert(vec![v]);
-            }
-        }
-    }
-}
-
-impl<K, V> Default for HashMapOfVec<K, V> {
-    fn default() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl<K, V> IntoIterator for HashMapOfVec<K, V> {
-    type Item = (K, Vec<V>);
-    type IntoIter = hashbrown::hash_map::IntoIter<K, Vec<V>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<K, V> Deref for HashMapOfVec<K, V> {
-    type Target = HashMap<K, Vec<V>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Clone, Debug)]
-struct AnnotatedPosting<'a, P, C>
-where
-    C: Clone,
-{
-    posting: &'a P,
-    idx: usize,
-    units_currency: Option<C>,
-    cost_currency: Option<C>,
-    price_currency: Option<C>,
-}
-
-impl<'a, P, C> AnnotatedPosting<'a, P, C>
-where
-    C: Clone,
-{
-    fn bucket(&self) -> Option<C>
-    where
-        C: Clone,
-    {
-        self.cost_currency
-            .as_ref()
-            .cloned()
-            .or(self.price_currency.as_ref().cloned())
-            .or(self.units_currency.as_ref().cloned())
-    }
-}
-
-#[derive(Clone, Debug)]
-enum CostedPosting<'p, P, N, C>
-where
-    N: Copy,
-    C: Clone,
-{
-    Booked(BookedAtCostPosting<'p, P, N, C>),
-    Unbooked(AnnotatedPosting<'p, P, C>),
-}
-
-#[derive(Clone, Debug)]
-struct BookedAtCostPosting<'p, P, N, C>
-where
-    N: Copy,
-    C: Clone,
-{
-    posting: &'p P,
-    idx: usize,
-    units: N,
-    currency: C,
 }
