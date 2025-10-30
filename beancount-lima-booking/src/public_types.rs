@@ -26,11 +26,6 @@ pub trait Posting: Clone {
     fn cost_date(&self) -> Option<Self::Date>;
     fn cost_label(&self) -> Option<Self::Label>;
     fn cost_merge(&self) -> Option<bool>;
-    fn matches_cost(
-        &self,
-        default_date: Self::Date,
-        cost: &Cost<Self::Date, Self::Number, Self::Currency, Self::Label>,
-    ) -> bool;
 
     fn has_price(&self) -> bool;
     fn price_currency(&self) -> Option<Self::Currency>;

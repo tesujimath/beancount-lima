@@ -150,12 +150,32 @@ where
     P: Posting,
     C: Clone,
 {
+    // determine the weight of a posting
+    // https://beancount.github.io/docs/beancount_language_syntax.html#balancing-rule-the-weight-of-postings
     pub(crate) fn weight(&self) -> Option<P::Number> {
         use CostedPosting::*;
 
         match self {
-            Booked(booked) => Some(booked.units),
-            Unbooked(unbooked) => unbooked.posting.units(),
+            Booked(booked) => Some(booked.cost_units),
+            Unbooked(unbooked) => {
+                let p = unbooked.posting;
+
+                if p.has_cost() {
+                    match (p.cost_total(), p.cost_per_unit(), p.units()) {
+                        (Some(cost_total), _, _) => Some(cost_total),
+                        (None, Some(cost_per_unit), Some(units)) => Some(cost_per_unit * units),
+                        _ => None,
+                    }
+                } else if p.has_price() {
+                    match (p.price_total(), p.price_per_unit(), p.units()) {
+                        (Some(price_total), _, _) => Some(price_total),
+                        (None, Some(price_per_unit), Some(units)) => Some(price_per_unit * units),
+                        _ => None,
+                    }
+                } else {
+                    p.units()
+                }
+            }
         }
     }
 }
@@ -168,8 +188,8 @@ where
 {
     pub(crate) posting: &'p P,
     pub(crate) idx: usize,
-    pub(crate) units: N,
-    pub(crate) currency: C,
+    pub(crate) cost_units: N,
+    pub(crate) cost_currency: C,
 }
 
 #[derive(Clone, Debug)]

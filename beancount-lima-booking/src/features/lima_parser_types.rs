@@ -1,4 +1,4 @@
-use super::{Booking, Cost, Posting, Tolerance};
+use super::{Booking, Posting, Tolerance};
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
 use time::Date;
@@ -56,32 +56,6 @@ impl<'a> Posting for &'a parser::Posting<'a> {
 
     fn cost_merge(&self) -> Option<bool> {
         self.cost_spec().map(|cost_spec| cost_spec.merge())
-    }
-
-    fn matches_cost(
-        &self,
-        default_date: Self::Date,
-        cost: &Cost<Self::Date, Self::Number, Self::Currency, Self::Label>,
-    ) -> bool {
-        self.has_cost()
-            && !(
-                self.cost_date().unwrap_or(default_date) != cost.date
-                    || self
-                        .cost_currency()
-                        .is_some_and(|posting_cost_currency| posting_cost_currency != cost.currency)
-                    || self
-                        .cost_per_unit()
-                        .is_some_and(|posting_cost_units| posting_cost_units != cost.per_unit)
-                    || self
-                        .cost_currency()
-                        .is_some_and(|posting_cost_currency| posting_cost_currency != cost.currency)
-                    || self.cost_label().is_some_and(|cost_label| {
-                        cost.label
-                            .as_ref()
-                            .is_some_and(|posting_cost_label| *posting_cost_label != cost_label)
-                    })
-                // TODO merge
-            )
     }
 
     fn has_price(&self) -> bool {

@@ -5,7 +5,7 @@ use hashbrown::{HashMap, HashSet};
 use std::{fmt::Debug, hash::Hash, iter::once};
 
 use super::{
-    interpolate, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, CostedPosting,
+    interpolate, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost, CostedPosting,
     HashMapOfVec, Number, Position, Posting, PostingBookingError, Tolerance, WeightedPosting,
 };
 
@@ -138,9 +138,7 @@ where
                             .enumerate()
                             .filter_map(|(i, pos)| {
                                 pos.cost.as_ref().and_then(|pos_cost| {
-                                    annotated
-                                        .posting
-                                        .matches_cost(date, pos_cost)
+                                    matches_cost(annotated.posting, date, pos_cost)
                                         .then_some((i, pos))
                                 })
                             })
@@ -188,8 +186,8 @@ where
                             Ok(Booked(BookedAtCostPosting {
                                 posting: annotated.posting,
                                 idx: annotated.idx,
-                                units: cost_units,
-                                currency: cost_currency,
+                                cost_units,
+                                cost_currency,
                             }))
                         } else if tolerance
                             .residual(
@@ -234,8 +232,8 @@ where
                                 Ok(Booked(BookedAtCostPosting {
                                     posting: annotated.posting,
                                     idx: annotated.idx,
-                                    units: cost_units,
-                                    currency: cost_currency,
+                                    cost_units,
+                                    cost_currency,
                                 }))
                             } else {
                                 Err(BookingError::Posting(
@@ -262,6 +260,35 @@ where
         updated_inventory,
         costed_postings,
     })
+}
+
+fn matches_cost<P>(
+    posting: &P,
+    default_date: P::Date,
+    cost: &Cost<P::Date, P::Number, P::Currency, P::Label>,
+) -> bool
+where
+    P: Posting,
+{
+    posting.has_cost()
+        && !(
+            posting.cost_date().unwrap_or(default_date) != cost.date
+                || posting
+                    .cost_currency()
+                    .is_some_and(|posting_cost_currency| posting_cost_currency != cost.currency)
+                || posting
+                    .cost_per_unit()
+                    .is_some_and(|posting_cost_units| posting_cost_units != cost.per_unit)
+                || posting
+                    .cost_currency()
+                    .is_some_and(|posting_cost_currency| posting_cost_currency != cost.currency)
+                || posting.cost_label().is_some_and(|cost_label| {
+                    cost.label
+                        .as_ref()
+                        .is_some_and(|posting_cost_label| *posting_cost_label != cost_label)
+                })
+            // TODO merge
+        )
 }
 
 // See OG Beancount function of the same name
