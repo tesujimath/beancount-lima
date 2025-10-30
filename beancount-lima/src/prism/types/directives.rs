@@ -6,7 +6,6 @@ use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
 use steel::{
     gc::Shared,
-    rvals::Custom,
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelErr,
 };
@@ -22,7 +21,7 @@ pub(crate) struct Directive {
     pub(crate) variant: DirectiveVariant,
 }
 
-impl Custom for Directive {
+impl steel::rvals::Custom for Directive {
     fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
         Some(Ok(self.to_string()))
     }
@@ -41,6 +40,7 @@ pub(crate) enum DirectiveVariant {
     Note(Note),
     Event(Event),
     Query(Query),
+    Custom(Custom),
 }
 
 // Scheme is not statically typed, so we don't force the user to unpack the directive variants, but rather support direct access
@@ -181,6 +181,12 @@ pub(crate) struct Event {
 pub(crate) struct Query {
     pub(crate) name: String,
     pub(crate) content: String,
+}
+
+#[derive(Clone, Steel, Debug)]
+pub(crate) struct Custom {
+    pub(crate) type_: String,
+    // TODO values are not yet handled
 }
 
 pub(crate) fn register_types(steel_engine: &mut Engine) {

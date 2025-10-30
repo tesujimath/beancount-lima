@@ -23,6 +23,7 @@ impl Display for Directive {
             Note(x) => x.fmt(f, self.date /*, &self.metadata*/),
             Event(x) => x.fmt(f, self.date /*, &self.metadata*/),
             Query(x) => x.fmt(f, self.date /*, &self.metadata*/),
+            Custom(x) => x.fmt(f, self.date /*, &self.metadata*/),
         }
     }
 }
@@ -131,6 +132,17 @@ impl Event {
 impl Query {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} query \"{}\" \"{}\"", date, &self.name, &self.content)?;
+        f.write_str(NEWLINE)
+    }
+}
+
+impl Custom {
+    fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
+        write!(
+            f,
+            "{} custom \"{}\" ; TODO values not yet supported",
+            date, &self.type_
+        )?;
         f.write_str(NEWLINE)
     }
 }

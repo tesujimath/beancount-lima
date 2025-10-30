@@ -7,7 +7,10 @@ use std::{
 use tabulator::{Align, Cell, Gap};
 use time::Date;
 
-use crate::format::{format, plain, EMPTY, SPACE};
+use crate::{
+    format::{format, plain, EMPTY, SPACE},
+    options::defaults::default_inferred_tolerance_multiplier,
+};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Directive<'a> {
@@ -169,7 +172,10 @@ impl<'a> InferredTolerance<'a> {
                 .inferred_tolerance_defaults()
                 .filter_map(|(cur, value)| cur.map(|cur| (cur, value)))
                 .collect::<HashMap<_, _>>(),
-            multiplier: options.inferred_tolerance_multiplier(),
+            multiplier: options
+                .inferred_tolerance_multiplier()
+                .map(|m| *m.item())
+                .unwrap_or(default_inferred_tolerance_multiplier()),
         }
     }
 }

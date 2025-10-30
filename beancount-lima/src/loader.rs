@@ -118,6 +118,7 @@ impl<'a> Loader<'a> {
             Note(note) => Ok(DirectiveVariant::NA),
             Event(event) => Ok(DirectiveVariant::NA),
             Query(query) => Ok(DirectiveVariant::NA),
+            Custom(custom) => Ok(DirectiveVariant::NA),
         } {
             self.directives.push(Directive {
                 parsed: directive,

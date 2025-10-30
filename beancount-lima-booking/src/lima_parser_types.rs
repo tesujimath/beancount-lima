@@ -167,7 +167,10 @@ impl<'a> Tolerance for parser::Options<'a> {
         values: impl Iterator<Item = Self::Number>,
         cur: &Self::Currency,
     ) -> bool {
-        let multiplier = self.inferred_tolerance_multiplier();
+        let multiplier = self
+            .inferred_tolerance_multiplier()
+            .map(|m| *m.item())
+            .unwrap_or(default_inferred_tolerance_multiplier());
         let s = values.collect::<SumWithMinNonZeroScale>();
         let residual = s.sum.abs();
 
@@ -200,4 +203,10 @@ impl From<parser::Booking> for Booking {
             parser::Hifo => Hifo,
         }
     }
+}
+
+// TODO where should default_inferred_tolerance_multiplier be defined?
+// (we can't depend on the main beancount-lima crate here)
+fn default_inferred_tolerance_multiplier() -> Decimal {
+    Decimal::new(5, 1) // 0.5
 }

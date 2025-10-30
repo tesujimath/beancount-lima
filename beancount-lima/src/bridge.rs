@@ -11,6 +11,7 @@ use steel::{gc::Gc, rvals::IntoSteelVal, SteelVal};
 use crate::{
     config::LoaderConfig,
     loader::{InferredTolerance, LoadError, LoadSuccess, Loader},
+    options::defaults::default_booking_method,
     prism::Prism,
 };
 
@@ -26,12 +27,25 @@ where
             directives,
             options,
             plugins: _,
-            warnings,
+            mut warnings,
         }) => {
-            sources.write_errors_or_warnings(error_w, warnings)?;
             let inferred_tolerance = InferredTolerance::new(&options);
+            let default_booking_method = if let Some(booking_method) = options.booking_method() {
+                // TODO allow all supported booking methods
+                if *booking_method.item() != parser::Booking::Strict {
+                    warnings.push(
+                        booking_method
+                            .warning("Unsupported booking method, falling back to STRICT"),
+                    );
+                }
+                parser::Booking::Strict
+            } else {
+                default_booking_method()
+            };
 
-            match Loader::new(options.booking_method(), inferred_tolerance, config)
+            sources.write_errors_or_warnings(error_w, warnings)?;
+
+            match Loader::new(default_booking_method, inferred_tolerance, config)
                 .collect(&directives)
             {
                 Ok(LoadSuccess {

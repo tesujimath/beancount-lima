@@ -4,7 +4,7 @@
 use hashbrown::{hash_map::Entry, HashMap, HashSet};
 use std::{fmt::Debug, hash::Hash, iter::once, ops::Deref};
 
-use crate::{PostingBookingError, TransactionBookingError};
+use crate::PostingBookingError;
 
 use super::{Booking, BookingError, Cost, Number, Position, Posting, Tolerance};
 
@@ -106,17 +106,18 @@ where
                     .or_else(|| inventory(account.clone())),
             ) {
                 (Some(posting_cost_currency), Some(posting_units), Some(previous_positions)) => {
-                    let method = method(account.clone());
-
                     // TODO booking methods other than strict
-                    if method != Booking::Strict {
-                        Err(BookingError::Transaction(
-                            TransactionBookingError::UnsupportedBookingMethod(
-                                method,
-                                account.to_string(),
-                            ),
-                        ))
-                    } else if let Some(ann_sign) = posting_units.sign()
+                    // let method = method(account.clone());
+                    // we already warn about this, so we simply ignore it here
+                    // if method != Booking::Strict {
+                    //     Err(BookingError::Transaction(
+                    //         TransactionBookingError::UnsupportedBookingMethod(
+                    //             method,
+                    //             account.to_string(),
+                    //         ),
+                    //     ))
+                    // } else
+                    if let Some(ann_sign) = posting_units.sign()
                         && previous_positions
                             .iter()
                             .filter(|pos| pos.currency == currency && pos.cost.is_some())

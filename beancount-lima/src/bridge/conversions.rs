@@ -162,6 +162,13 @@ pub(crate) fn convert_directives(
                     content: query.content().item().to_string(),
                 }),
             }),
+            PDV::Custom(custom) => directives.push(prism::Directive {
+                date,
+                element: element.clone(),
+                variant: prism::DirectiveVariant::Custom(prism::Custom {
+                    type_: custom.type_().item().to_string(),
+                }),
+            }),
         }
     }
     directives
