@@ -108,18 +108,18 @@ impl<K, V> Deref for HashMapOfVec<K, V> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct AnnotatedPosting<'a, P, C>
+pub(crate) struct AnnotatedPosting<P, C>
 where
     C: Clone,
 {
-    pub(crate) posting: &'a P,
+    pub(crate) posting: P,
     pub(crate) idx: usize,
     pub(crate) currency: Option<C>,
     pub(crate) cost_currency: Option<C>,
     pub(crate) price_currency: Option<C>,
 }
 
-impl<'a, P, C> AnnotatedPosting<'a, P, C>
+impl<P, C> AnnotatedPosting<P, C>
 where
     C: Clone,
 {
@@ -136,16 +136,16 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum CostedPosting<'p, P, N, C>
+pub(crate) enum CostedPosting<P, N, C>
 where
     N: Copy,
     C: Clone,
 {
-    Booked(BookedAtCostPosting<'p, P, N, C>),
-    Unbooked(AnnotatedPosting<'p, P, C>),
+    Booked(BookedAtCostPosting<P, N, C>),
+    Unbooked(AnnotatedPosting<P, C>),
 }
 
-impl<'p, P, C> CostedPosting<'p, P, P::Number, C>
+impl<P, C> CostedPosting<P, P::Number, C>
 where
     P: Posting,
     C: Clone,
@@ -158,7 +158,7 @@ where
         match self {
             Booked(booked) => Some(booked.cost_units),
             Unbooked(unbooked) => {
-                let p = unbooked.posting;
+                let p = &unbooked.posting;
 
                 if p.has_cost() {
                     match (p.cost_total(), p.cost_per_unit(), p.units()) {
@@ -181,24 +181,24 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct BookedAtCostPosting<'p, P, N, C>
+pub(crate) struct BookedAtCostPosting<P, N, C>
 where
     N: Copy,
     C: Clone,
 {
-    pub(crate) posting: &'p P,
+    pub(crate) posting: P,
     pub(crate) idx: usize,
     pub(crate) cost_units: N,
     pub(crate) cost_currency: C,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct InterpolatedPosting<'a, P, N, C>
+pub(crate) struct InterpolatedPosting<P, N, C>
 where
     N: Copy,
     C: Clone,
 {
-    pub(crate) posting: &'a P,
+    pub(crate) posting: P,
     pub(crate) idx: usize,
     pub(crate) units: N,
     pub(crate) currency: C,

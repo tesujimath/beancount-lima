@@ -130,7 +130,7 @@ impl FromIterator<Decimal> for SumWithMinNonZeroScale {
     }
 }
 
-impl<'a> Tolerance for parser::Options<'a> {
+impl<'a> Tolerance for &parser::Options<'a> {
     type Currency = &'a str;
     type Number = Decimal;
 
@@ -188,4 +188,68 @@ impl From<parser::Booking> for Booking {
 // (we can't depend on the main beancount-lima crate here)
 fn default_inferred_tolerance_multiplier() -> Decimal {
     Decimal::new(5, 1) // 0.5
+}
+
+impl<'a> Posting for &'a parser::Spanned<parser::Posting<'a>> {
+    type Date = time::Date;
+    type Account = &'a str;
+    type Currency = &'a str;
+    type Number = Decimal;
+    type Label = &'a str;
+
+    fn account(&self) -> Self::Account {
+        Posting::account(&self.item())
+    }
+
+    fn currency(&self) -> Option<Self::Currency> {
+        Posting::currency(&self.item())
+    }
+
+    fn units(&self) -> Option<Self::Number> {
+        Posting::units(&self.item())
+    }
+
+    fn has_cost(&self) -> bool {
+        Posting::has_cost(&self.item())
+    }
+
+    fn cost_currency(&self) -> Option<Self::Currency> {
+        Posting::cost_currency(&self.item())
+    }
+
+    fn cost_per_unit(&self) -> Option<Self::Number> {
+        Posting::cost_per_unit(&self.item())
+    }
+
+    fn cost_total(&self) -> Option<Self::Number> {
+        Posting::cost_total(&self.item())
+    }
+
+    fn cost_date(&self) -> Option<Self::Date> {
+        Posting::cost_date(&self.item())
+    }
+
+    fn cost_label(&self) -> Option<Self::Label> {
+        Posting::cost_label(&self.item())
+    }
+
+    fn cost_merge(&self) -> Option<bool> {
+        Posting::cost_merge(&self.item())
+    }
+
+    fn has_price(&self) -> bool {
+        Posting::has_price(&self.item())
+    }
+
+    fn price_currency(&self) -> Option<Self::Currency> {
+        Posting::price_currency(&self.item())
+    }
+
+    fn price_per_unit(&self) -> Option<Self::Number> {
+        Posting::price_per_unit(&self.item())
+    }
+
+    fn price_total(&self) -> Option<Self::Number> {
+        Posting::price_total(&self.item())
+    }
 }

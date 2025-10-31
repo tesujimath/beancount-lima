@@ -11,6 +11,17 @@ pub enum BookingError {
     Posting(usize, PostingBookingError),
 }
 
+impl Display for BookingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use BookingError::*;
+
+        match self {
+            Transaction(e) => write!(f, "{e}"),
+            Posting(idx, e) => write!(f, "posting {idx} {e}"),
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum TransactionBookingError {
     UnsupportedBookingMethod(Booking, String),

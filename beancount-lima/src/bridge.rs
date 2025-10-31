@@ -45,7 +45,7 @@ where
 
             sources.write_errors_or_warnings(error_w, warnings)?;
 
-            match Loader::new(default_booking_method, inferred_tolerance, config)
+            match Loader::new(default_booking_method, inferred_tolerance, &options, config)
                 .collect(&directives)
             {
                 Ok(LoadSuccess {

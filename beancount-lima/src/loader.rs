@@ -16,7 +16,7 @@ use crate::config::LoaderConfig;
 use crate::format::format;
 
 #[derive(Debug)]
-pub(crate) struct Loader<'a> {
+pub(crate) struct Loader<'a, T> {
     directives: Vec<Directive<'a>>,
     // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
     open_accounts: hashbrown::HashMap<&'a str, Span>,
@@ -26,6 +26,7 @@ pub(crate) struct Loader<'a> {
     config: LoaderConfig,
     default_booking: parser::Booking,
     inferred_tolerance: InferredTolerance<'a>,
+    tolerance: T,
     errors: Vec<parser::AnnotatedError>,
     warnings: Vec<parser::AnnotatedWarning>,
 }
@@ -40,10 +41,11 @@ pub(crate) struct LoadError {
     pub(crate) warnings: Vec<parser::AnnotatedWarning>,
 }
 
-impl<'a> Loader<'a> {
+impl<'a, T> Loader<'a, T> {
     pub(crate) fn new(
         default_booking: parser::Booking,
         inferred_tolerance: InferredTolerance<'a>,
+        tolerance: T,
         config: LoaderConfig,
     ) -> Self {
         Self {
@@ -54,6 +56,7 @@ impl<'a> Loader<'a> {
             currency_usage: hashbrown::HashMap::default(),
             config,
             default_booking,
+            tolerance,
             inferred_tolerance,
             errors: Vec::default(),
             warnings: Vec::default(),
@@ -91,6 +94,7 @@ impl<'a> Loader<'a> {
     pub(crate) fn collect<I>(mut self, directives: I) -> Result<LoadSuccess<'a>, LoadError>
     where
         I: IntoIterator<Item = &'a Spanned<parser::Directive<'a>>>,
+        T: beancount_lima_booking::Tolerance<Currency = &'a str, Number = Decimal>,
     {
         for directive in directives {
             self.directive(directive);
@@ -99,7 +103,10 @@ impl<'a> Loader<'a> {
         self.validate()
     }
 
-    fn directive(&mut self, directive: &'a Spanned<parser::Directive<'a>>) {
+    fn directive(&mut self, directive: &'a Spanned<parser::Directive<'a>>)
+    where
+        T: beancount_lima_booking::Tolerance<Currency = &'a str, Number = Decimal>,
+    {
         use parser::DirectiveVariant::*;
 
         let date = *directive.date().item();
@@ -132,7 +139,43 @@ impl<'a> Loader<'a> {
         transaction: &'a parser::Transaction<'a>,
         date: Date,
         element: parser::Spanned<Element>,
-    ) -> Result<DirectiveVariant<'a>, ()> {
+    ) -> Result<DirectiveVariant<'a>, ()>
+    where
+        T: beancount_lima_booking::Tolerance<Currency = &'a str, Number = Decimal>,
+    {
+        match beancount_lima_booking::book(
+            date,
+            transaction.postings(),
+            &self.tolerance,
+            |accname| self.accounts.get(accname).map(|acc| &acc.positions),
+            |accname| {
+                self.accounts
+                    .get(accname)
+                    .map(|acc| acc.booking)
+                    .unwrap_or(self.default_booking)
+                    .into()
+            },
+        ) {
+            Ok(updated_inventory) => {
+                tracing::debug!("booked {:?}", &updated_inventory);
+            }
+            Err(e) => {
+                use beancount_lima_booking::BookingError::*;
+
+                match &e {
+                    Transaction(e) => {
+                        self.errors.push(element.error(e.to_string()).into());
+                    }
+                    Posting(idx, e) => {
+                        let bad_posting = transaction.postings().nth(*idx).unwrap();
+                        self.errors.push(bad_posting.error(e.to_string()).into());
+                    }
+                }
+                tracing::error!("booking error {}", &e);
+            }
+        }
+
+        // TODO remove legacy booking:
         match balance_transaction(transaction, &self.inferred_tolerance, &element) {
             Ok(weights) => {
                 let mut postings = Vec::default();
@@ -724,6 +767,8 @@ struct AccountBuilder<'a> {
     units_currencies: HashSet<&'a parser::Currency<'a>>,
     cost_currencies: HashSet<&'a parser::Currency<'a>>,
     inventory: Inventory<'a>,
+    // TODO replace all use of inventory with positions
+    positions: Vec<beancount_lima_booking::Position<Date, Decimal, &'a str, &'a str>>,
     opened: Span,
     // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
@@ -743,6 +788,7 @@ impl<'a> AccountBuilder<'a> {
             units_currencies: HashSet::default(),
             cost_currencies: HashSet::default(),
             inventory: Inventory::default(),
+            positions: Vec::default(),
             opened,
             postings: Vec::default(),
             pad_idx: None,

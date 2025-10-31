@@ -16,17 +16,17 @@ use super::{
     PostingBookingError, Tolerance, UpdatedInventory,
 };
 
-pub fn book<'p, 'i, P, T, I, M>(
+pub fn book<'a, P, T, I, M>(
     date: P::Date,
-    postings: impl Iterator<Item = &'p P>,
+    postings: impl Iterator<Item = P>,
     tolerance: &T,
     inventory: I,
     method: M,
 ) -> Result<UpdatedInventory<P>, BookingError>
 where
-    P: Posting + Debug + 'p + 'i,
+    P: Posting + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
         + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
@@ -87,26 +87,26 @@ where
 }
 
 #[derive(Debug)]
-struct Reductions<'p, P>
+struct Reductions<P>
 where
     P: Posting,
 {
     updated_inventory: UpdatedInventory<P>,
-    costed_postings: Vec<CostedPosting<'p, P, P::Number, P::Currency>>,
+    costed_postings: Vec<CostedPosting<P, P::Number, P::Currency>>,
 }
 
-fn book_reductions<'p, 'i, 'b, P, T, I, M>(
+fn book_reductions<'a, 'b, P, T, I, M>(
     date: P::Date,
     currency: P::Currency,
-    annotateds: Vec<AnnotatedPosting<'p, P, P::Currency>>,
+    annotateds: Vec<AnnotatedPosting<P, P::Currency>>,
     tolerance: &T,
     inventory: I,
     method: M,
-) -> Result<Reductions<'p, P>, BookingError>
+) -> Result<Reductions<P>, BookingError>
 where
-    P: Posting + Debug + 'p + 'i,
+    P: Posting + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
         + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
@@ -156,7 +156,7 @@ where
                             .enumerate()
                             .filter_map(|(i, pos)| {
                                 pos.cost.as_ref().and_then(|pos_cost| {
-                                    matches_cost(annotated.posting, date, pos_cost)
+                                    matches_cost(&annotated.posting, date, pos_cost)
                                         .then_some((i, pos))
                                 })
                             })
@@ -310,22 +310,22 @@ where
 }
 
 // See OG Beancount function of the same name
-fn categorize_by_currency<'p, 'b, 'i, P, I>(
-    postings: &'b [&'p P],
+fn categorize_by_currency<'a, 'b, P, I>(
+    postings: &'b [P],
     inventory: I,
-) -> Result<HashMapOfVec<P::Currency, AnnotatedPosting<'p, P, P::Currency>>, BookingError>
+) -> Result<HashMapOfVec<P::Currency, AnnotatedPosting<P, P::Currency>>, BookingError>
 where
     P: Posting,
-    I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
         + Copy, // 'i for inventory
-    P::Date: 'i,
-    P::Number: 'i,
-    P::Currency: 'i,
-    P::Label: 'i,
+    P::Date: 'a,
+    P::Number: 'a,
+    P::Currency: 'a,
+    P::Label: 'a,
 {
     let mut currency_groups = HashMapOfVec::default();
     let mut auto_postings =
-        HashMap::<Option<P::Currency>, AnnotatedPosting<'p, P, P::Currency>>::default();
+        HashMap::<Option<P::Currency>, AnnotatedPosting<P, P::Currency>>::default();
     let mut unknown = Vec::default();
     let mut account_currency_lookup = HashMap::<P::Account, Option<P::Currency>>::default();
 
@@ -343,7 +343,7 @@ where
             .or(posting_cost_currency);
 
         let p = AnnotatedPosting {
-            posting: *posting,
+            posting: posting.clone(),
             idx,
             currency,
             cost_currency,
@@ -479,18 +479,18 @@ where
     })
 }
 
-fn book_augmentations<'p, 'i, 'b, P, T, I, M>(
+fn book_augmentations<'a, 'b, P, T, I, M>(
     date: P::Date,
     currency: P::Currency,
-    interpolateds: Vec<InterpolatedPosting<'p, P, P::Number, P::Currency>>,
+    interpolateds: Vec<InterpolatedPosting<P, P::Number, P::Currency>>,
     tolerance: &T,
     inventory: I,
     method: M,
 ) -> Result<UpdatedInventory<P>, BookingError>
 where
-    P: Posting + Debug + 'p + 'i,
+    P: Posting + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'i Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
         + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
@@ -508,7 +508,7 @@ where
         };
         // .or_else(|| inventory(account.clone()));
 
-        let posting_cost = posting.has_cost().then_some({
+        let posting_cost = posting.has_cost().then(|| {
             // insist that cosy is fully specified
             let date = posting.cost_date().unwrap_or(date);
             let InterpolatedCost { per_unit, currency } = interpolated.cost.unwrap();

@@ -9,21 +9,21 @@ use super::{
 };
 
 #[derive(Debug)]
-pub(crate) struct Interpolation<'p, P, N, C>
+pub(crate) struct Interpolation<P, N, C>
 where
     N: Copy,
     C: Clone,
 {
-    pub(crate) unbooked_postings: Vec<InterpolatedPosting<'p, P, N, C>>,
+    pub(crate) unbooked_postings: Vec<InterpolatedPosting<P, N, C>>,
 }
 
-pub(crate) fn interpolate<'p, 'i, 'b, P, T>(
+pub(crate) fn interpolate<'i, 'b, P, T>(
     currency: &P::Currency,
-    costeds: Vec<CostedPosting<'p, P, P::Number, P::Currency>>,
+    costeds: Vec<CostedPosting<P, P::Number, P::Currency>>,
     tolerance: &T,
-) -> Result<Interpolation<'p, P, P::Number, P::Currency>, BookingError>
+) -> Result<Interpolation<P, P::Number, P::Currency>, BookingError>
 where
-    P: Posting + Debug + 'p + 'i,
+    P: Posting + Debug + 'i,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
 {
     let mut weights = costeds.iter().map(|c| c.weight()).collect::<Vec<_>>();
@@ -58,7 +58,7 @@ where
             if let CostedPosting::Unbooked(a) = c {
                 let w = w.unwrap();
 
-                match (units(a.posting, w), a.currency) {
+                match (units(&a.posting, w), a.currency) {
                     (
                         Some(UnitsAndCostPerUnit {
                             units,

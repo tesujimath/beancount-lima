@@ -13,6 +13,10 @@ name = "lima"
 path = "src/main.rs"
 
 [dependencies]
+beancount-lima-booking = { path = "../beancount-lima-booking", features = [
+  "lima-parser-types",
+  "rust-decimal",
+] }
 abi_stable = "0.11.3"
 beancount-parser-lima = { workspace = true }
 # steel-core = "0.7.0"
