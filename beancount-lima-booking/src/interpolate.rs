@@ -58,48 +58,60 @@ where
             if let CostedPosting::Unbooked(a) = c {
                 let w = w.unwrap();
 
-                match (units(&a.posting, w), a.currency) {
-                    (
-                        Some(UnitsAndCostPerUnit {
-                            units,
-                            cost_per_unit,
-                        }),
-                        Some(currency),
-                    ) => {
-                        if a.posting.has_cost() {
-                            Some(Ok(InterpolatedPosting {
-                                posting: a.posting,
-                                idx: a.idx,
+                if !(a.posting.has_cost() || a.posting.has_price()) {
+                    // simple case with no cost or price
+                    Some(Ok(InterpolatedPosting {
+                        posting: a.posting,
+                        idx: a.idx,
+                        units: w,
+                        currency: currency.clone(),
+                        cost: None,
+                    }))
+                } else {
+                    match (units(&a.posting, w), a.currency) {
+                        (
+                            Some(UnitsAndCostPerUnit {
                                 units,
-                                currency,
-                                cost: Some(InterpolatedCost {
-                                    // I don't think these can fail, but let's see during testing:
-                                    per_unit: cost_per_unit.unwrap(),
-                                    currency: a.cost_currency.unwrap(),
-                                }),
-                            }))
-                        } else {
-                            Some(Ok(InterpolatedPosting {
-                                posting: a.posting,
-                                idx: a.idx,
-                                units,
-                                currency,
-                                cost: None,
-                            }))
+                                cost_per_unit,
+                            }),
+                            Some(currency),
+                        ) => {
+                            if a.posting.has_cost() {
+                                Some(Ok(InterpolatedPosting {
+                                    posting: a.posting,
+                                    idx: a.idx,
+                                    units,
+                                    currency,
+                                    cost: Some(InterpolatedCost {
+                                        // I don't think these can fail, but let's see during testing:
+                                        per_unit: cost_per_unit.unwrap(),
+                                        currency: a.cost_currency.unwrap(),
+                                    }),
+                                }))
+                            } else {
+                                // price
+                                Some(Ok(InterpolatedPosting {
+                                    posting: a.posting,
+                                    idx: a.idx,
+                                    units,
+                                    currency,
+                                    cost: None,
+                                }))
+                            }
                         }
+                        (None, Some(_)) => Some(Err(BookingError::Posting(
+                            a.idx,
+                            PostingBookingError::CannotInferUnits,
+                        ))),
+                        (Some(_), None) => Some(Err(BookingError::Posting(
+                            a.idx,
+                            PostingBookingError::CannotInferCurrency,
+                        ))),
+                        (None, None) => Some(Err(BookingError::Posting(
+                            a.idx,
+                            PostingBookingError::CannotInferAnything,
+                        ))),
                     }
-                    (None, Some(_)) => Some(Err(BookingError::Posting(
-                        a.idx,
-                        PostingBookingError::CannotInferUnits,
-                    ))),
-                    (Some(_), None) => Some(Err(BookingError::Posting(
-                        a.idx,
-                        PostingBookingError::CannotInferCurrency,
-                    ))),
-                    (None, None) => Some(Err(BookingError::Posting(
-                        a.idx,
-                        PostingBookingError::CannotInferAnything,
-                    ))),
                 }
             } else {
                 None
