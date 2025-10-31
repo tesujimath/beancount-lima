@@ -114,7 +114,7 @@ where
 {
     pub(crate) posting: &'a P,
     pub(crate) idx: usize,
-    pub(crate) units_currency: Option<C>,
+    pub(crate) currency: Option<C>,
     pub(crate) cost_currency: Option<C>,
     pub(crate) price_currency: Option<C>,
 }
@@ -131,7 +131,7 @@ where
             .as_ref()
             .cloned()
             .or(self.price_currency.as_ref().cloned())
-            .or(self.units_currency.as_ref().cloned())
+            .or(self.currency.as_ref().cloned())
     }
 }
 
@@ -193,7 +193,7 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct WeightedPosting<'a, P, N, C>
+pub(crate) struct InterpolatedPosting<'a, P, N, C>
 where
     N: Copy,
     C: Clone,
@@ -201,6 +201,16 @@ where
     pub(crate) posting: &'a P,
     pub(crate) idx: usize,
     pub(crate) units: N,
-    pub(crate) cost_currency: Option<C>,
-    pub(crate) price_currency: Option<C>,
+    pub(crate) currency: C,
+    pub(crate) cost: Option<InterpolatedCost<N, C>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct InterpolatedCost<N, C>
+where
+    N: Copy,
+    C: Clone,
+{
+    pub(crate) per_unit: N,
+    pub(crate) currency: C,
 }

@@ -1,12 +1,19 @@
 // TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
 
-use hashbrown::{HashMap, HashSet};
-use std::{fmt::Debug, hash::Hash, iter::once};
+use hashbrown::{hash_map::Entry, HashMap, HashSet};
+use std::{
+    cmp::Ordering,
+    fmt::{Debug, Display},
+    hash::Hash,
+    iter::once,
+    ops::AddAssign,
+};
 
 use super::{
     interpolate, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost, CostedPosting,
-    HashMapOfVec, Number, Position, Posting, PostingBookingError, Tolerance, WeightedPosting,
+    HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation, Number, Position, Posting,
+    PostingBookingError, Tolerance, UpdatedInventory,
 };
 
 pub fn book<'p, 'i, P, T, I, M>(
@@ -15,15 +22,7 @@ pub fn book<'p, 'i, P, T, I, M>(
     tolerance: &T,
     inventory: I,
     method: M,
-) -> Result<
-    impl Iterator<
-        Item = (
-            P::Account,
-            Vec<Position<P::Date, P::Number, P::Currency, P::Label>>,
-        ),
-    >,
-    BookingError,
->
+) -> Result<UpdatedInventory<P>, BookingError>
 where
     P: Posting + Debug + 'p + 'i,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
@@ -32,8 +31,7 @@ where
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let postings = postings.collect::<Vec<_>>();
-    let mut updated_inventory =
-        HashMap::<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>::default();
+    let mut updated_inventory = UpdatedInventory::default();
 
     let currency_groups = categorize_by_currency(&postings, inventory)?;
 
@@ -59,12 +57,33 @@ where
             updated_inventory.insert(account, positions);
         }
 
-        // TODO weights/interpolation/other booking
-        let weights = interpolate(&cur, costed_postings, tolerance)?;
-        tracing::debug!("weights {:?}", &weights);
+        let Interpolation { unbooked_postings } = interpolate(&cur, costed_postings, tolerance)?;
+        tracing::debug!("weights {:?}", &unbooked_postings);
+
+        let updated_inventory_for_cur = book_augmentations(
+            date,
+            cur.clone(),
+            unbooked_postings,
+            tolerance,
+            |account| {
+                updated_inventory
+                    .get(&account)
+                    .or_else(|| inventory(account.clone()))
+            },
+            method,
+        )?;
+
+        tracing::debug!(
+            "book augmentations {:?} {:?}",
+            &cur,
+            updated_inventory_for_cur
+        );
+        for (account, positions) in updated_inventory_for_cur {
+            updated_inventory.insert(account, positions);
+        }
     }
 
-    Ok(updated_inventory.into_iter())
+    Ok(updated_inventory)
 }
 
 #[derive(Debug)]
@@ -72,8 +91,7 @@ struct Reductions<'p, P>
 where
     P: Posting,
 {
-    updated_inventory:
-        HashMap<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>,
+    updated_inventory: UpdatedInventory<P>,
     costed_postings: Vec<CostedPosting<'p, P, P::Number, P::Currency>>,
 }
 
@@ -257,7 +275,7 @@ where
         .collect::<Result<Vec<_>, BookingError>>()?;
 
     Ok(Reductions {
-        updated_inventory,
+        updated_inventory: updated_inventory.into(),
         costed_postings,
     })
 }
@@ -312,7 +330,7 @@ where
     let mut account_currency_lookup = HashMap::<P::Account, Option<P::Currency>>::default();
 
     for (idx, posting) in postings.iter().enumerate() {
-        let units_currency = posting.currency();
+        let currency = posting.currency();
         let posting_cost_currency = posting.cost_currency();
         let posting_price_currency = posting.price_currency();
         let cost_currency = posting_cost_currency
@@ -327,7 +345,7 @@ where
         let p = AnnotatedPosting {
             posting: *posting,
             idx,
-            units_currency,
+            currency,
             cost_currency,
             price_currency,
         };
@@ -362,7 +380,7 @@ where
         let inferred = AnnotatedPosting {
             posting: u.posting,
             idx,
-            units_currency: if u.price_currency.is_none() && u.cost_currency.is_none() {
+            currency: if u.price_currency.is_none() && u.cost_currency.is_none() {
                 Some(only_bucket.clone())
             } else {
                 None
@@ -383,7 +401,7 @@ where
         let inferred = AnnotatedPosting {
             posting: u.posting,
             idx,
-            units_currency: u.units_currency.or(account_currency(
+            currency: u.currency.or(account_currency(
                 u_account,
                 inventory,
                 &mut account_currency_lookup,
@@ -396,7 +414,7 @@ where
         } else {
             return Err(BookingError::Posting(
                 idx,
-                crate::PostingBookingError::FailedToCategorize,
+                crate::PostingBookingError::CannotCategorize,
             ));
         }
     }
@@ -461,23 +479,14 @@ where
     })
 }
 
-#[derive(Debug)]
-struct Augmentations<P>
-where
-    P: Posting,
-{
-    updated_inventory:
-        HashMap<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>,
-}
-
 fn book_augmentations<'p, 'i, 'b, P, T, I, M>(
     date: P::Date,
     currency: P::Currency,
-    annotateds: Vec<WeightedPosting<'p, P, P::Number, P::Currency>>,
+    interpolateds: Vec<InterpolatedPosting<'p, P, P::Number, P::Currency>>,
     tolerance: &T,
     inventory: I,
     method: M,
-) -> Result<Augmentations<P>, BookingError>
+) -> Result<UpdatedInventory<P>, BookingError>
 where
     P: Posting + Debug + 'p + 'i,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
@@ -485,8 +494,83 @@ where
         + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
-    // TODO augmentations
-    Ok(Augmentations {
-        updated_inventory: HashMap::default(),
-    })
+    let mut updated_inventory = HashMap::default();
+
+    for interpolated in interpolateds {
+        use Entry::*;
+
+        let posting = interpolated.posting;
+        let account = posting.account();
+
+        let previous_positions = match updated_inventory.entry(account.clone()) {
+            Occupied(entry) => entry.into_mut(),
+            Vacant(entry) => entry.insert(inventory(account).cloned().unwrap_or_default()),
+        };
+        // .or_else(|| inventory(account.clone()));
+
+        let posting_cost = posting.has_cost().then_some({
+            // insist that cosy is fully specified
+            let date = posting.cost_date().unwrap_or(date);
+            let InterpolatedCost { per_unit, currency } = interpolated.cost.unwrap();
+            let label = posting.cost_label();
+            let merge = posting.cost_merge().unwrap_or_default();
+
+            Cost {
+                date,
+                per_unit,
+                currency,
+                label,
+                merge,
+            }
+        });
+
+        augment_positions(
+            interpolated.units,
+            currency.clone(),
+            posting_cost,
+            previous_positions,
+        );
+    }
+    Ok(updated_inventory.into())
+}
+
+fn augment_positions<D, N, C, L>(
+    units: N,
+    currency: C,
+    cost: Option<Cost<D, N, C, L>>,
+    positions: &mut Vec<Position<D, N, C, L>>,
+) where
+    D: Ord + Copy + Debug,
+    N: AddAssign + Ord + Copy + Debug + Display,
+    C: Ord + Clone + Debug,
+    L: Ord + Clone + Debug,
+{
+    use Ordering::*;
+
+    match positions.binary_search_by(|position| match (&cost, &position.cost) {
+        (None, None) => Equal,
+        (None, Some(_)) => Less,
+        (Some(_), None) => Greater,
+        (Some(cost0), Some(cost1)) => cost0.cmp(cost1),
+    }) {
+        Ok(i) => {
+            let position = &mut positions[i];
+            tracing::debug!(
+                "augmenting position {:?} with {} {:?}",
+                &position,
+                units,
+                &cost
+            );
+            position.units += units;
+        }
+        Err(i) => {
+            let position = Position {
+                units,
+                currency,
+                cost,
+            };
+            tracing::debug!("inserting new position {:?} at {i}", &position);
+            positions.insert(i, position)
+        }
+    }
 }

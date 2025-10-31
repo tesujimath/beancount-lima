@@ -4,7 +4,8 @@
 use std::fmt::Debug;
 
 use super::{
-    BookingError, CostedPosting, Posting, Tolerance, TransactionBookingError, WeightedPosting,
+    BookingError, CostedPosting, InterpolatedCost, InterpolatedPosting, Posting,
+    PostingBookingError, Tolerance, TransactionBookingError,
 };
 
 #[derive(Debug)]
@@ -13,7 +14,7 @@ where
     N: Copy,
     C: Clone,
 {
-    weighted_postings: Vec<WeightedPosting<'p, P, N, C>>,
+    pub(crate) unbooked_postings: Vec<InterpolatedPosting<'p, P, N, C>>,
 }
 
 pub(crate) fn interpolate<'p, 'i, 'b, P, T>(
@@ -57,18 +58,89 @@ where
             if let CostedPosting::Unbooked(a) = c {
                 let w = w.unwrap();
 
-                Some(WeightedPosting {
-                    posting: a.posting,
-                    idx: a.idx,
-                    units: w,
-                    cost_currency: a.cost_currency,
-                    price_currency: a.price_currency,
-                })
+                match (units(a.posting, w), a.currency) {
+                    (
+                        Some(UnitsAndCostPerUnit {
+                            units,
+                            cost_per_unit,
+                        }),
+                        Some(currency),
+                    ) => {
+                        if a.posting.has_cost() {
+                            Some(Ok(InterpolatedPosting {
+                                posting: a.posting,
+                                idx: a.idx,
+                                units,
+                                currency,
+                                cost: Some(InterpolatedCost {
+                                    // I don't think these can fail, but let's see during testing:
+                                    per_unit: cost_per_unit.unwrap(),
+                                    currency: a.cost_currency.unwrap(),
+                                }),
+                            }))
+                        } else {
+                            Some(Ok(InterpolatedPosting {
+                                posting: a.posting,
+                                idx: a.idx,
+                                units,
+                                currency,
+                                cost: None,
+                            }))
+                        }
+                    }
+                    (None, Some(_)) => Some(Err(BookingError::Posting(
+                        a.idx,
+                        PostingBookingError::CannotInferUnits,
+                    ))),
+                    (Some(_), None) => Some(Err(BookingError::Posting(
+                        a.idx,
+                        PostingBookingError::CannotInferCurrency,
+                    ))),
+                    (None, None) => Some(Err(BookingError::Posting(
+                        a.idx,
+                        PostingBookingError::CannotInferAnything,
+                    ))),
+                }
             } else {
                 None
             }
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, BookingError>>()?;
 
-    Ok(Interpolation { weighted_postings })
+    Ok(Interpolation {
+        unbooked_postings: weighted_postings,
+    })
+}
+
+struct UnitsAndCostPerUnit<N> {
+    units: N,
+    cost_per_unit: Option<N>,
+}
+
+// infer the units once we know the weight
+fn units<P>(posting: &P, weight: P::Number) -> Option<UnitsAndCostPerUnit<P::Number>>
+where
+    P: Posting,
+{
+    let units = posting.units().unwrap_or(weight);
+    if posting.has_cost() {
+        posting
+            .cost_per_unit()
+            .map(|cost_per_unit| UnitsAndCostPerUnit {
+                units: units / cost_per_unit,
+                cost_per_unit: Some(cost_per_unit),
+            })
+    } else if posting.has_price() {
+        posting
+            .price_per_unit()
+            .map(|price_per_unit| UnitsAndCostPerUnit {
+                units: units / price_per_unit,
+                cost_per_unit: None,
+            })
+    } else {
+        Some(UnitsAndCostPerUnit {
+            units,
+            cost_per_unit: None,
+        })
+    }
 }

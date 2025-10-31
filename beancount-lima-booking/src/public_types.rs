@@ -1,8 +1,9 @@
+use hashbrown::HashMap;
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
     iter::Sum,
-    ops::{Add, Mul, Neg},
+    ops::{Add, AddAssign, Deref, Div, Mul, Neg},
 };
 use strum_macros::Display;
 
@@ -82,6 +83,48 @@ where
     pub merge: bool,
 }
 
+impl<D, N, C, L> PartialOrd for Cost<D, N, C, L>
+where
+    D: Ord + Copy,
+    N: Ord + Copy,
+    C: Ord + Clone,
+    L: Ord + Clone,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<D, N, C, L> Ord for Cost<D, N, C, L>
+where
+    D: Ord + Copy,
+    N: Ord + Copy,
+    C: Ord + Clone,
+    L: Ord + Clone,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering::*;
+
+        match self.date.cmp(&other.date) {
+            Equal => {}
+            ord => return ord,
+        }
+        match self.currency.cmp(&other.currency) {
+            Equal => {}
+            ord => return ord,
+        }
+        match self.label.cmp(&other.label) {
+            Equal => {}
+            ord => return ord,
+        }
+        match self.merge.cmp(&other.merge) {
+            Equal => {}
+            ord => return ord,
+        }
+
+        self.per_unit.cmp(&other.per_unit)
+    }
+}
+
 pub trait Tolerance {
     type Currency;
     type Number;
@@ -95,7 +138,14 @@ pub trait Tolerance {
 }
 
 pub trait Number:
-    Add<Output = Self> + Neg<Output = Self> + Mul<Output = Self> + Sum + Sized
+    Add<Output = Self>
+    + AddAssign
+    + Neg<Output = Self>
+    + Mul<Output = Self>
+    + Div<Output = Self>
+    + Sum
+    + Ord
+    + Sized
 {
     fn abs(&self) -> Self;
 
@@ -122,4 +172,81 @@ pub enum Booking {
     Fifo,
     Lifo,
     Hifo,
+}
+
+#[derive(Debug)]
+pub struct UpdatedInventory<P>
+where
+    P: Posting,
+{
+    value: HashMap<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>,
+}
+
+impl<P> Default for UpdatedInventory<P>
+where
+    P: Posting,
+{
+    fn default() -> Self {
+        Self {
+            value: Default::default(),
+        }
+    }
+}
+
+impl<P> From<HashMap<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>>
+    for UpdatedInventory<P>
+where
+    P: Posting,
+{
+    fn from(
+        value: HashMap<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>,
+    ) -> Self {
+        Self { value }
+    }
+}
+
+impl<P> Deref for UpdatedInventory<P>
+where
+    P: Posting,
+{
+    type Target = HashMap<P::Account, Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+impl<P> IntoIterator for UpdatedInventory<P>
+where
+    P: Posting,
+{
+    type Item = (
+        P::Account,
+        Vec<Position<P::Date, P::Number, P::Currency, P::Label>>,
+    );
+    type IntoIter = hashbrown::hash_map::IntoIter<
+        P::Account,
+        Vec<Position<P::Date, P::Number, P::Currency, P::Label>>,
+    >;
+
+    fn into_iter(
+        self,
+    ) -> hashbrown::hash_map::IntoIter<
+        P::Account,
+        Vec<Position<P::Date, P::Number, P::Currency, P::Label>>,
+    > {
+        self.value.into_iter()
+    }
+}
+
+impl<P> UpdatedInventory<P>
+where
+    P: Posting,
+{
+    pub(crate) fn insert(
+        &mut self,
+        k: P::Account,
+        v: Vec<Position<P::Date, P::Number, P::Currency, P::Label>>,
+    ) -> Option<Vec<Position<P::Date, P::Number, P::Currency, P::Label>>> {
+        self.value.insert(k, v)
+    }
 }

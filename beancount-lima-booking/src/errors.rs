@@ -38,10 +38,13 @@ impl Error for TransactionBookingError {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum PostingBookingError {
-    FailedToCategorize,
+    CannotCategorize,
     AmbiguousAutoPost,
     MultipleCostSpecMatches,
     MultipleCostCurrenciesMatch,
+    CannotInferUnits,
+    CannotInferCurrency,
+    CannotInferAnything,
 }
 
 impl Display for PostingBookingError {
@@ -49,12 +52,15 @@ impl Display for PostingBookingError {
         use PostingBookingError::*;
 
         match self {
-            FailedToCategorize => f.write_str("failed to categorize posting"),
+            CannotCategorize => f.write_str("cannot categorize posting"),
             AmbiguousAutoPost => f.write_str("ambiguous auto-post"),
             MultipleCostSpecMatches => f.write_str("multiple cost spec matches against inventory"),
             MultipleCostCurrenciesMatch => {
                 f.write_str("multiple currencies in cost spec matches against inventory")
             }
+            CannotInferUnits => f.write_str("cannot infer units"),
+            CannotInferCurrency => f.write_str("cannot infer currency"),
+            CannotInferAnything => f.write_str("cannot infer anything"),
         }
     }
 }
