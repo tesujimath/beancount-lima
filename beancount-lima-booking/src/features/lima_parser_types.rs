@@ -141,6 +141,11 @@ impl<'a> Tolerance for &parser::Options<'a> {
         values: impl Iterator<Item = Self::Number>,
         cur: &Self::Currency,
     ) -> Option<Self::Number> {
+        // TODO don't iterate twice over values
+        let values = values.collect::<Vec<_>>();
+        tracing::debug!("calculating tolerance residual for {} {:?}", cur, &values);
+        let values = values.into_iter();
+
         let multiplier = self
             .inferred_tolerance_multiplier()
             .map(|m| *m.item())
@@ -149,7 +154,8 @@ impl<'a> Tolerance for &parser::Options<'a> {
         let residual = s.sum;
         let abs_residual = residual.abs();
 
-        if let Some(min_nonzero_scale) = s.min_nonzero_scale.as_ref() {
+        // TODO remove result
+        let result = if let Some(min_nonzero_scale) = s.min_nonzero_scale.as_ref() {
             (abs_residual >= Decimal::new(1, *min_nonzero_scale) * multiplier).then_some(residual)
         } else {
             // TODO should we have kept currency as a parser::Currency all along, to avoid extra validation here??
@@ -163,7 +169,10 @@ impl<'a> Tolerance for &parser::Options<'a> {
             } else {
                 (!residual.is_zero()).then_some(residual)
             }
-        }
+        };
+        tracing::debug!("tolerance residual {:?}", &result);
+
+        result
     }
 }
 

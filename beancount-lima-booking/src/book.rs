@@ -13,7 +13,7 @@ use std::{
 use super::{
     interpolate, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost, CostedPosting,
     HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation, Number, Position, Posting,
-    PostingBookingError, Tolerance, UpdatedInventory,
+    PostingBookingError, Tolerance, TransactionBookingError, UpdatedInventory,
 };
 
 pub fn book<'a, P, T, I, M>(
@@ -427,10 +427,24 @@ where
             ));
         }
 
-        // add auto_posting to each currency group
+        // can only have a currency-ambiguous auto-post if there's a single bucket
         let all_buckets = currency_groups.keys().cloned().collect::<Vec<_>>();
-        for bucket in all_buckets {
-            currency_groups.push_or_insert(bucket, auto_posting.clone());
+        if all_buckets.is_empty() {
+            return Err(BookingError::Transaction(
+                TransactionBookingError::AutoPostNoBuckets,
+            ));
+        } else if all_buckets.len() == 1 {
+            let sole_bucket = all_buckets.into_iter().next().unwrap();
+            currency_groups.push_or_insert(sole_bucket, auto_posting);
+        } else {
+            return Err(BookingError::Transaction(
+                TransactionBookingError::AutoPostMultipleBuckets(
+                    all_buckets
+                        .into_iter()
+                        .map(|cur| cur.to_string())
+                        .collect::<Vec<_>>(),
+                ),
+            ));
         }
     } else {
         for (bucket, auto_posting) in auto_postings.into_iter() {

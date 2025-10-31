@@ -8,11 +8,11 @@ use std::{
 use strum_macros::Display;
 
 pub trait Posting: Clone {
-    type Date: Eq + Ord + Copy + Debug;
+    type Date: Eq + Ord + Copy + Display + Debug;
     type Account: Eq + Hash + Clone + Display + Debug;
-    type Currency: Eq + Hash + Ord + Clone + Debug;
+    type Currency: Eq + Hash + Ord + Clone + Display + Debug;
     type Number: Number + Eq + Copy + Display + Debug;
-    type Label: Eq + Ord + Clone + Debug;
+    type Label: Eq + Ord + Clone + Display + Debug;
 
     fn account(&self) -> Self::Account;
 

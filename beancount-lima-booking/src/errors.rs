@@ -28,6 +28,8 @@ pub enum TransactionBookingError {
     TooManyMissingNumbers,
     NoResidualForInterpolation,
     Unbalanced(String),
+    AutoPostNoBuckets,
+    AutoPostMultipleBuckets(Vec<String>),
 }
 
 impl Display for TransactionBookingError {
@@ -41,6 +43,12 @@ impl Display for TransactionBookingError {
             TooManyMissingNumbers => f.write_str("too many missing numbers for interpolation"),
             NoResidualForInterpolation => f.write_str("no residual for interpolation"),
             Unbalanced(residual) => write!(f, "unbalanced transaction with residual {residual}"),
+            AutoPostNoBuckets => f.write_str("can't have auto-post with no currencies"),
+            AutoPostMultipleBuckets(buckets) => write!(
+                f,
+                "can't have auto-post with multiple currencies {}",
+                buckets.join(","),
+            ),
         }
     }
 }

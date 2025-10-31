@@ -28,11 +28,13 @@ where
 {
     let mut weights = costeds.iter().map(|c| c.weight()).collect::<Vec<_>>();
     let residual = tolerance.residual(weights.iter().filter_map(|w| *w), currency);
+    tracing::debug!("weights for {:?} {:?}", &currency, &weights);
     let unknown = weights
         .iter()
         .enumerate()
         .filter(|w| w.1.is_none())
         .collect::<Vec<_>>();
+    tracing::debug!("unknown values for {:?} {:?}", &currency, &unknown);
     match (residual, unknown.len()) {
         (None, 0) => (),
         (None, 1) => Err(BookingError::Transaction(
