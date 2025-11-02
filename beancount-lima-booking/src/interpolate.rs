@@ -4,8 +4,8 @@
 use std::fmt::Debug;
 
 use super::{
-    BookingError, CostedPosting, InterpolatedCost, InterpolatedPosting, Posting,
-    PostingBookingError, Tolerance, TransactionBookingError,
+    BookingError, CostSpec, CostedPosting, InterpolatedCost, InterpolatedPosting, Posting,
+    PostingBookingError, PriceSpec, Tolerance, TransactionBookingError,
 };
 
 #[derive(Debug)]
@@ -60,7 +60,7 @@ where
             if let CostedPosting::Unbooked(a) = c {
                 let w = w.unwrap();
 
-                if !(a.posting.has_cost() || a.posting.has_price()) {
+                if a.posting.cost().is_none() && a.posting.price().is_none() {
                     // simple case with no cost or price
                     Some(Ok(InterpolatedPosting {
                         posting: a.posting,
@@ -78,7 +78,7 @@ where
                             }),
                             Some(currency),
                         ) => {
-                            if a.posting.has_cost() {
+                            if a.posting.cost().is_some() {
                                 Some(Ok(InterpolatedPosting {
                                     posting: a.posting,
                                     idx: a.idx,
@@ -137,16 +137,16 @@ where
     P: Posting,
 {
     let units = posting.units().unwrap_or(weight);
-    if posting.has_cost() {
-        posting
-            .cost_per_unit()
+    if let Some(cost_spec) = posting.cost() {
+        cost_spec
+            .per_unit()
             .map(|cost_per_unit| UnitsAndCostPerUnit {
                 units: units / cost_per_unit,
                 cost_per_unit: Some(cost_per_unit),
             })
-    } else if posting.has_price() {
-        posting
-            .price_per_unit()
+    } else if let Some(price_spec) = posting.price() {
+        price_spec
+            .per_unit()
             .map(|price_per_unit| UnitsAndCostPerUnit {
                 units: units / price_per_unit,
                 cost_per_unit: None,

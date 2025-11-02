@@ -11,9 +11,10 @@ use std::{
 };
 
 use super::{
-    interpolate, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost, CostedPosting,
-    HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation, Number, Position, Posting,
-    PostingBookingError, Tolerance, TransactionBookingError, UpdatedInventory,
+    interpolate, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost, CostSpec,
+    CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation, Number,
+    Position, Posting, PostingBookingError, PriceSpec, Tolerance, TransactionBookingError,
+    UpdatedInventory,
 };
 
 pub fn book<'a, P, T, I, M>(
@@ -155,10 +156,12 @@ where
                             .iter()
                             .enumerate()
                             .filter_map(|(i, pos)| {
-                                pos.cost.as_ref().and_then(|pos_cost| {
-                                    matches_cost(&annotated.posting, date, pos_cost)
-                                        .then_some((i, pos))
-                                })
+                                match (pos.cost.as_ref(), annotated.posting.cost().as_ref()) {
+                                    (Some(pos_cost), Some(cost_spec)) => {
+                                        pos_cost.matches_spec(cost_spec, date).then_some((i, pos))
+                                    }
+                                    _ => None,
+                                }
                             })
                             .collect::<Vec<_>>();
 
@@ -280,35 +283,6 @@ where
     })
 }
 
-fn matches_cost<P>(
-    posting: &P,
-    default_date: P::Date,
-    cost: &Cost<P::Date, P::Number, P::Currency, P::Label>,
-) -> bool
-where
-    P: Posting,
-{
-    posting.has_cost()
-        && !(
-            posting.cost_date().unwrap_or(default_date) != cost.date
-                || posting
-                    .cost_currency()
-                    .is_some_and(|posting_cost_currency| posting_cost_currency != cost.currency)
-                || posting
-                    .cost_per_unit()
-                    .is_some_and(|posting_cost_units| posting_cost_units != cost.per_unit)
-                || posting
-                    .cost_currency()
-                    .is_some_and(|posting_cost_currency| posting_cost_currency != cost.currency)
-                || posting.cost_label().is_some_and(|cost_label| {
-                    cost.label
-                        .as_ref()
-                        .is_some_and(|posting_cost_label| *posting_cost_label != cost_label)
-                })
-            // TODO merge
-        )
-}
-
 // See OG Beancount function of the same name
 fn categorize_by_currency<'a, 'b, P, I>(
     postings: &'b [P],
@@ -331,8 +305,8 @@ where
 
     for (idx, posting) in postings.iter().enumerate() {
         let currency = posting.currency();
-        let posting_cost_currency = posting.cost_currency();
-        let posting_price_currency = posting.price_currency();
+        let posting_cost_currency = posting.cost().and_then(|cost_spec| cost_spec.currency());
+        let posting_price_currency = posting.price().and_then(|price_spec| price_spec.currency());
         let cost_currency = posting_cost_currency
             .as_ref()
             .cloned()
@@ -522,12 +496,12 @@ where
         };
         // .or_else(|| inventory(account.clone()));
 
-        let posting_cost = posting.has_cost().then(|| {
+        let posting_cost = posting.cost().map(|cost_spec| {
             // insist that cosy is fully specified
-            let date = posting.cost_date().unwrap_or(date);
+            let date = cost_spec.date().unwrap_or(date);
             let InterpolatedCost { per_unit, currency } = interpolated.cost.unwrap();
-            let label = posting.cost_label();
-            let merge = posting.cost_merge().unwrap_or_default();
+            let label = cost_spec.label();
+            let merge = cost_spec.merge();
 
             Cost {
                 date,

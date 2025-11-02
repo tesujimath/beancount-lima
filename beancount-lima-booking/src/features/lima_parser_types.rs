@@ -1,4 +1,4 @@
-use super::{Booking, Posting, Tolerance};
+use super::{Booking, CostSpec, Posting, PriceSpec, Tolerance};
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
 use time::Date;
@@ -8,6 +8,8 @@ impl<'a> Posting for &'a parser::Posting<'a> {
     type Account = &'a str;
     type Currency = &'a str;
     type Number = Decimal;
+    type CostSpec = &'a parser::CostSpec<'a>;
+    type PriceSpec = &'a parser::PriceSpec<'a>;
     type Label = &'a str;
 
     fn account(&self) -> &'a str {
@@ -22,82 +24,82 @@ impl<'a> Posting for &'a parser::Posting<'a> {
         parser::Posting::amount(self).map(|amount| amount.item().value())
     }
 
-    fn has_cost(&self) -> bool {
-        self.cost_spec().is_some()
+    fn cost(&self) -> Option<Self::CostSpec> {
+        self.cost_spec().as_ref().map(|cost_spec| cost_spec.item())
     }
 
-    fn cost_currency(&self) -> Option<&'a str> {
-        self.cost_spec().and_then(|cost_spec| {
-            cost_spec
-                .currency()
-                .map(|currency| currency.item().as_ref())
-        })
+    fn price(&self) -> Option<Self::PriceSpec> {
+        self.price_annotation()
+            .as_ref()
+            .map(|cost_spec| cost_spec.item())
+    }
+}
+
+impl<'a> CostSpec for &'a parser::CostSpec<'a> {
+    type Date = time::Date;
+    type Currency = &'a str;
+    type Number = Decimal;
+    type Label = &'a str;
+
+    fn currency(&self) -> Option<&'a str> {
+        parser::CostSpec::currency(self).map(|currency| currency.item().as_ref())
     }
 
-    fn cost_per_unit(&self) -> Option<Decimal> {
-        self.cost_spec()
-            .and_then(|cost_spec| cost_spec.per_unit().map(|per_unit| per_unit.value()))
+    fn per_unit(&self) -> Option<Decimal> {
+        parser::CostSpec::per_unit(self).map(|per_unit| per_unit.value())
     }
 
-    fn cost_total(&self) -> Option<Decimal> {
-        self.cost_spec()
-            .and_then(|cost_spec| cost_spec.total().map(|total| total.value()))
+    fn total(&self) -> Option<Decimal> {
+        parser::CostSpec::total(self).map(|total| total.value())
     }
 
-    fn cost_date(&self) -> Option<Date> {
-        self.cost_spec()
-            .and_then(|cost_spec| cost_spec.date().map(|date| *date.item()))
+    fn date(&self) -> Option<Date> {
+        parser::CostSpec::date(self).map(|date| *date.item())
     }
 
-    fn cost_label(&self) -> Option<&'a str> {
-        self.cost_spec()
-            .and_then(|cost_spec| cost_spec.label().map(|label| label.item().as_ref()))
+    fn label(&self) -> Option<&'a str> {
+        parser::CostSpec::label(self).map(|label| label.item().as_ref())
     }
 
-    fn cost_merge(&self) -> Option<bool> {
-        self.cost_spec().map(|cost_spec| cost_spec.merge())
+    fn merge(&self) -> bool {
+        parser::CostSpec::merge(self)
+    }
+}
+
+impl<'a> PriceSpec for &'a parser::PriceSpec<'a> {
+    type Currency = &'a str;
+    type Number = Decimal;
+
+    fn currency(&self) -> Option<&'a str> {
+        use parser::PriceSpec::*;
+
+        match self {
+            BareCurrency(currency) => Some(currency.as_ref()),
+            CurrencyAmount(_, currency) => Some(currency.as_ref()),
+            _ => None,
+        }
     }
 
-    fn has_price(&self) -> bool {
-        self.price_annotation().is_some()
+    fn per_unit(&self) -> Option<Decimal> {
+        use parser::PriceSpec::*;
+        use parser::ScopedExprValue::*;
+
+        match self {
+            BareAmount(PerUnit(expr)) => Some(expr.value()),
+            CurrencyAmount(PerUnit(expr), _) => Some(expr.value()),
+            _ => None,
+        }
     }
 
-    fn price_currency(&self) -> Option<&'a str> {
-        self.price_annotation().and_then(|price| {
-            use parser::PriceSpec::*;
+    fn total(&self) -> Option<Decimal> {
+        use parser::PriceSpec::*;
+        use parser::ScopedExprValue::*;
 
-            match price.item() {
-                BareCurrency(currency) => Some(currency.as_ref()),
-                CurrencyAmount(_, currency) => Some(currency.as_ref()),
-                _ => None,
-            }
-        })
-    }
-
-    fn price_per_unit(&self) -> Option<Decimal> {
-        self.price_annotation().and_then(|price| {
-            use parser::PriceSpec::*;
-            use parser::ScopedExprValue::*;
-
-            match price.item() {
-                BareAmount(PerUnit(expr)) => Some(expr.value()),
-                CurrencyAmount(PerUnit(expr), _) => Some(expr.value()),
-                _ => None,
-            }
-        })
-    }
-
-    fn price_total(&self) -> Option<Decimal> {
-        self.price_annotation().and_then(|price| {
-            use parser::PriceSpec::*;
-            use parser::ScopedExprValue::*;
-
-            match price.item() {
-                BareAmount(Total(expr)) => Some(expr.value()),
-                CurrencyAmount(Total(expr), _) => Some(expr.value()),
-                _ => None,
-            }
-        })
+        match self {
+            BareAmount(Total(expr)) => Some(expr.value()),
+            CurrencyAmount(Total(expr), _) => Some(expr.value()),
+            _ => None,
+        }
     }
 }
 
@@ -204,6 +206,8 @@ impl<'a> Posting for &'a parser::Spanned<parser::Posting<'a>> {
     type Account = &'a str;
     type Currency = &'a str;
     type Number = Decimal;
+    type CostSpec = &'a parser::CostSpec<'a>;
+    type PriceSpec = &'a parser::PriceSpec<'a>;
     type Label = &'a str;
 
     fn account(&self) -> Self::Account {
@@ -218,47 +222,11 @@ impl<'a> Posting for &'a parser::Spanned<parser::Posting<'a>> {
         Posting::units(&self.item())
     }
 
-    fn has_cost(&self) -> bool {
-        Posting::has_cost(&self.item())
+    fn cost(&self) -> Option<Self::CostSpec> {
+        Posting::cost(&self.item())
     }
 
-    fn cost_currency(&self) -> Option<Self::Currency> {
-        Posting::cost_currency(&self.item())
-    }
-
-    fn cost_per_unit(&self) -> Option<Self::Number> {
-        Posting::cost_per_unit(&self.item())
-    }
-
-    fn cost_total(&self) -> Option<Self::Number> {
-        Posting::cost_total(&self.item())
-    }
-
-    fn cost_date(&self) -> Option<Self::Date> {
-        Posting::cost_date(&self.item())
-    }
-
-    fn cost_label(&self) -> Option<Self::Label> {
-        Posting::cost_label(&self.item())
-    }
-
-    fn cost_merge(&self) -> Option<bool> {
-        Posting::cost_merge(&self.item())
-    }
-
-    fn has_price(&self) -> bool {
-        Posting::has_price(&self.item())
-    }
-
-    fn price_currency(&self) -> Option<Self::Currency> {
-        Posting::price_currency(&self.item())
-    }
-
-    fn price_per_unit(&self) -> Option<Self::Number> {
-        Posting::price_per_unit(&self.item())
-    }
-
-    fn price_total(&self) -> Option<Self::Number> {
-        Posting::price_total(&self.item())
+    fn price(&self) -> Option<Self::PriceSpec> {
+        Posting::price(&self.item())
     }
 }

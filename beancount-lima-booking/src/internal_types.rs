@@ -4,7 +4,7 @@
 use hashbrown::{hash_map::Entry, HashMap};
 use std::{fmt::Debug, hash::Hash, ops::Deref};
 
-use super::{Cost, Number, Posting};
+use super::{Cost, CostSpec, Number, Posting, PriceSpec};
 
 ///
 /// A list of positions for a currency satisfying these invariants:
@@ -160,14 +160,14 @@ where
             Unbooked(unbooked) => {
                 let p = &unbooked.posting;
 
-                if p.has_cost() {
-                    match (p.cost_total(), p.cost_per_unit(), p.units()) {
+                if let Some(cost_spec) = p.cost() {
+                    match (cost_spec.total(), cost_spec.per_unit(), p.units()) {
                         (Some(cost_total), _, _) => Some(cost_total),
                         (None, Some(cost_per_unit), Some(units)) => Some(cost_per_unit * units),
                         _ => None,
                     }
-                } else if p.has_price() {
-                    match (p.price_total(), p.price_per_unit(), p.units()) {
+                } else if let Some(price_spec) = p.price() {
+                    match (price_spec.total(), price_spec.per_unit(), p.units()) {
                         (Some(price_total), _, _) => Some(price_total),
                         (None, Some(price_per_unit), Some(units)) => Some(price_per_unit * units),
                         _ => None,

@@ -12,26 +12,48 @@ pub trait Posting: Clone {
     type Account: Eq + Hash + Clone + Display + Debug;
     type Currency: Eq + Hash + Ord + Clone + Display + Debug;
     type Number: Number + Eq + Copy + Display + Debug;
+    type CostSpec: CostSpec<
+            Date = Self::Date,
+            Currency = Self::Currency,
+            Number = Self::Number,
+            Label = Self::Label,
+        > + Clone
+        + Display
+        + Debug;
+    type PriceSpec: PriceSpec<Currency = Self::Currency, Number = Self::Number>
+        + Clone
+        + Display
+        + Debug;
     type Label: Eq + Ord + Clone + Display + Debug;
 
     fn account(&self) -> Self::Account;
-
     fn currency(&self) -> Option<Self::Currency>;
     fn units(&self) -> Option<Self::Number>;
+    fn cost(&self) -> Option<Self::CostSpec>;
+    fn price(&self) -> Option<Self::PriceSpec>;
+}
 
-    // TODO remove these in favour of matches cost?
-    fn has_cost(&self) -> bool;
-    fn cost_currency(&self) -> Option<Self::Currency>;
-    fn cost_per_unit(&self) -> Option<Self::Number>;
-    fn cost_total(&self) -> Option<Self::Number>;
-    fn cost_date(&self) -> Option<Self::Date>;
-    fn cost_label(&self) -> Option<Self::Label>;
-    fn cost_merge(&self) -> Option<bool>;
+pub trait CostSpec: Clone {
+    type Date: Eq + Ord + Copy + Display + Debug;
+    type Currency: Eq + Hash + Ord + Clone + Display + Debug;
+    type Number: Number + Eq + Copy + Display + Debug;
+    type Label: Eq + Ord + Clone + Display + Debug;
 
-    fn has_price(&self) -> bool;
-    fn price_currency(&self) -> Option<Self::Currency>;
-    fn price_per_unit(&self) -> Option<Self::Number>;
-    fn price_total(&self) -> Option<Self::Number>;
+    fn currency(&self) -> Option<Self::Currency>;
+    fn per_unit(&self) -> Option<Self::Number>;
+    fn total(&self) -> Option<Self::Number>;
+    fn date(&self) -> Option<Self::Date>;
+    fn label(&self) -> Option<Self::Label>;
+    fn merge(&self) -> bool;
+}
+
+pub trait PriceSpec: Clone {
+    type Currency: Eq + Hash + Ord + Clone + Display + Debug;
+    type Number: Number + Eq + Copy + Display + Debug;
+
+    fn currency(&self) -> Option<Self::Currency>;
+    fn per_unit(&self) -> Option<Self::Number>;
+    fn total(&self) -> Option<Self::Number>;
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -81,6 +103,42 @@ where
     pub currency: C,
     pub label: Option<L>,
     pub merge: bool,
+}
+
+impl<D, N, C, L> Cost<D, N, C, L>
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone,
+{
+    pub(crate) fn matches_spec<CS>(&self, cost_spec: &CS, default_date: D) -> bool
+    where
+        D: Eq,
+        N: Eq,
+        C: Eq,
+        L: Eq,
+        CS: CostSpec<Date = D, Number = N, Currency = C, Label = L>,
+    {
+        !(
+            cost_spec.date().unwrap_or(default_date) != self.date
+                || cost_spec
+                    .currency()
+                    .is_some_and(|cost_spec_currency| cost_spec_currency != self.currency)
+                || cost_spec
+                    .per_unit()
+                    .is_some_and(|cost_spec_units| cost_spec_units != self.per_unit)
+                || cost_spec
+                    .currency()
+                    .is_some_and(|cost_spec_currency| cost_spec_currency != self.currency)
+                || cost_spec.label().is_some_and(|cost_spec_label| {
+                    self.label
+                        .as_ref()
+                        .is_some_and(|cost_label| *cost_label != cost_spec_label)
+                })
+            // TODO merge
+        )
+    }
 }
 
 impl<D, N, C, L> PartialOrd for Cost<D, N, C, L>
