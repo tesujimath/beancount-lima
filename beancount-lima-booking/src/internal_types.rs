@@ -199,7 +199,6 @@ where
     C: Clone,
 {
     pub(crate) posting: P,
-    pub(crate) idx: usize,
     pub(crate) units: N,
     pub(crate) currency: C,
     pub(crate) cost: Option<InterpolatedCost<N, C>>,

@@ -17,7 +17,7 @@ where
     pub(crate) unbooked_postings: Vec<InterpolatedPosting<P, N, C>>,
 }
 
-pub(crate) fn interpolate<'i, 'b, P, T>(
+pub(crate) fn interpolate_from_costed<'i, 'b, P, T>(
     currency: &P::Currency,
     costeds: Vec<CostedPosting<P, P::Number, P::Currency>>,
     tolerance: &T,
@@ -64,7 +64,6 @@ where
                     // simple case with no cost or price
                     Some(Ok(InterpolatedPosting {
                         posting: a.posting,
-                        idx: a.idx,
                         units: w,
                         currency: currency.clone(),
                         cost: None,
@@ -81,7 +80,6 @@ where
                             if a.posting.cost().is_some() {
                                 Some(Ok(InterpolatedPosting {
                                     posting: a.posting,
-                                    idx: a.idx,
                                     units,
                                     currency,
                                     cost: Some(InterpolatedCost {
@@ -94,7 +92,6 @@ where
                                 // price
                                 Some(Ok(InterpolatedPosting {
                                     posting: a.posting,
-                                    idx: a.idx,
                                     units,
                                     currency,
                                     cost: None,

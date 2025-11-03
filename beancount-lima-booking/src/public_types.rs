@@ -105,42 +105,6 @@ where
     pub merge: bool,
 }
 
-impl<D, N, C, L> Cost<D, N, C, L>
-where
-    D: Copy,
-    N: Copy,
-    C: Clone,
-    L: Clone,
-{
-    pub(crate) fn matches_spec<CS>(&self, cost_spec: &CS, default_date: D) -> bool
-    where
-        D: Eq,
-        N: Eq,
-        C: Eq,
-        L: Eq,
-        CS: CostSpec<Date = D, Number = N, Currency = C, Label = L>,
-    {
-        !(
-            cost_spec.date().unwrap_or(default_date) != self.date
-                || cost_spec
-                    .currency()
-                    .is_some_and(|cost_spec_currency| cost_spec_currency != self.currency)
-                || cost_spec
-                    .per_unit()
-                    .is_some_and(|cost_spec_units| cost_spec_units != self.per_unit)
-                || cost_spec
-                    .currency()
-                    .is_some_and(|cost_spec_currency| cost_spec_currency != self.currency)
-                || cost_spec.label().is_some_and(|cost_spec_label| {
-                    self.label
-                        .as_ref()
-                        .is_some_and(|cost_label| *cost_label != cost_spec_label)
-                })
-            // TODO merge
-        )
-    }
-}
-
 impl<D, N, C, L> PartialOrd for Cost<D, N, C, L>
 where
     D: Ord + Copy,
@@ -181,6 +145,31 @@ where
 
         self.per_unit.cmp(&other.per_unit)
     }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct Price<N, C>
+where
+    N: Copy,
+    C: Clone,
+{
+    pub per_unit: N,
+    pub currency: C,
+}
+
+#[derive(Clone, Debug)]
+pub struct Interpolated<P, D, N, C, L>
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone,
+{
+    pub posting: P,
+    pub units: N,
+    pub currency: C,
+    pub cost: Option<Cost<D, N, C, L>>,
+    pub price: Option<Price<N, C>>,
 }
 
 pub trait Tolerance {

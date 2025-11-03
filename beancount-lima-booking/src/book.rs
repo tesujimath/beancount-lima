@@ -11,9 +11,9 @@ use std::{
 };
 
 use super::{
-    interpolate, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost, CostSpec,
-    CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation, Number,
-    Position, Posting, PostingBookingError, PriceSpec, Tolerance, TransactionBookingError,
+    interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost,
+    CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation,
+    Number, Position, Posting, PostingBookingError, PriceSpec, Tolerance, TransactionBookingError,
     UpdatedInventory,
 };
 
@@ -58,7 +58,8 @@ where
             updated_inventory.insert(account, positions);
         }
 
-        let Interpolation { unbooked_postings } = interpolate(&cur, costed_postings, tolerance)?;
+        let Interpolation { unbooked_postings } =
+            interpolate_from_costed(&cur, costed_postings, tolerance)?;
         tracing::debug!("weights {:?}", &unbooked_postings);
 
         let updated_inventory_for_cur = book_augmentations(
@@ -158,7 +159,8 @@ where
                             .filter_map(|(i, pos)| {
                                 match (pos.cost.as_ref(), annotated.posting.cost().as_ref()) {
                                     (Some(pos_cost), Some(cost_spec)) => {
-                                        pos_cost.matches_spec(cost_spec, date).then_some((i, pos))
+                                        cost_matches_spec(pos_cost, cost_spec, date)
+                                            .then_some((i, pos))
                                     }
                                     _ => None,
                                 }
@@ -429,6 +431,38 @@ where
     }
 
     Ok(currency_groups)
+}
+
+pub(crate) fn cost_matches_spec<D, N, C, L, CS>(
+    cost: &Cost<D, N, C, L>,
+    cost_spec: &CS,
+    default_date: D,
+) -> bool
+where
+    D: Eq + Copy,
+    N: Eq + Copy,
+    C: Eq + Clone,
+    L: Eq + Clone,
+    CS: CostSpec<Date = D, Number = N, Currency = C, Label = L>,
+{
+    !(
+        cost_spec.date().unwrap_or(default_date) != cost.date
+            || cost_spec
+                .currency()
+                .is_some_and(|cost_spec_currency| cost_spec_currency != cost.currency)
+            || cost_spec
+                .per_unit()
+                .is_some_and(|cost_spec_units| cost_spec_units != cost.per_unit)
+            || cost_spec
+                .currency()
+                .is_some_and(|cost_spec_currency| cost_spec_currency != cost.currency)
+            || cost_spec.label().is_some_and(|cost_spec_label| {
+                cost.label
+                    .as_ref()
+                    .is_some_and(|cost_label| *cost_label != cost_spec_label)
+            })
+        // TODO merge
+    )
 }
 
 // lookup account currency with memoization
