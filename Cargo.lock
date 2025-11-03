@@ -264,6 +264,7 @@ name = "beancount-lima"
 version = "0.5.0"
 dependencies = [
  "abi_stable",
+ "beancount-lima-booking",
  "beancount-parser-lima",
  "build-deps",
  "clap",
@@ -305,9 +306,9 @@ dependencies = [
 
 [[package]]
 name = "beancount-parser-lima"
-version = "0.13.0"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b387b054e2dd83b053dde60ecb869e9a813d45eaa209cbd98bfebc2b82ee38ba"
+checksum = "3e09e55bfacb734abbe5b8351e4df71ef7f5043045495f59cf1a254d8f927e07"
 dependencies = [
  "anyhow",
  "ariadne",
@@ -318,7 +319,6 @@ dependencies = [
  "protobuf",
  "protobuf-codegen",
  "rust_decimal",
- "rust_decimal_macros",
  "strum",
  "strum_macros",
  "time",
