@@ -156,8 +156,8 @@ impl<'a, T> Loader<'a, T> {
                     .into()
             },
         ) {
-            Ok(updated_inventory) => {
-                tracing::debug!("booked {:?}", &updated_inventory);
+            Ok(bookings) => {
+                tracing::debug!("booked {:?}", &bookings);
             }
             Err(e) => {
                 use beancount_lima_booking::BookingError::*;

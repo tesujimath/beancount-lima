@@ -5,10 +5,10 @@ use hashbrown::{hash_map::Entry, HashMap, HashSet};
 use std::{cmp::Ordering, fmt::Debug, hash::Hash, iter::once};
 
 use super::{
-    interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost,
-    CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation,
-    Number, Position, PostingBookingError, PostingSpec, PriceSpec, Tolerance,
-    TransactionBookingError, UpdatedInventory,
+    interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError,
+    Bookings, Cost, CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting,
+    Interpolation, Inventory, Number, Position, PostingBookingError, PostingSpec, PriceSpec,
+    Tolerance, TransactionBookingError,
 };
 
 pub fn book<'a, P, T, I, M>(
@@ -17,7 +17,7 @@ pub fn book<'a, P, T, I, M>(
     tolerance: &T,
     inventory: I,
     method: M,
-) -> Result<UpdatedInventory<P::Account, P::Date, P::Number, P::Currency, P::Label>, BookingError>
+) -> Result<Bookings<P>, BookingError>
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
@@ -26,7 +26,7 @@ where
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let postings = postings.collect::<Vec<_>>();
-    let mut updated_inventory = UpdatedInventory::default();
+    let mut updated_inventory = Inventory::default();
 
     let currency_groups = categorize_by_currency(&postings, inventory)?;
 
@@ -79,7 +79,12 @@ where
         }
     }
 
-    Ok(updated_inventory)
+    let interpolated_postings = Vec::default(); // TODO
+
+    Ok(Bookings {
+        interpolated_postings,
+        updated_inventory,
+    })
 }
 
 #[derive(Debug)]
@@ -87,7 +92,7 @@ struct Reductions<P>
 where
     P: PostingSpec,
 {
-    updated_inventory: UpdatedInventory<P::Account, P::Date, P::Number, P::Currency, P::Label>,
+    updated_inventory: Inventory<P::Account, P::Date, P::Number, P::Currency, P::Label>,
     costed_postings: Vec<CostedPosting<P, P::Number, P::Currency>>,
 }
 
@@ -502,7 +507,7 @@ fn book_augmentations<'a, 'b, P, T, I, M>(
     tolerance: &T,
     inventory: I,
     method: M,
-) -> Result<UpdatedInventory<P::Account, P::Date, P::Number, P::Currency, P::Label>, BookingError>
+) -> Result<Inventory<P::Account, P::Date, P::Number, P::Currency, P::Label>, BookingError>
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,

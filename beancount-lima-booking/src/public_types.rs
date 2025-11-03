@@ -121,6 +121,28 @@ where
     pub merge: bool,
 }
 
+impl<D, N, C, L> Display for Cost<D, N, C, L>
+where
+    D: Copy + Display,
+    N: Copy + Display,
+    C: Clone + Display,
+    L: Clone + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{{}, {} {}", &self.date, &self.per_unit, &self.currency)?;
+
+        if let Some(label) = &self.label {
+            write!(f, ", \"{label}\"")?;
+        }
+
+        if self.merge {
+            write!(f, ", *",)?;
+        }
+
+        f.write_str("}")
+    }
+}
+
 impl<D, N, C, L> PartialOrd for Cost<D, N, C, L>
 where
     D: Ord + Copy,
@@ -171,6 +193,15 @@ where
 {
     pub per_unit: N,
     pub currency: C,
+}
+
+#[derive(Debug)]
+pub struct Bookings<P>
+where
+    P: PostingSpec,
+{
+    pub interpolated_postings: Vec<Interpolated<P, P::Date, P::Number, P::Currency, P::Label>>,
+    pub updated_inventory: Inventory<P::Account, P::Date, P::Number, P::Currency, P::Label>,
 }
 
 #[derive(Clone, Debug)]
@@ -239,7 +270,7 @@ pub enum Booking {
 }
 
 #[derive(Debug)]
-pub struct UpdatedInventory<A, D, N, C, L>
+pub struct Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
@@ -250,7 +281,7 @@ where
     value: HashMap<A, Vec<Position<D, N, C, L>>>,
 }
 
-impl<A, D, N, C, L> Default for UpdatedInventory<A, D, N, C, L>
+impl<A, D, N, C, L> Default for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
@@ -265,7 +296,7 @@ where
     }
 }
 
-impl<A, D, N, C, L> From<HashMap<A, Vec<Position<D, N, C, L>>>> for UpdatedInventory<A, D, N, C, L>
+impl<A, D, N, C, L> From<HashMap<A, Vec<Position<D, N, C, L>>>> for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
@@ -278,7 +309,7 @@ where
     }
 }
 
-impl<A, D, N, C, L> Deref for UpdatedInventory<A, D, N, C, L>
+impl<A, D, N, C, L> Deref for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
@@ -292,7 +323,7 @@ where
         &self.value
     }
 }
-impl<A, D, N, C, L> IntoIterator for UpdatedInventory<A, D, N, C, L>
+impl<A, D, N, C, L> IntoIterator for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
@@ -308,7 +339,7 @@ where
     }
 }
 
-impl<A, D, N, C, L> UpdatedInventory<A, D, N, C, L>
+impl<A, D, N, C, L> Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,

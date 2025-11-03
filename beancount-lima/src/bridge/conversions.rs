@@ -1,5 +1,7 @@
 use crate::loader::{self as loader, into_spanned_element};
 use crate::prism::{self as prism};
+use beancount_lima_booking as booking;
+use rust_decimal::Decimal;
 
 pub(crate) fn convert_directives(
     loaded_directives: Vec<loader::Directive>,
@@ -187,6 +189,18 @@ impl From<loader::Posting<'_>> for prism::Posting {
 
 impl From<loader::Cost<'_>> for prism::Cost {
     fn from(value: loader::Cost<'_>) -> Self {
+        Self {
+            per_unit: value.per_unit,
+            currency: value.currency.to_string(),
+            date: value.date,
+            label: value.label.map(ToString::to_string),
+            merge: value.merge,
+        }
+    }
+}
+
+impl<'a> From<booking::Cost<time::Date, Decimal, &'a str, &'a str>> for prism::Cost {
+    fn from(value: booking::Cost<time::Date, Decimal, &'a str, &'a str>) -> Self {
         Self {
             per_unit: value.per_unit,
             currency: value.currency.to_string(),
