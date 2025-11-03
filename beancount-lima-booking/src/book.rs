@@ -5,9 +5,9 @@ use hashbrown::{hash_map::Entry, HashMap, HashSet};
 use std::{cmp::Ordering, fmt::Debug, hash::Hash, iter::once};
 
 use super::{
-    interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError,
-    CostImpl, CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting,
-    Interpolation, Number, Position, PostingBookingError, PostingSpec, PriceSpec, Tolerance,
+    interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost,
+    CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation,
+    Number, Position, PostingBookingError, PostingSpec, PriceSpec, Tolerance,
     TransactionBookingError, UpdatedInventory,
 };
 
@@ -17,23 +17,12 @@ pub fn book<'a, P, T, I, M>(
     tolerance: &T,
     inventory: I,
     method: M,
-) -> Result<UpdatedInventory<P>, BookingError>
+) -> Result<UpdatedInventory<P::Account, P::Date, P::Number, P::Currency, P::Label>, BookingError>
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(
-            P::Account,
-        ) -> Option<
-            &'a Vec<
-                Position<
-                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                    P::Date,
-                    P::Number,
-                    P::Currency,
-                    P::Label,
-                >,
-            >,
-        > + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+        + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let postings = postings.collect::<Vec<_>>();
@@ -98,7 +87,7 @@ struct Reductions<P>
 where
     P: PostingSpec,
 {
-    updated_inventory: UpdatedInventory<P>,
+    updated_inventory: UpdatedInventory<P::Account, P::Date, P::Number, P::Currency, P::Label>,
     costed_postings: Vec<CostedPosting<P, P::Number, P::Currency>>,
 }
 
@@ -113,19 +102,8 @@ fn book_reductions<'a, 'b, P, T, I, M>(
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(
-            P::Account,
-        ) -> Option<
-            &'a Vec<
-                Position<
-                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                    P::Date,
-                    P::Number,
-                    P::Currency,
-                    P::Label,
-                >,
-            >,
-        > + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+        + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     use CostedPosting::*;
@@ -308,19 +286,8 @@ fn categorize_by_currency<'a, 'b, P, I>(
 ) -> Result<HashMapOfVec<P::Currency, AnnotatedPosting<P, P::Currency>>, BookingError>
 where
     P: PostingSpec,
-    I: Fn(
-            P::Account,
-        ) -> Option<
-            &'a Vec<
-                Position<
-                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                    P::Date,
-                    P::Number,
-                    P::Currency,
-                    P::Label,
-                >,
-            >,
-        > + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+        + Copy, // 'i for inventory
     P::Date: 'a,
     P::Number: 'a,
     P::Currency: 'a,
@@ -461,7 +428,7 @@ where
 }
 
 pub(crate) fn cost_matches_spec<D, N, C, L, CS>(
-    cost: &CostImpl<D, N, C, L>,
+    cost: &Cost<D, N, C, L>,
     cost_spec: &CS,
     default_date: D,
 ) -> bool
@@ -504,7 +471,7 @@ where
     C: Eq + Hash + Ord + Clone + Debug + 'i,
     N: Number + Copy + Debug + 'i,
     L: Eq + Ord + Clone + Debug + 'i,
-    I: Fn(A) -> Option<&'i Vec<Position<CostImpl<D, N, C, L>, D, N, C, L>>> + Copy, // 'i for inventory
+    I: Fn(A) -> Option<&'i Vec<Position<D, N, C, L>>> + Copy, // 'i for inventory
 {
     account_currency.get(&account).cloned().unwrap_or_else(|| {
         let currency = if let Some(positions) = inventory(account.clone()) {
@@ -535,23 +502,12 @@ fn book_augmentations<'a, 'b, P, T, I, M>(
     tolerance: &T,
     inventory: I,
     method: M,
-) -> Result<UpdatedInventory<P>, BookingError>
+) -> Result<UpdatedInventory<P::Account, P::Date, P::Number, P::Currency, P::Label>, BookingError>
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(
-            P::Account,
-        ) -> Option<
-            &'a Vec<
-                Position<
-                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                    P::Date,
-                    P::Number,
-                    P::Currency,
-                    P::Label,
-                >,
-            >,
-        > + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
+        + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let mut updated_inventory = HashMap::default();
@@ -575,7 +531,7 @@ where
             let label = cost_spec.label();
             let merge = cost_spec.merge();
 
-            CostImpl {
+            Cost {
                 date,
                 per_unit,
                 currency,
@@ -597,8 +553,8 @@ where
 fn augment_positions<D, N, C, L>(
     units: N,
     currency: C,
-    cost: Option<CostImpl<D, N, C, L>>,
-    positions: &mut Vec<Position<CostImpl<D, N, C, L>, D, N, C, L>>,
+    cost: Option<Cost<D, N, C, L>>,
+    positions: &mut Vec<Position<D, N, C, L>>,
 ) where
     D: Eq + Ord + Copy + Debug,
     C: Eq + Hash + Ord + Clone + Debug,

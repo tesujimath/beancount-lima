@@ -38,22 +38,15 @@ pub trait Posting: Clone {
     type Account: Eq + Hash + Clone + Display + Debug;
     type Currency: Eq + Hash + Ord + Clone + Display + Debug;
     type Number: Number + Eq + Copy + Display + Debug;
-    type Cost: Cost<
-            Date = Self::Date,
-            Currency = Self::Currency,
-            Number = Self::Number,
-            Label = Self::Label,
-        > + Clone
-        + Display
-        + Debug;
-    type Price: Price<Currency = Self::Currency, Number = Self::Number> + Clone + Display + Debug;
     type Label: Eq + Ord + Clone + Display + Debug;
 
     fn account(&self) -> Self::Account;
     fn currency(&self) -> Self::Currency;
     fn units(&self) -> Self::Number;
-    fn cost(&self) -> Option<impl Iterator<Item = Self::Cost>>;
-    fn price(&self) -> Option<Self::Price>;
+    fn cost(
+        &self,
+    ) -> Option<impl Iterator<Item = Cost<Self::Date, Self::Number, Self::Currency, Self::Label>>>;
+    fn price(&self) -> Option<Price<Self::Number, Self::Currency>>;
 }
 
 pub trait CostSpec: Clone {
@@ -70,19 +63,6 @@ pub trait CostSpec: Clone {
     fn merge(&self) -> bool;
 }
 
-pub trait Cost: PartialEq + Eq + Clone + Debug {
-    type Date: Eq + Ord + Copy + Debug;
-    type Currency: Eq + Hash + Ord + Clone + Debug;
-    type Number: Number + Copy + Debug;
-    type Label: Eq + Ord + Clone + Debug;
-
-    fn date(&self) -> Self::Date;
-    fn per_unit(&self) -> Self::Number;
-    fn currency(&self) -> Self::Currency;
-    fn label(&self) -> Option<Self::Label>;
-    fn merge(&self) -> bool;
-}
-
 pub trait PriceSpec: Clone {
     type Currency: Eq + Hash + Ord + Clone + Display + Debug;
     type Number: Number + Eq + Copy + Display + Debug;
@@ -92,18 +72,9 @@ pub trait PriceSpec: Clone {
     fn total(&self) -> Option<Self::Number>;
 }
 
-pub trait Price: PartialEq + Eq + Clone + Debug {
-    type Currency: Eq + Hash + Ord + Clone + Debug;
-    type Number: Number + Copy + Debug;
-
-    fn per_unit(&self) -> Self::Number;
-    fn currency(&self) -> Self::Currency;
-}
-
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Position<T, D, N, C, L>
+pub struct Position<D, N, C, L>
 where
-    T: Cost<Date = D, Number = N, Currency = C, Label = L>,
     D: Copy,
     N: Copy,
     C: Clone,
@@ -111,12 +82,11 @@ where
 {
     pub currency: C,
     pub units: N,
-    pub cost: Option<T>,
+    pub cost: Option<Cost<D, N, C, L>>,
 }
 
-impl<T, D, N, C, L> Position<T, D, N, C, L>
+impl<D, N, C, L> Position<D, N, C, L>
 where
-    T: Cost<Date = D, Number = N, Currency = C, Label = L>,
     D: Copy,
     N: Copy,
     C: Clone,
@@ -137,7 +107,7 @@ where
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct CostImpl<D, N, C, L>
+pub struct Cost<D, N, C, L>
 where
     D: Copy,
     N: Copy,
@@ -151,43 +121,7 @@ where
     pub merge: bool,
 }
 
-impl<D, N, C, L> Cost for CostImpl<D, N, C, L>
-where
-    D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
-    N: Number + Eq + Copy + Debug,
-    L: Eq + Ord + Clone + Debug,
-{
-    type Date = D;
-
-    type Currency = C;
-
-    type Number = N;
-
-    type Label = L;
-
-    fn date(&self) -> Self::Date {
-        self.date
-    }
-
-    fn per_unit(&self) -> Self::Number {
-        self.per_unit
-    }
-
-    fn currency(&self) -> Self::Currency {
-        self.currency.clone()
-    }
-
-    fn label(&self) -> Option<Self::Label> {
-        self.label.clone()
-    }
-
-    fn merge(&self) -> bool {
-        self.merge
-    }
-}
-
-impl<D, N, C, L> PartialOrd for CostImpl<D, N, C, L>
+impl<D, N, C, L> PartialOrd for Cost<D, N, C, L>
 where
     D: Ord + Copy,
     N: Ord + Copy,
@@ -198,7 +132,7 @@ where
         Some(self.cmp(other))
     }
 }
-impl<D, N, C, L> Ord for CostImpl<D, N, C, L>
+impl<D, N, C, L> Ord for Cost<D, N, C, L>
 where
     D: Ord + Copy,
     N: Ord + Copy,
@@ -230,31 +164,13 @@ where
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct PriceImpl<N, C>
+pub struct Price<N, C>
 where
     N: Copy,
     C: Clone,
 {
     pub per_unit: N,
     pub currency: C,
-}
-
-impl<N, C> Price for PriceImpl<N, C>
-where
-    C: Eq + Hash + Ord + Clone + Debug,
-    N: Number + Eq + Copy + Debug,
-{
-    type Currency = C;
-
-    type Number = N;
-
-    fn per_unit(&self) -> Self::Number {
-        self.per_unit
-    }
-
-    fn currency(&self) -> Self::Currency {
-        self.currency.clone()
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -268,8 +184,8 @@ where
     pub posting: P,
     pub units: N,
     pub currency: C,
-    pub cost: Option<CostImpl<D, N, C, L>>,
-    pub price: Option<PriceImpl<N, C>>,
+    pub cost: Option<Cost<D, N, C, L>>,
+    pub price: Option<Price<N, C>>,
 }
 
 pub trait Tolerance {
@@ -323,27 +239,24 @@ pub enum Booking {
 }
 
 #[derive(Debug)]
-pub struct UpdatedInventory<P>
+pub struct UpdatedInventory<A, D, N, C, L>
 where
-    P: PostingSpec,
+    A: Eq + Hash + Clone + Display + Debug,
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
 {
-    value: HashMap<
-        P::Account,
-        Vec<
-            Position<
-                CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                P::Date,
-                P::Number,
-                P::Currency,
-                P::Label,
-            >,
-        >,
-    >,
+    value: HashMap<A, Vec<Position<D, N, C, L>>>,
 }
 
-impl<P> Default for UpdatedInventory<P>
+impl<A, D, N, C, L> Default for UpdatedInventory<A, D, N, C, L>
 where
-    P: PostingSpec,
+    A: Eq + Hash + Clone + Display + Debug,
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
 {
     fn default() -> Self {
         Self {
@@ -352,137 +265,62 @@ where
     }
 }
 
-impl<P>
-    From<
-        HashMap<
-            P::Account,
-            Vec<
-                Position<
-                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                    P::Date,
-                    P::Number,
-                    P::Currency,
-                    P::Label,
-                >,
-            >,
-        >,
-    > for UpdatedInventory<P>
+impl<A, D, N, C, L> From<HashMap<A, Vec<Position<D, N, C, L>>>> for UpdatedInventory<A, D, N, C, L>
 where
-    P: PostingSpec,
+    A: Eq + Hash + Clone + Display + Debug,
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
 {
-    fn from(
-        value: HashMap<
-            P::Account,
-            Vec<
-                Position<
-                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                    P::Date,
-                    P::Number,
-                    P::Currency,
-                    P::Label,
-                >,
-            >,
-        >,
-    ) -> Self {
+    fn from(value: HashMap<A, Vec<Position<D, N, C, L>>>) -> Self {
         Self { value }
     }
 }
 
-impl<P> Deref for UpdatedInventory<P>
+impl<A, D, N, C, L> Deref for UpdatedInventory<A, D, N, C, L>
 where
-    P: PostingSpec,
+    A: Eq + Hash + Clone + Display + Debug,
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
 {
-    type Target = HashMap<
-        P::Account,
-        Vec<
-            Position<
-                CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                P::Date,
-                P::Number,
-                P::Currency,
-                P::Label,
-            >,
-        >,
-    >;
+    type Target = HashMap<A, Vec<Position<D, N, C, L>>>;
 
     fn deref(&self) -> &Self::Target {
         &self.value
     }
 }
-impl<P> IntoIterator for UpdatedInventory<P>
+impl<A, D, N, C, L> IntoIterator for UpdatedInventory<A, D, N, C, L>
 where
-    P: PostingSpec,
+    A: Eq + Hash + Clone + Display + Debug,
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
 {
-    type Item = (
-        P::Account,
-        Vec<
-            Position<
-                CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                P::Date,
-                P::Number,
-                P::Currency,
-                P::Label,
-            >,
-        >,
-    );
-    type IntoIter = hashbrown::hash_map::IntoIter<
-        P::Account,
-        Vec<
-            Position<
-                CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                P::Date,
-                P::Number,
-                P::Currency,
-                P::Label,
-            >,
-        >,
-    >;
+    type Item = (A, Vec<Position<D, N, C, L>>);
+    type IntoIter = hashbrown::hash_map::IntoIter<A, Vec<Position<D, N, C, L>>>;
 
-    fn into_iter(
-        self,
-    ) -> hashbrown::hash_map::IntoIter<
-        P::Account,
-        Vec<
-            Position<
-                CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                P::Date,
-                P::Number,
-                P::Currency,
-                P::Label,
-            >,
-        >,
-    > {
+    fn into_iter(self) -> hashbrown::hash_map::IntoIter<A, Vec<Position<D, N, C, L>>> {
         self.value.into_iter()
     }
 }
 
-impl<P> UpdatedInventory<P>
+impl<A, D, N, C, L> UpdatedInventory<A, D, N, C, L>
 where
-    P: PostingSpec,
+    A: Eq + Hash + Clone + Display + Debug,
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
 {
     pub(crate) fn insert(
         &mut self,
-        k: P::Account,
-        v: Vec<
-            Position<
-                CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                P::Date,
-                P::Number,
-                P::Currency,
-                P::Label,
-            >,
-        >,
-    ) -> Option<
-        Vec<
-            Position<
-                CostImpl<P::Date, P::Number, P::Currency, P::Label>,
-                P::Date,
-                P::Number,
-                P::Currency,
-                P::Label,
-            >,
-        >,
-    > {
+        k: A,
+        v: Vec<Position<D, N, C, L>>,
+    ) -> Option<Vec<Position<D, N, C, L>>> {
         self.value.insert(k, v)
     }
 }

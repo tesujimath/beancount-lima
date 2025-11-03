@@ -1,7 +1,6 @@
 // TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
 
-use beancount_lima_booking::CostImpl;
 use beancount_parser_lima::{self as parser, Span, Spanned};
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
@@ -769,15 +768,7 @@ struct AccountBuilder<'a> {
     cost_currencies: HashSet<&'a parser::Currency<'a>>,
     inventory: Inventory<'a>,
     // TODO replace all use of inventory with positions
-    positions: Vec<
-        beancount_lima_booking::Position<
-            CostImpl<Date, Decimal, &'a str, &'a str>,
-            Date,
-            Decimal,
-            &'a str,
-            &'a str,
-        >,
-    >,
+    positions: Vec<beancount_lima_booking::Position<Date, Decimal, &'a str, &'a str>>,
     opened: Span,
     // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
