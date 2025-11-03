@@ -2,19 +2,13 @@
 #![allow(dead_code, unused_variables)]
 
 use hashbrown::{hash_map::Entry, HashMap, HashSet};
-use std::{
-    cmp::Ordering,
-    fmt::{Debug, Display},
-    hash::Hash,
-    iter::once,
-    ops::AddAssign,
-};
+use std::{cmp::Ordering, fmt::Debug, hash::Hash, iter::once};
 
 use super::{
-    interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError, Cost,
-    CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting, Interpolation,
-    Number, Position, Posting, PostingBookingError, PriceSpec, Tolerance, TransactionBookingError,
-    UpdatedInventory,
+    interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError,
+    CostImpl, CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting,
+    Interpolation, Number, Position, PostingBookingError, PostingSpec, PriceSpec, Tolerance,
+    TransactionBookingError, UpdatedInventory,
 };
 
 pub fn book<'a, P, T, I, M>(
@@ -25,10 +19,21 @@ pub fn book<'a, P, T, I, M>(
     method: M,
 ) -> Result<UpdatedInventory<P>, BookingError>
 where
-    P: Posting + Debug + 'a,
+    P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
-        + Copy, // 'i for inventory
+    I: Fn(
+            P::Account,
+        ) -> Option<
+            &'a Vec<
+                Position<
+                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
+                    P::Date,
+                    P::Number,
+                    P::Currency,
+                    P::Label,
+                >,
+            >,
+        > + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let postings = postings.collect::<Vec<_>>();
@@ -91,7 +96,7 @@ where
 #[derive(Debug)]
 struct Reductions<P>
 where
-    P: Posting,
+    P: PostingSpec,
 {
     updated_inventory: UpdatedInventory<P>,
     costed_postings: Vec<CostedPosting<P, P::Number, P::Currency>>,
@@ -106,10 +111,21 @@ fn book_reductions<'a, 'b, P, T, I, M>(
     method: M,
 ) -> Result<Reductions<P>, BookingError>
 where
-    P: Posting + Debug + 'a,
+    P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
-        + Copy, // 'i for inventory
+    I: Fn(
+            P::Account,
+        ) -> Option<
+            &'a Vec<
+                Position<
+                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
+                    P::Date,
+                    P::Number,
+                    P::Currency,
+                    P::Label,
+                >,
+            >,
+        > + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     use CostedPosting::*;
@@ -291,9 +307,20 @@ fn categorize_by_currency<'a, 'b, P, I>(
     inventory: I,
 ) -> Result<HashMapOfVec<P::Currency, AnnotatedPosting<P, P::Currency>>, BookingError>
 where
-    P: Posting,
-    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
-        + Copy, // 'i for inventory
+    P: PostingSpec,
+    I: Fn(
+            P::Account,
+        ) -> Option<
+            &'a Vec<
+                Position<
+                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
+                    P::Date,
+                    P::Number,
+                    P::Currency,
+                    P::Label,
+                >,
+            >,
+        > + Copy, // 'i for inventory
     P::Date: 'a,
     P::Number: 'a,
     P::Currency: 'a,
@@ -434,7 +461,7 @@ where
 }
 
 pub(crate) fn cost_matches_spec<D, N, C, L, CS>(
-    cost: &Cost<D, N, C, L>,
+    cost: &CostImpl<D, N, C, L>,
     cost_spec: &CS,
     default_date: D,
 ) -> bool
@@ -473,11 +500,11 @@ fn account_currency<'i, A, D, N, C, L, I>(
 ) -> Option<C>
 where
     A: Eq + Hash + Clone,
-    D: 'i + Copy,
-    N: 'i + Copy,
-    C: Eq + Hash + Clone + 'i,
-    L: 'i + Clone,
-    I: Fn(A) -> Option<&'i Vec<Position<D, N, C, L>>> + Copy, // 'i for inventory
+    D: Eq + Ord + Copy + Debug + 'i,
+    C: Eq + Hash + Ord + Clone + Debug + 'i,
+    N: Number + Copy + Debug + 'i,
+    L: Eq + Ord + Clone + Debug + 'i,
+    I: Fn(A) -> Option<&'i Vec<Position<CostImpl<D, N, C, L>, D, N, C, L>>> + Copy, // 'i for inventory
 {
     account_currency.get(&account).cloned().unwrap_or_else(|| {
         let currency = if let Some(positions) = inventory(account.clone()) {
@@ -510,10 +537,21 @@ fn book_augmentations<'a, 'b, P, T, I, M>(
     method: M,
 ) -> Result<UpdatedInventory<P>, BookingError>
 where
-    P: Posting + Debug + 'a,
+    P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
-        + Copy, // 'i for inventory
+    I: Fn(
+            P::Account,
+        ) -> Option<
+            &'a Vec<
+                Position<
+                    CostImpl<P::Date, P::Number, P::Currency, P::Label>,
+                    P::Date,
+                    P::Number,
+                    P::Currency,
+                    P::Label,
+                >,
+            >,
+        > + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let mut updated_inventory = HashMap::default();
@@ -537,7 +575,7 @@ where
             let label = cost_spec.label();
             let merge = cost_spec.merge();
 
-            Cost {
+            CostImpl {
                 date,
                 per_unit,
                 currency,
@@ -559,13 +597,13 @@ where
 fn augment_positions<D, N, C, L>(
     units: N,
     currency: C,
-    cost: Option<Cost<D, N, C, L>>,
-    positions: &mut Vec<Position<D, N, C, L>>,
+    cost: Option<CostImpl<D, N, C, L>>,
+    positions: &mut Vec<Position<CostImpl<D, N, C, L>, D, N, C, L>>,
 ) where
-    D: Ord + Copy + Debug,
-    N: AddAssign + Ord + Copy + Debug + Display,
-    C: Ord + Clone + Debug,
-    L: Ord + Clone + Debug,
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
 {
     use Ordering::*;
 
@@ -578,7 +616,7 @@ fn augment_positions<D, N, C, L>(
         Ok(i) => {
             let position = &mut positions[i];
             tracing::debug!(
-                "augmenting position {:?} with {} {:?}",
+                "augmenting position {:?} with {:?} {:?}",
                 &position,
                 units,
                 &cost

@@ -4,8 +4,8 @@
 use std::fmt::Debug;
 
 use super::{
-    BookingError, CostSpec, CostedPosting, InterpolatedCost, InterpolatedPosting, Posting,
-    PostingBookingError, PriceSpec, Tolerance, TransactionBookingError,
+    BookingError, CostSpec, CostedPosting, InterpolatedCost, InterpolatedPosting,
+    PostingBookingError, PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
 };
 
 #[derive(Debug)]
@@ -23,7 +23,7 @@ pub(crate) fn interpolate_from_costed<'i, 'b, P, T>(
     tolerance: &T,
 ) -> Result<Interpolation<P, P::Number, P::Currency>, BookingError>
 where
-    P: Posting + Debug + 'i,
+    P: PostingSpec + Debug + 'i,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
 {
     let mut weights = costeds.iter().map(|c| c.weight()).collect::<Vec<_>>();
@@ -131,7 +131,7 @@ struct UnitsAndCostPerUnit<N> {
 // infer the units once we know the weight
 fn units<P>(posting: &P, weight: P::Number) -> Option<UnitsAndCostPerUnit<P::Number>>
 where
-    P: Posting,
+    P: PostingSpec,
 {
     let units = posting.units().unwrap_or(weight);
     if let Some(cost_spec) = posting.cost() {

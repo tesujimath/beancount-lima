@@ -4,7 +4,7 @@
 use hashbrown::{hash_map::Entry, HashMap};
 use std::{fmt::Debug, hash::Hash, ops::Deref};
 
-use super::{Cost, CostSpec, Number, Posting, PriceSpec};
+use super::{CostImpl, CostSpec, Number, PostingSpec, PriceSpec};
 
 ///
 /// A list of positions for a currency satisfying these invariants:
@@ -44,7 +44,7 @@ where
     L: Clone,
 {
     units: N,
-    cost: Option<Cost<D, N, C, L>>,
+    cost: Option<CostImpl<D, N, C, L>>,
 }
 
 impl<D, N, C, L> CurrencyPosition<D, N, C, L>
@@ -147,7 +147,7 @@ where
 
 impl<P, C> CostedPosting<P, P::Number, C>
 where
-    P: Posting,
+    P: PostingSpec,
     C: Clone,
 {
     // determine the weight of a posting

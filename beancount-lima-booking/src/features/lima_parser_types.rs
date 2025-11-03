@@ -1,9 +1,9 @@
-use super::{Booking, CostSpec, Posting, PriceSpec, Tolerance};
+use super::{Booking, CostSpec, PostingSpec, PriceSpec, Tolerance};
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
 use time::Date;
 
-impl<'a> Posting for &'a parser::Posting<'a> {
+impl<'a> PostingSpec for &'a parser::Posting<'a> {
     type Date = time::Date;
     type Account = &'a str;
     type Currency = &'a str;
@@ -201,7 +201,7 @@ fn default_inferred_tolerance_multiplier() -> Decimal {
     Decimal::new(5, 1) // 0.5
 }
 
-impl<'a> Posting for &'a parser::Spanned<parser::Posting<'a>> {
+impl<'a> PostingSpec for &'a parser::Spanned<parser::Posting<'a>> {
     type Date = time::Date;
     type Account = &'a str;
     type Currency = &'a str;
@@ -211,22 +211,22 @@ impl<'a> Posting for &'a parser::Spanned<parser::Posting<'a>> {
     type Label = &'a str;
 
     fn account(&self) -> Self::Account {
-        Posting::account(&self.item())
+        PostingSpec::account(&self.item())
     }
 
     fn currency(&self) -> Option<Self::Currency> {
-        Posting::currency(&self.item())
+        PostingSpec::currency(&self.item())
     }
 
     fn units(&self) -> Option<Self::Number> {
-        Posting::units(&self.item())
+        PostingSpec::units(&self.item())
     }
 
     fn cost(&self) -> Option<Self::CostSpec> {
-        Posting::cost(&self.item())
+        PostingSpec::cost(&self.item())
     }
 
     fn price(&self) -> Option<Self::PriceSpec> {
-        Posting::price(&self.item())
+        PostingSpec::price(&self.item())
     }
 }
