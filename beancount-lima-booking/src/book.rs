@@ -6,9 +6,9 @@ use std::{cmp::Ordering, fmt::Debug, hash::Hash, iter::once};
 
 use super::{
     interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError,
-    Bookings, Cost, CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting,
-    Interpolation, Inventory, Number, Position, Positions, Posting, PostingBookingError,
-    PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
+    Bookings, Cost, CostSpec, CostedPosting, HashMapOfVec, InterpolatedPosting, Interpolation,
+    Inventory, Number, Position, Positions, Posting, PostingBookingError, PostingCost,
+    PostingCosts, PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
 };
 
 pub fn book<'a, P, T, I, M>(
@@ -52,7 +52,7 @@ where
         }
 
         let Interpolation { unbooked_postings } =
-            interpolate_from_costed(&cur, costed_postings, tolerance)?;
+            interpolate_from_costed(date, &cur, costed_postings, tolerance)?;
         tracing::debug!("weights {:?}", &unbooked_postings);
 
         let updated_inventory_for_cur = book_augmentations(
@@ -116,11 +116,11 @@ where
                 previous_positions.accumulate(posting.units(), posting.currency(), None, method);
             }
             Some(costs) => {
-                for cost in costs {
+                for (cur, adj) in costs.iter() {
                     previous_positions.accumulate(
-                        posting.units(),
+                        adj.units,
                         posting.currency(),
-                        Some(cost.clone()),
+                        Some(adj.clone()),
                         method,
                     );
                 }
@@ -137,7 +137,7 @@ where
     P: PostingSpec,
 {
     updated_inventory: Inventory<P::Account, P::Date, P::Number, P::Currency, P::Label>,
-    costed_postings: Vec<CostedPosting<P, P::Number, P::Currency>>,
+    costed_postings: Vec<CostedPosting<P>>,
 }
 
 fn book_reductions<'a, 'b, P, T, I, M>(
@@ -202,7 +202,7 @@ where
                                 match (pos.cost.as_ref(), annotated.posting.cost().as_ref()) {
                                     (Some(pos_cost), Some(cost_spec)) => {
                                         cost_matches_spec(pos_cost, cost_spec, date)
-                                            .then_some((i, pos))
+                                            .then_some((i, pos.clone()))
                                     }
                                     _ => None,
                                 }
@@ -226,9 +226,12 @@ where
                                 i_matched,
                                 &matched_pos
                             );
-                            let cost_currency = matched_pos.currency.clone();
-                            let cost_units =
-                                matched_pos.cost.as_ref().unwrap().per_unit * posting_units;
+                            let Position {
+                                currency: matched_currency,
+                                units: matched_units,
+                                cost: matched_cost,
+                            } = matched_pos.clone();
+                            let matched_cost = matched_cost.unwrap();
 
                             let updated_positions = Positions::new(
                                 previous_positions
@@ -253,8 +256,16 @@ where
                             Ok(Booked(BookedAtCostPosting {
                                 posting: annotated.posting,
                                 idx: annotated.idx,
-                                cost_units,
-                                cost_currency,
+                                cost: PostingCosts {
+                                    cost_currency: matched_currency.clone(),
+                                    adjustments: vec![PostingCost {
+                                        date: matched_cost.date,
+                                        units: posting_units,
+                                        per_unit: matched_cost.per_unit,
+                                        label: matched_cost.label,
+                                        merge: matched_cost.merge,
+                                    }],
+                                }, //vec![]_units,
                             }))
                         } else if tolerance
                             .residual(
@@ -282,7 +293,7 @@ where
                                     })
                                     .sum();
 
-                                let matched_positions = matched_positions
+                                let matched_position_indices = matched_positions
                                     .iter()
                                     .map(|(i, _)| *i)
                                     .collect::<HashSet<_>>();
@@ -292,7 +303,9 @@ where
                                         .iter()
                                         .enumerate()
                                         .filter_map(|(i, pos)| {
-                                            matched_positions.contains(&i).then_some(pos.clone())
+                                            matched_position_indices
+                                                .contains(&i)
+                                                .then_some(pos.clone())
                                         })
                                         .collect::<Vec<_>>(),
                                 );
@@ -301,8 +314,23 @@ where
                                 Ok(Booked(BookedAtCostPosting {
                                     posting: annotated.posting,
                                     idx: annotated.idx,
-                                    cost_units,
-                                    cost_currency,
+                                    cost: PostingCosts {
+                                        cost_currency,
+                                        adjustments: matched_positions
+                                            .into_iter()
+                                            .map(|(idx, matched_pos)| {
+                                                let matched_cost =
+                                                    matched_pos.cost.clone().unwrap();
+                                                PostingCost {
+                                                    date: matched_cost.date,
+                                                    units: -matched_pos.units,
+                                                    per_unit: matched_cost.per_unit,
+                                                    label: matched_cost.label,
+                                                    merge: matched_cost.merge,
+                                                }
+                                            })
+                                            .collect::<Vec<_>>(),
+                                    },
                                 }))
                             } else {
                                 Err(BookingError::Posting(
@@ -549,7 +577,7 @@ where
 fn book_augmentations<'a, 'b, P, T, I, M>(
     date: P::Date,
     currency: P::Currency,
-    interpolateds: Vec<InterpolatedPosting<P, P::Number, P::Currency>>,
+    interpolateds: Vec<InterpolatedPosting<P>>,
     tolerance: &T,
     inventory: I,
     method: M,
@@ -574,23 +602,18 @@ where
         };
         // .or_else(|| inventory(account.clone()));
 
-        let posting_cost = posting.cost().map(|cost_spec| {
-            // insist that cosy is fully specified
-            let date = cost_spec.date().unwrap_or(date);
-            let InterpolatedCost { per_unit, currency } = interpolated.cost.unwrap();
-            let label = cost_spec.label();
-            let merge = cost_spec.merge();
-
-            Cost {
-                date,
-                per_unit,
-                currency,
-                label,
-                merge,
+        if let Some(posting_costs) = interpolated.cost.as_ref() {
+            for (currency, posting_cost) in posting_costs.iter() {
+                previous_positions.accumulate(
+                    interpolated.units,
+                    currency.clone(),
+                    Some(posting_cost.clone()),
+                    method,
+                );
             }
-        });
-
-        previous_positions.accumulate(interpolated.units, currency.clone(), posting_cost, method);
+        } else {
+            previous_positions.accumulate(interpolated.units, currency.clone(), None, method);
+        }
     }
     Ok(updated_inventory.into())
 }
@@ -602,19 +625,39 @@ where
     N: Number + Copy + Debug,
     L: Eq + Ord + Clone + Debug,
 {
-    fn accumulate<A, M>(&mut self, units: N, currency: C, cost: Option<Cost<D, N, C, L>>, method: M)
-    where
+    fn accumulate<A, M>(
+        &mut self,
+        units: N,
+        currency: C,
+        posting_cost: Option<PostingCost<D, N, L>>,
+        method: M,
+    ) where
         M: Fn(A) -> Booking + Copy, // 'i for inventory
     {
         use Ordering::*;
 
-        match self.binary_search_by(|position| match (&cost, &position.cost) {
-            (None, None) => Equal,
-            (None, Some(_)) => Less,
-            (Some(_), None) => Greater,
-            (Some(cost0), Some(cost1)) => cost0.cmp(cost1),
-        }) {
-            Ok(i) => {
+        let posting_cost = posting_cost.map(|posting_cost| {
+            let units = posting_cost.units;
+            (
+                Into::<Cost<D, N, C, L>>::into((currency.clone(), posting_cost)),
+                units,
+            )
+        });
+
+        let insertion_idx =
+            self.binary_search_by(|position| match (&posting_cost, &position.cost) {
+                (None, None) => Equal,
+                (None, Some(_)) => Less,
+                (Some(_), None) => Greater,
+                (Some((cost, units)), Some(position_cost)) => cost.cmp(position_cost),
+            });
+        match (insertion_idx, posting_cost) {
+            (Ok(i), None) => {
+                let position = self.get_mut(i).unwrap();
+                tracing::debug!("augmenting position {:?} with {:?}", &position, units,);
+                position.units += units;
+            }
+            (Ok(i), Some((cost, units))) => {
                 let position = self.get_mut(i).unwrap();
                 tracing::debug!(
                     "augmenting position {:?} with {:?} {:?}",
@@ -624,11 +667,20 @@ where
                 );
                 position.units += units;
             }
-            Err(i) => {
+            (Err(i), None) => {
                 let position = Position {
                     units,
                     currency,
-                    cost,
+                    cost: None,
+                };
+                tracing::debug!("inserting new position {:?} at {i}", &position);
+                self.insert(i, position)
+            }
+            (Err(i), Some((cost, units))) => {
+                let position = Position {
+                    units,
+                    currency,
+                    cost: Some(cost),
                 };
                 tracing::debug!("inserting new position {:?} at {i}", &position);
                 self.insert(i, position)

@@ -2,7 +2,7 @@ use hashbrown::HashMap;
 use std::{
     fmt::{Debug, Display},
     hash::Hash,
-    iter::Sum,
+    iter::{repeat, Sum},
     ops::{Add, AddAssign, Deref, Div, Mul, Neg},
 };
 use strum_macros::Display;
@@ -43,7 +43,7 @@ pub trait Posting: Clone {
     fn account(&self) -> Self::Account;
     fn currency(&self) -> Self::Currency;
     fn units(&self) -> Self::Number;
-    fn cost(&self) -> Option<&[Cost<Self::Date, Self::Number, Self::Currency, Self::Label>]>;
+    fn cost(&self) -> Option<PostingCosts<Self::Date, Self::Number, Self::Currency, Self::Label>>;
     fn price(&self) -> Option<Price<Self::Number, Self::Currency>>;
 }
 
@@ -184,6 +184,82 @@ where
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+// Multiple different lots may be reduced by a single post,
+// but only for a single cost currency.
+// This is so that reductions don't violate the categorize by currency buckets.
+pub struct PostingCosts<D, N, C, L>
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone,
+{
+    pub cost_currency: C,
+    pub adjustments: Vec<PostingCost<D, N, L>>,
+}
+
+impl<D, N, C, L> PostingCosts<D, N, C, L>
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone,
+{
+    pub(crate) fn units(&self) -> N
+    where
+        N: Sum,
+    {
+        self.adjustments.iter().map(|c| c.units).sum()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&C, &PostingCost<D, N, L>)> {
+        repeat(&self.cost_currency).zip(self.adjustments.iter())
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct PostingCost<D, N, L>
+where
+    D: Copy,
+    N: Copy,
+    L: Clone,
+{
+    pub date: D,
+    pub units: N,
+    pub per_unit: N,
+    pub label: Option<L>,
+    pub merge: bool,
+}
+
+impl<D, N, C, L> From<(C, PostingCost<D, N, L>)> for Cost<D, N, C, L>
+where
+    D: Copy,
+    N: Copy,
+    C: Clone,
+    L: Clone,
+{
+    fn from(value: (C, PostingCost<D, N, L>)) -> Self {
+        let (
+            currency,
+            PostingCost {
+                date,
+                units: _,
+                per_unit,
+                label,
+                merge,
+            },
+        ) = value;
+        Self {
+            date,
+            per_unit,
+            currency,
+            label,
+            merge,
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Price<N, C>
 where
     N: Copy,
@@ -213,7 +289,7 @@ where
     pub posting: P,
     pub units: N,
     pub currency: C,
-    pub cost: Option<Cost<D, N, C, L>>,
+    pub cost: Option<PostingCosts<D, N, C, L>>,
     pub price: Option<Price<N, C>>,
 }
 
@@ -239,7 +315,7 @@ where
         todo!()
     }
 
-    fn cost(&self) -> Option<&[Cost<P::Date, P::Number, P::Currency, P::Label>]> {
+    fn cost(&self) -> Option<PostingCosts<P::Date, P::Number, P::Currency, P::Label>> {
         todo!()
     }
 

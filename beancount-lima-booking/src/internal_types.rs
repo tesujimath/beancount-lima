@@ -4,7 +4,7 @@
 use hashbrown::{hash_map::Entry, HashMap};
 use std::{fmt::Debug, hash::Hash, ops::Deref};
 
-use super::{Cost, CostSpec, Number, PostingSpec, PriceSpec};
+use super::{Cost, CostSpec, Number, PostingCosts, PostingSpec, PriceSpec};
 
 ///
 /// A list of positions for a currency satisfying these invariants:
@@ -123,6 +123,7 @@ impl<P, C> AnnotatedPosting<P, C>
 where
     C: Clone,
 {
+    // the bucket is the currency used for balancing weights during inference, not the currency booked to
     pub(crate) fn bucket(&self) -> Option<C>
     where
         C: Clone,
@@ -136,19 +137,17 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum CostedPosting<P, N, C>
-where
-    N: Copy,
-    C: Clone,
-{
-    Booked(BookedAtCostPosting<P, N, C>),
-    Unbooked(AnnotatedPosting<P, C>),
-}
-
-impl<P, C> CostedPosting<P, P::Number, C>
+pub(crate) enum CostedPosting<P>
 where
     P: PostingSpec,
-    C: Clone,
+{
+    Booked(BookedAtCostPosting<P>),
+    Unbooked(AnnotatedPosting<P, P::Currency>),
+}
+
+impl<P> CostedPosting<P>
+where
+    P: PostingSpec,
 {
     // determine the weight of a posting
     // https://beancount.github.io/docs/beancount_language_syntax.html#balancing-rule-the-weight-of-postings
@@ -156,7 +155,7 @@ where
         use CostedPosting::*;
 
         match self {
-            Booked(booked) => Some(booked.cost_units),
+            Booked(booked) => Some(booked.cost.units()),
             Unbooked(unbooked) => {
                 let p = &unbooked.posting;
 
@@ -181,27 +180,24 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct BookedAtCostPosting<P, N, C>
+pub(crate) struct BookedAtCostPosting<P>
 where
-    N: Copy,
-    C: Clone,
+    P: PostingSpec,
 {
     pub(crate) posting: P,
     pub(crate) idx: usize,
-    pub(crate) cost_units: N,
-    pub(crate) cost_currency: C,
+    pub(crate) cost: PostingCosts<P::Date, P::Number, P::Currency, P::Label>,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct InterpolatedPosting<P, N, C>
+pub(crate) struct InterpolatedPosting<P>
 where
-    N: Copy,
-    C: Clone,
+    P: PostingSpec,
 {
     pub(crate) posting: P,
-    pub(crate) units: N,
-    pub(crate) currency: C,
-    pub(crate) cost: Option<InterpolatedCost<N, C>>,
+    pub(crate) units: P::Number,
+    pub(crate) currency: P::Currency,
+    pub(crate) cost: Option<PostingCosts<P::Date, P::Number, P::Currency, P::Label>>,
 }
 
 #[derive(Clone, Debug)]

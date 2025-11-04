@@ -4,24 +4,24 @@
 use std::fmt::Debug;
 
 use super::{
-    BookingError, CostSpec, CostedPosting, InterpolatedCost, InterpolatedPosting,
-    PostingBookingError, PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
+    BookingError, CostSpec, CostedPosting, InterpolatedPosting, PostingBookingError, PostingCost,
+    PostingCosts, PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
 };
 
 #[derive(Debug)]
-pub(crate) struct Interpolation<P, N, C>
+pub(crate) struct Interpolation<P>
 where
-    N: Copy,
-    C: Clone,
+    P: PostingSpec,
 {
-    pub(crate) unbooked_postings: Vec<InterpolatedPosting<P, N, C>>,
+    pub(crate) unbooked_postings: Vec<InterpolatedPosting<P>>,
 }
 
 pub(crate) fn interpolate_from_costed<'i, 'b, P, T>(
+    date: P::Date,
     currency: &P::Currency,
-    costeds: Vec<CostedPosting<P, P::Number, P::Currency>>,
+    costeds: Vec<CostedPosting<P>>,
     tolerance: &T,
-) -> Result<Interpolation<P, P::Number, P::Currency>, BookingError>
+) -> Result<Interpolation<P>, BookingError>
 where
     P: PostingSpec + Debug + 'i,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
@@ -69,44 +69,60 @@ where
                         cost: None,
                     }))
                 } else {
-                    match (units(&a.posting, w), a.currency) {
+                    match (units(&a.posting, w), a.currency, a.posting.cost()) {
                         (
                             Some(UnitsAndCostPerUnit {
                                 units,
                                 cost_per_unit,
                             }),
                             Some(currency),
+                            Some(cost),
                         ) => {
-                            if a.posting.cost().is_some() {
-                                Some(Ok(InterpolatedPosting {
-                                    posting: a.posting,
-                                    units,
-                                    currency,
-                                    cost: Some(InterpolatedCost {
-                                        // I don't think these can fail, but let's see during testing:
-                                        per_unit: cost_per_unit.unwrap(),
-                                        currency: a.cost_currency.unwrap(),
-                                    }),
-                                }))
-                            } else {
-                                // price
-                                Some(Ok(InterpolatedPosting {
-                                    posting: a.posting,
-                                    units,
-                                    currency,
-                                    cost: None,
-                                }))
-                            }
+                            Some(Ok(InterpolatedPosting {
+                                posting: a.posting,
+                                units,
+                                currency,
+                                cost: Some(PostingCosts {
+                                    cost_currency: a.cost_currency.unwrap(),
+                                    adjustments: vec![PostingCost {
+                                        date,
+                                        units,
+                                        per_unit: (cost_per_unit.unwrap()), // can't fail, since we have cost
+                                        label: cost.label(),
+                                        merge: cost.merge(),
+                                    }],
+                                    // I don't think these can fail, but let's see during testing:
+                                    // per_unit: cost_per_unit.unwrap(),
+                                    // currency: a.cost_currency.unwrap(),
+                                }),
+                            }))
                         }
-                        (None, Some(_)) => Some(Err(BookingError::Posting(
+                        (
+                            Some(UnitsAndCostPerUnit {
+                                units,
+                                cost_per_unit: _,
+                            }),
+                            Some(currency),
+                            None,
+                        ) => {
+                            // price
+                            Some(Ok(InterpolatedPosting {
+                                posting: a.posting,
+                                units,
+                                currency,
+                                cost: None,
+                            }))
+                        }
+
+                        (None, Some(_), _) => Some(Err(BookingError::Posting(
                             a.idx,
                             PostingBookingError::CannotInferUnits,
                         ))),
-                        (Some(_), None) => Some(Err(BookingError::Posting(
+                        (Some(_), None, _) => Some(Err(BookingError::Posting(
                             a.idx,
                             PostingBookingError::CannotInferCurrency,
                         ))),
-                        (None, None) => Some(Err(BookingError::Posting(
+                        (None, None, _) => Some(Err(BookingError::Posting(
                             a.idx,
                             PostingBookingError::CannotInferAnything,
                         ))),

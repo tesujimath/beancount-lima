@@ -15,5 +15,5 @@ pub(crate) use internal_types::*;
 mod public_types;
 pub use public_types::{
     Booking, Bookings, Cost, CostSpec, Inventory, Number, Position, Positions, Posting,
-    PostingSpec, PriceSpec, Sign, Tolerance,
+    PostingCost, PostingCosts, PostingSpec, PriceSpec, Sign, Tolerance,
 };
