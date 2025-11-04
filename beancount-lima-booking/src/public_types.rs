@@ -287,6 +287,7 @@ where
     L: Clone,
 {
     pub posting: P,
+    pub(crate) idx: usize,
     pub units: N,
     pub currency: C,
     pub cost: Option<PostingCosts<D, N, C, L>>,
@@ -304,23 +305,23 @@ where
     type Label = P::Label;
 
     fn account(&self) -> Self::Account {
-        todo!()
+        self.posting.account()
     }
 
     fn currency(&self) -> Self::Currency {
-        todo!()
+        self.currency.clone()
     }
 
     fn units(&self) -> Self::Number {
-        todo!()
+        self.units
     }
 
     fn cost(&self) -> Option<PostingCosts<P::Date, P::Number, P::Currency, P::Label>> {
-        todo!()
+        self.cost.clone()
     }
 
     fn price(&self) -> Option<Price<Self::Number, Self::Currency>> {
-        todo!()
+        self.price.clone()
     }
 }
 

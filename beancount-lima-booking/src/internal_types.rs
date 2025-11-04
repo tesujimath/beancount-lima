@@ -4,7 +4,7 @@
 use hashbrown::{hash_map::Entry, HashMap};
 use std::{fmt::Debug, hash::Hash, ops::Deref};
 
-use super::{Cost, CostSpec, Number, PostingCosts, PostingSpec, PriceSpec};
+use super::{Cost, CostSpec, Interpolated, Number, PostingSpec, PriceSpec};
 
 ///
 /// A list of positions for a currency satisfying these invariants:
@@ -137,25 +137,25 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) enum CostedPosting<P>
+pub(crate) enum BookedOrUnbookedPosting<P>
 where
     P: PostingSpec,
 {
-    Booked(BookedAtCostPosting<P>),
+    Booked(Interpolated<P, P::Date, P::Number, P::Currency, P::Label>),
     Unbooked(AnnotatedPosting<P, P::Currency>),
 }
 
-impl<P> CostedPosting<P>
+impl<P> BookedOrUnbookedPosting<P>
 where
     P: PostingSpec,
 {
     // determine the weight of a posting
     // https://beancount.github.io/docs/beancount_language_syntax.html#balancing-rule-the-weight-of-postings
     pub(crate) fn weight(&self) -> Option<P::Number> {
-        use CostedPosting::*;
+        use BookedOrUnbookedPosting::*;
 
         match self {
-            Booked(booked) => Some(booked.cost.units()),
+            Booked(booked) => Some(booked.units),
             Unbooked(unbooked) => {
                 let p = &unbooked.posting;
 
@@ -177,35 +177,4 @@ where
             }
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct BookedAtCostPosting<P>
-where
-    P: PostingSpec,
-{
-    pub(crate) posting: P,
-    pub(crate) idx: usize,
-    pub(crate) cost: PostingCosts<P::Date, P::Number, P::Currency, P::Label>,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct InterpolatedPosting<P>
-where
-    P: PostingSpec,
-{
-    pub(crate) posting: P,
-    pub(crate) units: P::Number,
-    pub(crate) currency: P::Currency,
-    pub(crate) cost: Option<PostingCosts<P::Date, P::Number, P::Currency, P::Label>>,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct InterpolatedCost<N, C>
-where
-    N: Copy,
-    C: Clone,
-{
-    pub(crate) per_unit: N,
-    pub(crate) currency: C,
 }

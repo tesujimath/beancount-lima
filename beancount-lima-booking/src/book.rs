@@ -5,10 +5,10 @@ use hashbrown::{hash_map::Entry, HashMap, HashSet};
 use std::{cmp::Ordering, fmt::Debug, hash::Hash, iter::once};
 
 use super::{
-    interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError,
-    Bookings, Cost, CostSpec, CostedPosting, HashMapOfVec, InterpolatedPosting, Interpolation,
-    Inventory, Number, Position, Positions, Posting, PostingBookingError, PostingCost,
-    PostingCosts, PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
+    interpolate_from_costed, AnnotatedPosting, BookedOrUnbookedPosting, Booking, BookingError,
+    Bookings, Cost, CostSpec, HashMapOfVec, Interpolated, Interpolation, Inventory, Number,
+    Position, Positions, Posting, PostingBookingError, PostingCost, PostingCosts, PostingSpec,
+    PriceSpec, Tolerance, TransactionBookingError,
 };
 
 pub fn book<'a, P, T, I, M>(
@@ -32,7 +32,7 @@ where
     for (cur, annotated_postings) in currency_groups {
         let Reductions {
             updated_inventory: updated_inventory_for_cur,
-            costed_postings,
+            postings: costed_postings,
         } = book_reductions(
             date,
             cur.clone(),
@@ -137,7 +137,7 @@ where
     P: PostingSpec,
 {
     updated_inventory: Inventory<P::Account, P::Date, P::Number, P::Currency, P::Label>,
-    costed_postings: Vec<CostedPosting<P>>,
+    postings: Vec<BookedOrUnbookedPosting<P>>,
 }
 
 fn book_reductions<'a, 'b, P, T, I, M>(
@@ -154,7 +154,7 @@ where
     I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
-    use CostedPosting::*;
+    use BookedOrUnbookedPosting::*;
 
     let mut updated_inventory = HashMap::default();
 
@@ -253,10 +253,12 @@ where
                             );
                             updated_inventory.insert(account.clone(), updated_positions);
 
-                            Ok(Booked(BookedAtCostPosting {
+                            Ok(Booked(Interpolated {
                                 posting: annotated.posting,
                                 idx: annotated.idx,
-                                cost: PostingCosts {
+                                units: posting_units,
+                                currency: currency.clone(),
+                                cost: Some(PostingCosts {
                                     cost_currency: matched_currency.clone(),
                                     adjustments: vec![PostingCost {
                                         date: matched_cost.date,
@@ -265,7 +267,9 @@ where
                                         label: matched_cost.label,
                                         merge: matched_cost.merge,
                                     }],
-                                }, //vec![]_units,
+                                }),
+                                // TODO price
+                                price: None,
                             }))
                         } else if tolerance
                             .residual(
@@ -311,10 +315,12 @@ where
                                 );
                                 updated_inventory.insert(account.clone(), updated_positions);
 
-                                Ok(Booked(BookedAtCostPosting {
+                                Ok(Booked(Interpolated {
                                     posting: annotated.posting,
                                     idx: annotated.idx,
-                                    cost: PostingCosts {
+                                    units: posting_units,
+                                    currency: currency.clone(),
+                                    cost: Some(PostingCosts {
                                         cost_currency,
                                         adjustments: matched_positions
                                             .into_iter()
@@ -330,7 +336,9 @@ where
                                                 }
                                             })
                                             .collect::<Vec<_>>(),
-                                    },
+                                    }),
+                                    // TODO price
+                                    price: None,
                                 }))
                             } else {
                                 Err(BookingError::Posting(
@@ -355,7 +363,7 @@ where
 
     Ok(Reductions {
         updated_inventory: updated_inventory.into(),
-        costed_postings,
+        postings: costed_postings,
     })
 }
 
@@ -577,7 +585,7 @@ where
 fn book_augmentations<'a, 'b, P, T, I, M>(
     date: P::Date,
     currency: P::Currency,
-    interpolateds: Vec<InterpolatedPosting<P>>,
+    interpolateds: Vec<Interpolated<P, P::Date, P::Number, P::Currency, P::Label>>,
     tolerance: &T,
     inventory: I,
     method: M,
