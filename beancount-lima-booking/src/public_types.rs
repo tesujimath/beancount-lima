@@ -324,6 +324,21 @@ where
     pub(crate) fn insert(&mut self, i: usize, element: Position<D, N, C, L>) {
         self.0.insert(i, element)
     }
+
+    pub(crate) fn units(&self) -> HashMap<C, N> {
+        let mut units_by_currency = HashMap::default();
+        for Position {
+            currency, units, ..
+        } in &self.0
+        {
+            if units_by_currency.contains_key(currency) {
+                *units_by_currency.get_mut(currency).unwrap() += *units;
+            } else {
+                units_by_currency.insert(currency.clone(), *units);
+            }
+        }
+        units_by_currency
+    }
 }
 
 impl<D, N, C, L> Default for Positions<D, N, C, L>
