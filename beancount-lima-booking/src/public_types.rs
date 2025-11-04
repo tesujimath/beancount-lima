@@ -43,9 +43,7 @@ pub trait Posting: Clone {
     fn account(&self) -> Self::Account;
     fn currency(&self) -> Self::Currency;
     fn units(&self) -> Self::Number;
-    fn cost(
-        &self,
-    ) -> Option<impl Iterator<Item = Cost<Self::Date, Self::Number, Self::Currency, Self::Label>>>;
+    fn cost(&self) -> Option<&[Cost<Self::Date, Self::Number, Self::Currency, Self::Label>]>;
     fn price(&self) -> Option<Price<Self::Number, Self::Currency>>;
 }
 
@@ -219,6 +217,37 @@ where
     pub price: Option<Price<N, C>>,
 }
 
+impl<P> Posting for Interpolated<P, P::Date, P::Number, P::Currency, P::Label>
+where
+    P: PostingSpec,
+{
+    type Date = P::Date;
+    type Account = P::Account;
+    type Currency = P::Currency;
+    type Number = P::Number;
+    type Label = P::Label;
+
+    fn account(&self) -> Self::Account {
+        todo!()
+    }
+
+    fn currency(&self) -> Self::Currency {
+        todo!()
+    }
+
+    fn units(&self) -> Self::Number {
+        todo!()
+    }
+
+    fn cost(&self) -> Option<&[Cost<P::Date, P::Number, P::Currency, P::Label>]> {
+        todo!()
+    }
+
+    fn price(&self) -> Option<Price<Self::Number, Self::Currency>> {
+        todo!()
+    }
+}
+
 pub trait Tolerance {
     type Currency;
     type Number;
@@ -269,6 +298,60 @@ pub enum Booking {
     Hifo,
 }
 
+#[derive(Clone, Debug)]
+pub struct Positions<D, N, C, L>(Vec<Position<D, N, C, L>>)
+where
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug;
+
+impl<D, N, C, L> Positions<D, N, C, L>
+where
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
+{
+    pub(crate) fn new(positions: Vec<Position<D, N, C, L>>) -> Self {
+        Self(positions)
+    }
+
+    pub(crate) fn get_mut(&mut self, i: usize) -> Option<&mut Position<D, N, C, L>> {
+        self.0.get_mut(i)
+    }
+
+    pub(crate) fn insert(&mut self, i: usize, element: Position<D, N, C, L>) {
+        self.0.insert(i, element)
+    }
+}
+
+impl<D, N, C, L> Default for Positions<D, N, C, L>
+where
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
+{
+    fn default() -> Self {
+        Self(Default::default())
+    }
+}
+
+impl<D, N, C, L> Deref for Positions<D, N, C, L>
+where
+    D: Eq + Ord + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    N: Number + Copy + Debug,
+    L: Eq + Ord + Clone + Debug,
+{
+    type Target = Vec<Position<D, N, C, L>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Debug)]
 pub struct Inventory<A, D, N, C, L>
 where
@@ -278,7 +361,7 @@ where
     N: Number + Copy + Debug,
     L: Eq + Ord + Clone + Debug,
 {
-    value: HashMap<A, Vec<Position<D, N, C, L>>>,
+    value: HashMap<A, Positions<D, N, C, L>>,
 }
 
 impl<A, D, N, C, L> Default for Inventory<A, D, N, C, L>
@@ -296,7 +379,7 @@ where
     }
 }
 
-impl<A, D, N, C, L> From<HashMap<A, Vec<Position<D, N, C, L>>>> for Inventory<A, D, N, C, L>
+impl<A, D, N, C, L> From<HashMap<A, Positions<D, N, C, L>>> for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
@@ -304,7 +387,7 @@ where
     N: Number + Copy + Debug,
     L: Eq + Ord + Clone + Debug,
 {
-    fn from(value: HashMap<A, Vec<Position<D, N, C, L>>>) -> Self {
+    fn from(value: HashMap<A, Positions<D, N, C, L>>) -> Self {
         Self { value }
     }
 }
@@ -317,12 +400,13 @@ where
     N: Number + Copy + Debug,
     L: Eq + Ord + Clone + Debug,
 {
-    type Target = HashMap<A, Vec<Position<D, N, C, L>>>;
+    type Target = HashMap<A, Positions<D, N, C, L>>;
 
     fn deref(&self) -> &Self::Target {
         &self.value
     }
 }
+
 impl<A, D, N, C, L> IntoIterator for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
@@ -331,10 +415,10 @@ where
     N: Number + Copy + Debug,
     L: Eq + Ord + Clone + Debug,
 {
-    type Item = (A, Vec<Position<D, N, C, L>>);
-    type IntoIter = hashbrown::hash_map::IntoIter<A, Vec<Position<D, N, C, L>>>;
+    type Item = (A, Positions<D, N, C, L>);
+    type IntoIter = hashbrown::hash_map::IntoIter<A, Positions<D, N, C, L>>;
 
-    fn into_iter(self) -> hashbrown::hash_map::IntoIter<A, Vec<Position<D, N, C, L>>> {
+    fn into_iter(self) -> hashbrown::hash_map::IntoIter<A, Positions<D, N, C, L>> {
         self.value.into_iter()
     }
 }
@@ -350,8 +434,8 @@ where
     pub(crate) fn insert(
         &mut self,
         k: A,
-        v: Vec<Position<D, N, C, L>>,
-    ) -> Option<Vec<Position<D, N, C, L>>> {
+        v: Positions<D, N, C, L>,
+    ) -> Option<Positions<D, N, C, L>> {
         self.value.insert(k, v)
     }
 }

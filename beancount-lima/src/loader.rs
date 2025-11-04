@@ -1,6 +1,7 @@
 // TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
 
+use beancount_lima_booking::Bookings;
 use beancount_parser_lima::{self as parser, Span, Spanned};
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
@@ -143,6 +144,15 @@ impl<'a, T> Loader<'a, T> {
     where
         T: beancount_lima_booking::Tolerance<Currency = &'a str, Number = Decimal>,
     {
+        let description = transaction.payee().map_or_else(
+            || {
+                transaction
+                    .narration()
+                    .map_or("post", |narration| narration.item())
+            },
+            |payee| payee.item(),
+        );
+
         match beancount_lima_booking::book(
             date,
             transaction.postings(),
@@ -156,8 +166,26 @@ impl<'a, T> Loader<'a, T> {
                     .into()
             },
         ) {
-            Ok(bookings) => {
-                tracing::debug!("booked {:?}", &bookings);
+            Ok(Bookings {
+                interpolated_postings,
+                updated_inventory,
+            }) => {
+                tracing::debug!(
+                    "booking {:?} {:?} for transaction {:?}",
+                    &interpolated_postings,
+                    &updated_inventory,
+                    transaction
+                );
+
+                if let Err(e) = self.book(
+                    &element,
+                    date,
+                    updated_inventory,
+                    interpolated_postings.into_iter(),
+                    description,
+                ) {
+                    self.errors.push(e);
+                }
             }
             Err(e) => {
                 use beancount_lima_booking::BookingError::*;
@@ -188,15 +216,6 @@ impl<'a, T> Loader<'a, T> {
                         Price(number, currency) => (number, currency),
                     };
 
-                    let description = transaction.payee().map_or_else(
-                        || {
-                            transaction
-                                .narration()
-                                .map_or("post", |narration| narration.item())
-                        },
-                        |payee| payee.item(),
-                    );
-
                     match self.post(
                         Some(posting),
                         into_spanned_element(posting),
@@ -214,6 +233,8 @@ impl<'a, T> Loader<'a, T> {
                             self.errors.push(e);
                         }
                     }
+
+                    self.tally_currency_usage(weight.amount_for_post().currency);
                 }
 
                 Ok(DirectiveVariant::Transaction(Transaction { postings }))
@@ -222,6 +243,94 @@ impl<'a, T> Loader<'a, T> {
                 self.errors.push(e);
 
                 Err(())
+            }
+        }
+    }
+
+    fn book<P>(
+        &mut self,
+        element: &parser::Spanned<Element>,
+        date: Date,
+        updated_inventory: beancount_lima_booking::Inventory<
+            &'a str,
+            Date,
+            Decimal,
+            &'a str,
+            &'a str,
+        >,
+        postings: impl Iterator<Item = P>,
+        description: &'a str,
+    ) -> Result<(), parser::AnnotatedError>
+    where
+        P: beancount_lima_booking::Posting,
+    {
+        use hashbrown::hash_map::Entry::*;
+
+        for (account_name, updated_positions) in updated_inventory {
+            let account = self.validate_account(element, account_name)?;
+
+            account.positions = updated_positions;
+
+            // account.post(posting.clone(), Some(amount.currency), None);
+
+            // TODO
+            // account.balance_diagnostics.push(BalanceDiagnostic {
+            //     date,
+            //     description: Some(description),
+            //     amount: Some(amount.clone()),
+            //     balance,
+            // });
+        }
+
+        Ok(())
+    }
+
+    fn validate_account(
+        &mut self,
+        element: &parser::Spanned<Element>,
+        account_name: &'a str,
+    ) -> Result<&mut AccountBuilder<'a>, parser::AnnotatedError> {
+        if self.open_accounts.contains_key(account_name) {
+            Ok(self.accounts.get_mut(account_name).unwrap())
+        } else if let Some(closed) = self.closed_accounts.get(account_name) {
+            Err(element
+                .error_with_contexts("account was closed", vec![("close".to_string(), *closed)])
+                .into())
+        } else {
+            Err(element.error("account not open").into())
+        }
+    }
+
+    fn validate_account_and_currency(
+        &mut self,
+        element: &parser::Spanned<Element>,
+        account_name: &'a str,
+        currency: &'a parser::Currency<'a>,
+    ) -> Result<&mut AccountBuilder<'a>, parser::AnnotatedError> {
+        let account = self.validate_account(element, account_name)?;
+
+        if account.is_currency_valid(currency) {
+            Ok(account)
+        } else {
+            Err(element
+                .error_with_contexts(
+                    "invalid currency for account",
+                    vec![("open".to_string(), account.opened)],
+                )
+                .into())
+        }
+    }
+
+    fn tally_currency_usage(&mut self, currency: &'a parser::Currency<'a>) {
+        use hashbrown::hash_map::Entry::*;
+
+        match self.currency_usage.entry(currency) {
+            Occupied(mut usage) => {
+                let usage = usage.get_mut();
+                *usage += 1;
+            }
+            Vacant(usage) => {
+                usage.insert(1);
             }
         }
     }
@@ -247,91 +356,69 @@ impl<'a, T> Loader<'a, T> {
             weight,
             cost_spec
         );
-        if self.open_accounts.contains_key(account_name) {
-            let account = self.accounts.get_mut(account_name).unwrap();
-            let amount = weight.amount_for_post();
+        use hashbrown::hash_map::Entry::*;
 
-            use hashbrown::hash_map::Entry::*;
+        let account = self.validate_account_and_currency(
+            &element,
+            account_name,
+            weight.amount_for_post().currency,
+        )?;
 
-            if account.is_currency_valid(amount.currency) {
-                let booked =
-                    match account.inventory.entry(amount.currency) {
-                        Occupied(mut position) => {
-                            let value = position.get_mut();
-                            let booked =
-                                value.book(date, amount.number, cost_spec, account.booking);
+        let amount = weight.amount_for_post();
 
-                            if value.is_empty() {
-                                position.remove_entry();
-                            }
+        let booked = match account.inventory.entry(amount.currency) {
+            Occupied(mut position) => {
+                let value = position.get_mut();
+                let booked = value.book(date, amount.number, cost_spec, account.booking);
 
-                            booked
-                        }
-
-                        Vacant(position) => position
-                            .insert(CurrencyPositionsBuilder::default())
-                            .book(date, amount.number, cost_spec, account.booking),
-                    }
-                    .map_err(|message| element.error(message))?;
-
-                // count currency usage
-                match self.currency_usage.entry(amount.currency) {
-                    Occupied(mut usage) => {
-                        let usage = usage.get_mut();
-                        *usage += 1;
-                    }
-                    Vacant(usage) => {
-                        usage.insert(1);
-                    }
+                if value.is_empty() {
+                    position.remove_entry();
                 }
 
-                // collate balance from inventory across all currencies, sorted so deterministic
-                let mut currencies = account.inventory.keys().copied().collect::<Vec<_>>();
-                currencies.sort();
-                let balance = currencies
-                    .into_iter()
-                    .map(|cur| Amount {
-                        number: account.inventory.get(cur).unwrap().units(),
-                        currency: amount.currency,
-                    })
-                    .collect::<Vec<Amount>>();
-
-                let posting = Posting {
-                    parsed,
-                    flag,
-                    account: account_name,
-                    amount: amount.number,
-                    currency: amount.currency,
-                    cost: None,  // TODO cost
-                    price: None, // TODO price
-                }; // ::new(account_name, amount.clone(), flag, cost);
-                   // TODO pass through units and cost currency from CurrenciedPosting, also should not be optional?
-                account.post(posting.clone(), Some(amount.currency), None);
-
-                account.balance_diagnostics.push(BalanceDiagnostic {
-                    date,
-                    description: Some(description),
-                    amount: Some(amount.clone()),
-                    balance,
-                });
-
-                Ok(posting)
-            // TODO cost, price, flag, metadata
-            } else {
-                Err(element
-                    .error_with_contexts(
-                        "invalid currency for account",
-                        vec![("open".to_string(), account.opened)],
-                    )
-                    .into())
+                booked
             }
-        } else if let Some(closed) = self.closed_accounts.get(account_name) {
-            Err(element
-                .error_with_contexts("account was closed", vec![("close".to_string(), *closed)])
-                .into())
-        } else {
-            Err(element.error("account not open").into())
+
+            Vacant(position) => position.insert(CurrencyPositionsBuilder::default()).book(
+                date,
+                amount.number,
+                cost_spec,
+                account.booking,
+            ),
         }
+        .map_err(|message| element.error(message))?;
+
+        // collate balance from inventory across all currencies, sorted so deterministic
+        let mut currencies = account.inventory.keys().copied().collect::<Vec<_>>();
+        currencies.sort();
+        let balance = currencies
+            .into_iter()
+            .map(|cur| Amount {
+                number: account.inventory.get(cur).unwrap().units(),
+                currency: amount.currency,
+            })
+            .collect::<Vec<Amount>>();
+
+        let posting = Posting {
+            parsed,
+            flag,
+            account: account_name,
+            units: amount.number,
+            currency: amount.currency,
+            // cost: None,  // TODO cost
+            // price: None, // TODO price
+        }; // ::new(account_name, amount.clone(), flag, cost);
+           // TODO pass through units and cost currency from CurrenciedPosting, also should not be optional?
+        account.post(posting.clone(), Some(amount.currency), None);
+
+        account.balance_diagnostics.push(BalanceDiagnostic {
+            date,
+            description: Some(description),
+            amount: Some(amount.clone()),
+            balance,
+        });
+
+        Ok(posting)
+        // TODO cost, price, flag, metadata
     }
 
     // base account is known
@@ -768,7 +855,7 @@ struct AccountBuilder<'a> {
     cost_currencies: HashSet<&'a parser::Currency<'a>>,
     inventory: Inventory<'a>,
     // TODO replace all use of inventory with positions
-    positions: Vec<beancount_lima_booking::Position<Date, Decimal, &'a str, &'a str>>,
+    positions: beancount_lima_booking::Positions<Date, Decimal, &'a str, &'a str>,
     opened: Span,
     // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
@@ -788,7 +875,7 @@ impl<'a> AccountBuilder<'a> {
             units_currencies: HashSet::default(),
             cost_currencies: HashSet::default(),
             inventory: Inventory::default(),
-            positions: Vec::default(),
+            positions: beancount_lima_booking::Positions::default(),
             opened,
             postings: Vec::default(),
             pad_idx: None,

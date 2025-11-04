@@ -40,10 +40,11 @@ pub(crate) struct Posting<'a> {
     pub(crate) parsed: Option<&'a parser::Spanned<parser::Posting<'a>>>,
     pub(crate) flag: Option<parser::Flag>,
     pub(crate) account: &'a str,
-    pub(crate) amount: Decimal,
+    pub(crate) units: Decimal,
     pub(crate) currency: &'a parser::Currency<'a>,
-    pub(crate) cost: Option<Cost<'a>>,
-    pub(crate) price: Option<Price<'a>>,
+    // TODO cost/price
+    // pub(crate) cost: Option<Cost<'a>>,
+    // pub(crate) price: Option<Price<'a>>,
     // pub(crate) metadata: Metadata<'a>,
 }
 

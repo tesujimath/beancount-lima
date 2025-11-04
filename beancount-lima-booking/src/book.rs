@@ -7,8 +7,8 @@ use std::{cmp::Ordering, fmt::Debug, hash::Hash, iter::once};
 use super::{
     interpolate_from_costed, AnnotatedPosting, BookedAtCostPosting, Booking, BookingError,
     Bookings, Cost, CostSpec, CostedPosting, HashMapOfVec, InterpolatedCost, InterpolatedPosting,
-    Interpolation, Inventory, Number, Position, PostingBookingError, PostingSpec, PriceSpec,
-    Tolerance, TransactionBookingError,
+    Interpolation, Inventory, Number, Position, Positions, Posting, PostingBookingError,
+    PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
 };
 
 pub fn book<'a, P, T, I, M>(
@@ -21,8 +21,7 @@ pub fn book<'a, P, T, I, M>(
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
-        + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let postings = postings.collect::<Vec<_>>();
@@ -87,6 +86,51 @@ where
     })
 }
 
+/// book without the need for interpolation
+pub fn accumulate<'a, P, I, M>(
+    date: P::Date,
+    postings: impl Iterator<Item = P>,
+    inventory: I,
+    method: M,
+) -> Result<Inventory<P::Account, P::Date, P::Number, P::Currency, P::Label>, BookingError>
+where
+    P: Posting + Debug + 'a,
+    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
+    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+{
+    let mut updated_inventory = HashMap::default();
+
+    for posting in postings {
+        use Entry::*;
+
+        let account = posting.account();
+
+        let previous_positions = match updated_inventory.entry(account.clone()) {
+            Occupied(entry) => entry.into_mut(),
+            Vacant(entry) => entry.insert(inventory(account).cloned().unwrap_or_default()),
+        };
+        // .or_else(|| inventory(account.clone()));
+
+        match posting.cost() {
+            None => {
+                previous_positions.accumulate(posting.units(), posting.currency(), None, method);
+            }
+            Some(costs) => {
+                for cost in costs {
+                    previous_positions.accumulate(
+                        posting.units(),
+                        posting.currency(),
+                        Some(cost.clone()),
+                        method,
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(updated_inventory.into())
+}
+
 #[derive(Debug)]
 struct Reductions<P>
 where
@@ -107,8 +151,7 @@ fn book_reductions<'a, 'b, P, T, I, M>(
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
-        + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     use CostedPosting::*;
@@ -187,17 +230,19 @@ where
                             let cost_units =
                                 matched_pos.cost.as_ref().unwrap().per_unit * posting_units;
 
-                            let updated_positions = previous_positions
-                                .iter()
-                                .enumerate()
-                                .map(|(i, pos)| {
-                                    if i == i_matched {
-                                        pos.with_accumulated(posting_units)
-                                    } else {
-                                        pos.clone()
-                                    }
-                                })
-                                .collect::<Vec<_>>();
+                            let updated_positions = Positions::new(
+                                previous_positions
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, pos)| {
+                                        if i == i_matched {
+                                            pos.with_accumulated(posting_units)
+                                        } else {
+                                            pos.clone()
+                                        }
+                                    })
+                                    .collect::<Vec<_>>(),
+                            );
                             tracing::debug!(
                                 "updated positions for {:?}: {:?}",
                                 &account,
@@ -242,13 +287,15 @@ where
                                     .map(|(i, _)| *i)
                                     .collect::<HashSet<_>>();
 
-                                let updated_positions = previous_positions
-                                    .iter()
-                                    .enumerate()
-                                    .filter_map(|(i, pos)| {
-                                        matched_positions.contains(&i).then_some(pos.clone())
-                                    })
-                                    .collect::<Vec<_>>();
+                                let updated_positions = Positions::new(
+                                    previous_positions
+                                        .iter()
+                                        .enumerate()
+                                        .filter_map(|(i, pos)| {
+                                            matched_positions.contains(&i).then_some(pos.clone())
+                                        })
+                                        .collect::<Vec<_>>(),
+                                );
                                 updated_inventory.insert(account.clone(), updated_positions);
 
                                 Ok(Booked(BookedAtCostPosting {
@@ -291,8 +338,7 @@ fn categorize_by_currency<'a, 'b, P, I>(
 ) -> Result<HashMapOfVec<P::Currency, AnnotatedPosting<P, P::Currency>>, BookingError>
 where
     P: PostingSpec,
-    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
-        + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
     P::Date: 'a,
     P::Number: 'a,
     P::Currency: 'a,
@@ -476,7 +522,7 @@ where
     C: Eq + Hash + Ord + Clone + Debug + 'i,
     N: Number + Copy + Debug + 'i,
     L: Eq + Ord + Clone + Debug + 'i,
-    I: Fn(A) -> Option<&'i Vec<Position<D, N, C, L>>> + Copy, // 'i for inventory
+    I: Fn(A) -> Option<&'i Positions<D, N, C, L>> + Copy, // 'i for inventory
 {
     account_currency.get(&account).cloned().unwrap_or_else(|| {
         let currency = if let Some(positions) = inventory(account.clone()) {
@@ -511,8 +557,7 @@ fn book_augmentations<'a, 'b, P, T, I, M>(
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'a Vec<Position<P::Date, P::Number, P::Currency, P::Label>>>
-        + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
 {
     let mut updated_inventory = HashMap::default();
@@ -545,53 +590,49 @@ where
             }
         });
 
-        augment_positions(
-            interpolated.units,
-            currency.clone(),
-            posting_cost,
-            previous_positions,
-        );
+        previous_positions.accumulate(interpolated.units, currency.clone(), posting_cost, method);
     }
     Ok(updated_inventory.into())
 }
 
-fn augment_positions<D, N, C, L>(
-    units: N,
-    currency: C,
-    cost: Option<Cost<D, N, C, L>>,
-    positions: &mut Vec<Position<D, N, C, L>>,
-) where
+impl<D, N, C, L> Positions<D, N, C, L>
+where
     D: Eq + Ord + Copy + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
     L: Eq + Ord + Clone + Debug,
 {
-    use Ordering::*;
+    fn accumulate<A, M>(&mut self, units: N, currency: C, cost: Option<Cost<D, N, C, L>>, method: M)
+    where
+        M: Fn(A) -> Booking + Copy, // 'i for inventory
+    {
+        use Ordering::*;
 
-    match positions.binary_search_by(|position| match (&cost, &position.cost) {
-        (None, None) => Equal,
-        (None, Some(_)) => Less,
-        (Some(_), None) => Greater,
-        (Some(cost0), Some(cost1)) => cost0.cmp(cost1),
-    }) {
-        Ok(i) => {
-            let position = &mut positions[i];
-            tracing::debug!(
-                "augmenting position {:?} with {:?} {:?}",
-                &position,
-                units,
-                &cost
-            );
-            position.units += units;
-        }
-        Err(i) => {
-            let position = Position {
-                units,
-                currency,
-                cost,
-            };
-            tracing::debug!("inserting new position {:?} at {i}", &position);
-            positions.insert(i, position)
+        match self.binary_search_by(|position| match (&cost, &position.cost) {
+            (None, None) => Equal,
+            (None, Some(_)) => Less,
+            (Some(_), None) => Greater,
+            (Some(cost0), Some(cost1)) => cost0.cmp(cost1),
+        }) {
+            Ok(i) => {
+                let position = self.get_mut(i).unwrap();
+                tracing::debug!(
+                    "augmenting position {:?} with {:?} {:?}",
+                    &position,
+                    units,
+                    &cost
+                );
+                position.units += units;
+            }
+            Err(i) => {
+                let position = Position {
+                    units,
+                    currency,
+                    cost,
+                };
+                tracing::debug!("inserting new position {:?} at {i}", &position);
+                self.insert(i, position)
+            }
         }
     }
 }

@@ -180,9 +180,10 @@ impl From<loader::Posting<'_>> for prism::Posting {
     fn from(value: loader::Posting<'_>) -> Self {
         prism::Posting::new(
             value.account,
-            (value.amount, value.currency.to_string()).into(),
+            (value.units, value.currency.to_string()).into(),
             value.flag,
-            value.cost.map(Into::<prism::Cost>::into),
+            // TODO Cost
+            None, // value.cost.map(Into::<prism::Cost>::into),
         )
     }
 }
