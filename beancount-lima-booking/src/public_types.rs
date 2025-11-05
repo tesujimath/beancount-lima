@@ -379,15 +379,15 @@ pub enum Booking {
 pub struct Positions<D, N, C, L>(Vec<Position<D, N, C, L>>)
 where
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug;
 
 impl<D, N, C, L> Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     pub(crate) fn new(positions: Vec<Position<D, N, C, L>>) -> Self {
@@ -421,8 +421,8 @@ where
 impl<D, N, C, L> Default for Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     fn default() -> Self {
@@ -433,8 +433,8 @@ where
 impl<D, N, C, L> Deref for Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     type Target = Vec<Position<D, N, C, L>>;
@@ -449,8 +449,8 @@ pub struct Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     value: HashMap<A, Positions<D, N, C, L>>,
@@ -460,8 +460,8 @@ impl<A, D, N, C, L> Default for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     fn default() -> Self {
@@ -475,8 +475,8 @@ impl<A, D, N, C, L> From<HashMap<A, Positions<D, N, C, L>>> for Inventory<A, D, 
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     fn from(value: HashMap<A, Positions<D, N, C, L>>) -> Self {
@@ -488,8 +488,8 @@ impl<A, D, N, C, L> Deref for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     type Target = HashMap<A, Positions<D, N, C, L>>;
@@ -503,8 +503,8 @@ impl<A, D, N, C, L> IntoIterator for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     type Item = (A, Positions<D, N, C, L>);
@@ -519,8 +519,8 @@ impl<A, D, N, C, L> Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
     N: Number + Copy + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     pub(crate) fn insert(

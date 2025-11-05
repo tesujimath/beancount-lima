@@ -6,7 +6,7 @@ use time::Date;
 impl<'a> PostingSpec for &'a parser::Posting<'a> {
     type Date = time::Date;
     type Account = &'a str;
-    type Currency = &'a str;
+    type Currency = parser::Currency<'a>;
     type Number = Decimal;
     type CostSpec = &'a parser::CostSpec<'a>;
     type PriceSpec = &'a parser::PriceSpec<'a>;
@@ -16,8 +16,8 @@ impl<'a> PostingSpec for &'a parser::Posting<'a> {
         parser::Posting::account(self).item().as_ref()
     }
 
-    fn currency(&self) -> Option<&'a str> {
-        parser::Posting::currency(self).map(|cur| cur.item().as_ref())
+    fn currency(&self) -> Option<parser::Currency<'a>> {
+        parser::Posting::currency(self).map(|cur| *cur.item())
     }
 
     fn units(&self) -> Option<Decimal> {
@@ -37,12 +37,12 @@ impl<'a> PostingSpec for &'a parser::Posting<'a> {
 
 impl<'a> CostSpec for &'a parser::CostSpec<'a> {
     type Date = time::Date;
-    type Currency = &'a str;
+    type Currency = parser::Currency<'a>;
     type Number = Decimal;
     type Label = &'a str;
 
-    fn currency(&self) -> Option<&'a str> {
-        parser::CostSpec::currency(self).map(|currency| currency.item().as_ref())
+    fn currency(&self) -> Option<parser::Currency<'a>> {
+        parser::CostSpec::currency(self).map(|currency| *currency.item())
     }
 
     fn per_unit(&self) -> Option<Decimal> {
@@ -67,15 +67,15 @@ impl<'a> CostSpec for &'a parser::CostSpec<'a> {
 }
 
 impl<'a> PriceSpec for &'a parser::PriceSpec<'a> {
-    type Currency = &'a str;
+    type Currency = parser::Currency<'a>;
     type Number = Decimal;
 
-    fn currency(&self) -> Option<&'a str> {
+    fn currency(&self) -> Option<parser::Currency<'a>> {
         use parser::PriceSpec::*;
 
         match self {
-            BareCurrency(currency) => Some(currency.as_ref()),
-            CurrencyAmount(_, currency) => Some(currency.as_ref()),
+            BareCurrency(currency) => Some(*currency),
+            CurrencyAmount(_, currency) => Some(*currency),
             _ => None,
         }
     }
@@ -133,7 +133,7 @@ impl FromIterator<Decimal> for SumWithMinNonZeroScale {
 }
 
 impl<'a> Tolerance for &parser::Options<'a> {
-    type Currency = &'a str;
+    type Currency = parser::Currency<'a>;
     type Number = Decimal;
 
     // Beancount Precision & Tolerances
@@ -204,7 +204,7 @@ fn default_inferred_tolerance_multiplier() -> Decimal {
 impl<'a> PostingSpec for &'a parser::Spanned<parser::Posting<'a>> {
     type Date = time::Date;
     type Account = &'a str;
-    type Currency = &'a str;
+    type Currency = parser::Currency<'a>;
     type Number = Decimal;
     type CostSpec = &'a parser::CostSpec<'a>;
     type PriceSpec = &'a parser::PriceSpec<'a>;

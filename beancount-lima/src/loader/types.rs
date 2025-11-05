@@ -42,8 +42,10 @@ pub(crate) struct Posting<'a> {
     pub(crate) account: &'a str,
     pub(crate) units: Decimal,
     pub(crate) currency: &'a parser::Currency<'a>,
-    // TODO cost/price
-    // pub(crate) cost: Option<Cost<'a>>,
+    // pub(crate) cost: Option<
+    //     beancount_lima_booking::PostingCosts<Date, Decimal, &'a parser::Currency<'a>, &'a str>,
+    // >,
+    // TODO price
     // pub(crate) price: Option<Price<'a>>,
     // pub(crate) metadata: Metadata<'a>,
 }

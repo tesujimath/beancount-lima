@@ -95,7 +95,7 @@ impl<'a, T> Loader<'a, T> {
     pub(crate) fn collect<I>(mut self, directives: I) -> Result<LoadSuccess<'a>, LoadError>
     where
         I: IntoIterator<Item = &'a Spanned<parser::Directive<'a>>>,
-        T: beancount_lima_booking::Tolerance<Currency = &'a str, Number = Decimal>,
+        T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
         for directive in directives {
             self.directive(directive);
@@ -106,7 +106,7 @@ impl<'a, T> Loader<'a, T> {
 
     fn directive(&mut self, directive: &'a Spanned<parser::Directive<'a>>)
     where
-        T: beancount_lima_booking::Tolerance<Currency = &'a str, Number = Decimal>,
+        T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
         use parser::DirectiveVariant::*;
 
@@ -142,7 +142,7 @@ impl<'a, T> Loader<'a, T> {
         element: parser::Spanned<Element>,
     ) -> Result<DirectiveVariant<'a>, ()>
     where
-        T: beancount_lima_booking::Tolerance<Currency = &'a str, Number = Decimal>,
+        T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
         let description = transaction.payee().map_or_else(
             || {
@@ -255,7 +255,7 @@ impl<'a, T> Loader<'a, T> {
             &'a str,
             Date,
             Decimal,
-            &'a str,
+            parser::Currency<'a>,
             &'a str,
         >,
         postings: impl Iterator<Item = P>,
@@ -855,7 +855,7 @@ struct AccountBuilder<'a> {
     cost_currencies: HashSet<&'a parser::Currency<'a>>,
     inventory: Inventory<'a>,
     // TODO replace all use of inventory with positions
-    positions: beancount_lima_booking::Positions<Date, Decimal, &'a str, &'a str>,
+    positions: beancount_lima_booking::Positions<Date, Decimal, parser::Currency<'a>, &'a str>,
     opened: Span,
     // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
