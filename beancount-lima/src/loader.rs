@@ -23,7 +23,7 @@ pub(crate) struct Loader<'a, T> {
     open_accounts: hashbrown::HashMap<&'a str, Span>,
     closed_accounts: hashbrown::HashMap<&'a str, Span>,
     accounts: HashMap<&'a str, AccountBuilder<'a>>,
-    currency_usage: hashbrown::HashMap<&'a parser::Currency<'a>, i32>,
+    currency_usage: hashbrown::HashMap<parser::Currency<'a>, i32>,
     config: LoaderConfig,
     default_booking: parser::Booking,
     inferred_tolerance: InferredTolerance<'a>,
@@ -177,6 +177,10 @@ impl<'a, T> Loader<'a, T> {
                     transaction
                 );
 
+                for interpolated in &interpolated_postings {
+                    self.tally_currency_usage(interpolated.currency);
+                }
+
                 if let Err(e) = self.book(
                     &element,
                     date,
@@ -234,7 +238,7 @@ impl<'a, T> Loader<'a, T> {
                         }
                     }
 
-                    self.tally_currency_usage(weight.amount_for_post().currency);
+                    self.tally_currency_usage(*weight.amount_for_post().currency);
                 }
 
                 Ok(DirectiveVariant::Transaction(Transaction { postings }))
@@ -321,7 +325,7 @@ impl<'a, T> Loader<'a, T> {
         }
     }
 
-    fn tally_currency_usage(&mut self, currency: &'a parser::Currency<'a>) {
+    fn tally_currency_usage(&mut self, currency: parser::Currency<'a>) {
         use hashbrown::hash_map::Entry::*;
 
         match self.currency_usage.entry(currency) {
@@ -407,8 +411,6 @@ impl<'a, T> Loader<'a, T> {
             // cost: None,  // TODO cost
             // price: None, // TODO price
         }; // ::new(account_name, amount.clone(), flag, cost);
-           // TODO pass through units and cost currency from CurrenciedPosting, also should not be optional?
-        account.post(posting.clone(), Some(amount.currency), None);
 
         account.balance_diagnostics.push(BalanceDiagnostic {
             date,
@@ -851,15 +853,12 @@ impl<'a> Display for Inventory<'a> {
 struct AccountBuilder<'a> {
     // TODO support cost in inventory
     allowed_currencies: HashSet<&'a parser::Currency<'a>>,
-    units_currencies: HashSet<&'a parser::Currency<'a>>,
-    cost_currencies: HashSet<&'a parser::Currency<'a>>,
     inventory: Inventory<'a>,
     // TODO replace all use of inventory with positions
     positions: beancount_lima_booking::Positions<Date, Decimal, parser::Currency<'a>, &'a str>,
     opened: Span,
     // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
-    postings: Vec<Posting<'a>>,
     pad_idx: Option<usize>, // index in directives in Loader
     balance_diagnostics: Vec<BalanceDiagnostic<'a>>,
     booking: parser::Booking,
@@ -872,12 +871,9 @@ impl<'a> AccountBuilder<'a> {
     {
         AccountBuilder {
             allowed_currencies: allowed_currencies.collect(),
-            units_currencies: HashSet::default(),
-            cost_currencies: HashSet::default(),
             inventory: Inventory::default(),
             positions: beancount_lima_booking::Positions::default(),
             opened,
-            postings: Vec::default(),
             pad_idx: None,
             balance_diagnostics: Vec::default(),
             booking,
@@ -887,21 +883,6 @@ impl<'a> AccountBuilder<'a> {
     /// all currencies are valid unless any were specified during open
     fn is_currency_valid(&self, currency: &parser::Currency<'_>) -> bool {
         self.allowed_currencies.is_empty() || self.allowed_currencies.contains(currency)
-    }
-
-    fn post(
-        &mut self,
-        posting: Posting<'a>,
-        units_currency: Option<&'a parser::Currency<'a>>,
-        cost_currency: Option<&'a parser::Currency<'a>>,
-    ) {
-        self.postings.push(posting);
-        if let Some(units_currency) = units_currency {
-            self.units_currencies.insert(units_currency);
-        }
-        if let Some(cost_currency) = cost_currency {
-            self.cost_currencies.insert(cost_currency);
-        }
     }
 }
 
