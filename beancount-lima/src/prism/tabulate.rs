@@ -6,7 +6,9 @@ use steel::{
     steel_vm::{engine::Engine, register_fn::RegisterFn},
     SteelErr, SteelVal,
 };
-use tabulator::{Align, Cell, Gap};
+use tabulator::{Align, Cell};
+
+use crate::format::GUTTER_MEDIUM;
 
 use super::{Amount, SteelDecimal};
 
@@ -29,7 +31,7 @@ fn custom_to_cell<'a>(value: &GcMut<Box<dyn CustomType>>) -> Result<Cell<'a>, St
     }
 }
 
-fn container_to_cell<'a, I>(value: I, gap: Gap) -> Result<Cell<'a>, SteelErr>
+fn container_to_cell<'a, I>(value: I, gutter: &'static str) -> Result<Cell<'a>, SteelErr>
 where
     I: IntoIterator<Item = &'a SteelVal>,
 {
@@ -37,7 +39,7 @@ where
         .into_iter()
         .map(steelval_to_cell)
         .collect::<Result<Vec<_>, SteelErr>>()
-        .map(|cells| Cell::Row(cells, gap))
+        .map(|cells| Cell::Row(cells, gutter))
 }
 
 fn anchored_rational(s: String) -> Cell<'static> {
@@ -66,7 +68,7 @@ fn steelval_to_cell(value: &SteelVal) -> Result<Cell, SteelErr> {
 
         Custom(x) => custom_to_cell(x),
 
-        ListV(x) => container_to_cell(x, Gap::default()),
+        ListV(x) => container_to_cell(x, GUTTER_MEDIUM),
 
         // TODO turn these into rows
         // VectorV(x) => Ok(Cell::Left(Borrowed("oops"))),
@@ -89,10 +91,10 @@ fn table_to_cell(rows: &[Vec<SteelVal>]) -> Result<Cell, SteelErr> {
             row.iter()
                 .map(steelval_to_cell)
                 .collect::<Result<Vec<_>, SteelErr>>()
-                .map(|cells| Cell::Row(cells, Gap::default()))
+                .map(|cells| Cell::Row(cells, GUTTER_MEDIUM))
         })
         .collect::<Result<Vec<_>, SteelErr>>()
-        .map(Cell::Column)
+        .map(Cell::Stack)
 }
 
 fn tabulate(rows: Vec<Vec<SteelVal>>) -> Result<String, SteelErr> {

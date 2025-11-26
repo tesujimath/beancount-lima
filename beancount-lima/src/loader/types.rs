@@ -4,11 +4,11 @@ use std::{
     collections::HashMap,
     fmt::{self, Display},
 };
-use tabulator::{Align, Cell, Gap};
+use tabulator::{Align, Cell};
 use time::Date;
 
 use crate::{
-    format::{format, plain, EMPTY, SPACE},
+    format::{format, plain, EMPTY, GUTTER_MINOR, SPACE},
     options::defaults::default_inferred_tolerance_multiplier,
 };
 
@@ -131,7 +131,7 @@ impl<'a> From<Amount<'a>> for Cell<'static> {
                 value.number.into(),
                 (value.currency.to_string(), Align::Left).into(),
             ],
-            Gap::Minor,
+            GUTTER_MINOR,
         )
     }
 }

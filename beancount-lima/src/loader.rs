@@ -10,11 +10,11 @@ use std::{
     fmt::Display,
     ops::{Deref, DerefMut},
 };
-use tabulator::{Align, Cell, Gap};
+use tabulator::{Align, Cell};
 use time::Date;
 
-use crate::config::LoaderConfig;
-use crate::format::format;
+use crate::format::{format, GUTTER_MEDIUM};
+use crate::{config::LoaderConfig, format::GUTTER_MINOR};
 
 #[derive(Debug)]
 pub(crate) struct Loader<'a, T> {
@@ -611,7 +611,7 @@ impl<'a, T> Loader<'a, T> {
                 );
 
                 // determine context for error by collating postings since last balance
-                let annotation = Cell::Column(
+                let annotation = Cell::Stack(
                     account
                         .balance_diagnostics
                         .drain(..)
@@ -619,19 +619,19 @@ impl<'a, T> Loader<'a, T> {
                             Cell::Row(
                                 vec![
                                     (bd.date.to_string(), Align::Left).into(),
-                                    bd.amount.map(|amt| amt.into()).unwrap_or_else(Cell::empty),
+                                    bd.amount.map(|amt| amt.into()).unwrap_or(Cell::Empty),
                                     Cell::Row(
                                         bd.balance
                                             .into_iter()
                                             .map(|amt| amt.into())
                                             .collect::<Vec<_>>(),
-                                        Gap::Minor,
+                                        GUTTER_MINOR,
                                     ),
                                     bd.description
                                         .map(|d| (d, Align::Left).into())
-                                        .unwrap_or_else(Cell::empty),
+                                        .unwrap_or(Cell::Empty),
                                 ],
-                                Gap::Medium,
+                                GUTTER_MEDIUM,
                             )
                         })
                         .collect::<Vec<_>>(),
