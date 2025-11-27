@@ -49,6 +49,44 @@ pub(crate) struct Posting<'a> {
     // pub(crate) metadata: Metadata<'a>,
 }
 
+impl<'a> beancount_lima_booking::PostingSpec for Posting<'a> {
+    type Date = Date;
+
+    type Account = &'a str;
+
+    type Currency = parser::Currency<'a>;
+
+    type Number = Decimal;
+
+    type CostSpec = &'a parser::CostSpec<'a>;
+
+    type PriceSpec = &'a parser::PriceSpec<'a>;
+
+    type Label = &'a str;
+
+    fn account(&self) -> Self::Account {
+        todo!()
+    }
+
+    fn currency(&self) -> Option<Self::Currency> {
+        todo!()
+    }
+
+    fn units(&self) -> Option<Self::Number> {
+        todo!()
+    }
+
+    fn cost(&self) -> Option<Self::CostSpec> {
+        // TODO cost
+        None
+    }
+
+    fn price(&self) -> Option<Self::PriceSpec> {
+        // TODO price
+        None
+    }
+}
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Cost<'a> {
     pub(crate) per_unit: Decimal,

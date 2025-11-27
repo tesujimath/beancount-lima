@@ -448,68 +448,29 @@ impl<'a, T> Loader<'a, T> {
                 let pad = self.directives[pad_idx].parsed;
                 let pad_element = into_spanned_element(pad);
                 let pad_date = *pad.date().item();
-                let mut pad_postings = Vec::default();
 
-                for (cur, number) in &margin {
-                    let flag = Some(pad_flag());
-                    tracing::debug!(
-                        "back-filling pad at {} {} {} {}",
-                        pad_idx,
-                        &account_name,
-                        number,
-                        cur
-                    );
+                let pad_postings = margin
+                    .iter()
+                    .map(|(cur, number)| Posting {
+                        flag: Some(pad_flag()),
+                        account: balance.account().item().as_ref(),
+                        units: *number,
+                        currency: *cur,
+                    })
+                    .collect::<Vec<_>>();
 
-                    // let pad_weight = Weight {
-                    //     number: *number,
-                    //     currency: cur,
-                    //     source: WeightSource::Native,
-                    // };
-
-                    // TODO actually book something
-                    // if let Err(e) = self.book(
-                    //     &element,
-                    //     date,
-                    //     updated_inventory,
-                    //     interpolated_postings.into_iter(),
-                    //     description,
-                    // ) {
-                    //     self.errors.push(e);
-                    //     Err(())
-                    // } else {
-                    //     // where does this come from?
-                    //     todo!()
-                    //     // Ok(DirectiveVariant::Transaction(Transaction { postings }))
-                    // }
-
-                    // TODO use book instead of post
-                    // match self.post(
-                    //     None,
-                    //     pad_element.clone(),
-                    //     pad_date,
-                    //     account_name,
-                    //     &pad_weight,
-                    //     flag,
-                    //     None,
-                    //     "pad",
-                    // ) {
-                    //     Ok(posting) => {
-                    //         pad_postings.push(posting);
-                    //     }
-                    //     Err(e) => {
-                    //         self.errors.push(e);
-                    //     }
-                    // }
-                }
-
-                if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded {
-                    pad.postings = pad_postings;
-                } else {
-                    panic!(
-                        "directive at {pad_idx} is not a pad, is {:?}",
-                        &self.directives[pad_idx]
-                    );
-                }
+                // TODO book the pad postings
+                // if let Err(e) = self.book(&element, date, &pad_postings, "pad") {
+                //     self.errors.push(e);
+                //     Err(())?
+                // } else if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded {
+                //     pad.postings = pad_postings;
+                // } else {
+                //     panic!(
+                //         "directive at {pad_idx} is not a pad, is {:?}",
+                //         &self.directives[pad_idx]
+                //     );
+                // }
             }
             (Some(margin), None) => {
                 let reason = format!(

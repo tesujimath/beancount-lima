@@ -18,12 +18,8 @@ pub trait PostingSpec: Clone {
             Number = Self::Number,
             Label = Self::Label,
         > + Clone
-        + Display
         + Debug;
-    type PriceSpec: PriceSpec<Currency = Self::Currency, Number = Self::Number>
-        + Clone
-        + Display
-        + Debug;
+    type PriceSpec: PriceSpec<Currency = Self::Currency, Number = Self::Number> + Clone + Debug;
     type Label: Eq + Ord + Clone + Display + Debug;
 
     fn account(&self) -> Self::Account;
