@@ -375,7 +375,10 @@ impl<'a, T> Loader<'a, T> {
         balance: &'a parser::Balance,
         date: Date,
         element: parser::Spanned<Element>,
-    ) -> Result<DirectiveVariant<'a>, ()> {
+    ) -> Result<DirectiveVariant<'a>, ()>
+    where
+        T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
+    {
         let account_name = balance.account().item().as_ref();
         let account_rollup = self.rollup_units(account_name);
         let account = self.accounts.get_mut(&account_name).unwrap();
@@ -434,10 +437,13 @@ impl<'a, T> Loader<'a, T> {
             (None, None)
         };
 
+        tracing::debug!("balance {:?} {:?}", &margin, pad_idx);
+
         match (margin, pad_idx) {
             (Some(margin), Some(pad_idx)) => {
                 tracing::debug!(
-                    "margin {}",
+                    "balance {:?} with margin {}",
+                    balance,
                     margin
                         .iter()
                         .map(|(cur, number)| format!("{} {}", -number, cur))
@@ -448,29 +454,43 @@ impl<'a, T> Loader<'a, T> {
                 let pad = self.directives[pad_idx].parsed;
                 let pad_element = into_spanned_element(pad);
                 let pad_date = *pad.date().item();
+                if let parser::DirectiveVariant::Pad(pad) = pad.variant() {
+                    let pad_source = pad.source().item().as_ref();
 
-                let pad_postings = margin
-                    .iter()
-                    .map(|(cur, number)| Posting {
-                        flag: Some(pad_flag()),
-                        account: balance.account().item().as_ref(),
-                        units: *number,
-                        currency: *cur,
-                    })
-                    .collect::<Vec<_>>();
+                    let pad_postings = margin
+                        .iter()
+                        .flat_map(|(cur, number)| {
+                            vec![
+                                Posting {
+                                    flag: Some(pad_flag()),
+                                    account: balance.account().item().as_ref(),
+                                    units: *number,
+                                    currency: *cur,
+                                },
+                                Posting {
+                                    flag: Some(pad_flag()),
+                                    account: pad_source,
+                                    units: -*number,
+                                    currency: *cur,
+                                },
+                            ]
+                        })
+                        .collect::<Vec<_>>();
 
-                // TODO book the pad postings
-                // if let Err(e) = self.book(&element, date, &pad_postings, "pad") {
-                //     self.errors.push(e);
-                //     Err(())?
-                // } else if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded {
-                //     pad.postings = pad_postings;
-                // } else {
-                //     panic!(
-                //         "directive at {pad_idx} is not a pad, is {:?}",
-                //         &self.directives[pad_idx]
-                //     );
-                // }
+                    if let Err(e) = self.book(&element, date, &pad_postings, "pad") {
+                        self.errors.push(e);
+                        Err(())?
+                    } else if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded
+                    {
+                        pad.postings = pad_postings;
+                        tracing::debug!("pad postings inserted for {:?}", pad);
+                    }
+                } else {
+                    panic!(
+                        "directive at {pad_idx} is not a pad, is {:?}",
+                        &self.directives[pad_idx]
+                    );
+                }
             }
             (Some(margin), None) => {
                 let reason = format!(

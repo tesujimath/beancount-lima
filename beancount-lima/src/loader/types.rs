@@ -65,15 +65,15 @@ impl<'a> beancount_lima_booking::PostingSpec for Posting<'a> {
     type Label = &'a str;
 
     fn account(&self) -> Self::Account {
-        todo!()
+        self.account
     }
 
     fn currency(&self) -> Option<Self::Currency> {
-        todo!()
+        Some(self.currency)
     }
 
     fn units(&self) -> Option<Self::Number> {
-        todo!()
+        Some(self.units)
     }
 
     fn cost(&self) -> Option<Self::CostSpec> {
