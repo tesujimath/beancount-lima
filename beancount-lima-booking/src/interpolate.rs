@@ -29,9 +29,14 @@ where
     P: PostingSpec + Debug + 'i,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
 {
+    tracing::debug!(
+        "interpolate_from_costed {date} {:?} {:?}",
+        &currency,
+        &costeds
+    );
     let mut weights = costeds.iter().map(|c| c.weight()).collect::<Vec<_>>();
     let residual = tolerance.residual(weights.iter().filter_map(|w| *w), currency);
-    tracing::debug!("weights for {:?} {:?}", &currency, &weights);
+    tracing::debug!("{date} weights for {:?} {:?}", &currency, &weights);
     let unknown = weights
         .iter()
         .enumerate()
@@ -105,7 +110,7 @@ where
                                             // per_unit: cost_per_unit.unwrap(),
                                             // currency: a.cost_currency.unwrap(),
                                         }),
-                                        price: None, // TODO price
+                                        price: None, // TODO price with cost
                                     },
                                     false,
                                 ))
@@ -118,7 +123,14 @@ where
                                 Some(currency),
                                 None,
                             ) => {
-                                // TODO price
+                                // TODO price without cost
+                                tracing::debug!(
+                                    "price without cost {} {} {} {:?}",
+                                    a.idx,
+                                    units,
+                                    currency,
+                                    a.posting.price()
+                                );
                                 Ok((
                                     Interpolated {
                                         posting: a.posting,
@@ -167,23 +179,41 @@ fn units<P>(posting: &P, weight: P::Number) -> Option<UnitsAndCostPerUnit<P::Num
 where
     P: PostingSpec,
 {
-    let units = posting.units().unwrap_or(weight);
+    // TODO review unit inference from cost and price and weight
     if let Some(cost_spec) = posting.cost() {
-        cost_spec
-            .per_unit()
-            .map(|cost_per_unit| UnitsAndCostPerUnit {
-                units: units / cost_per_unit,
+        match (posting.units(), cost_spec.per_unit(), cost_spec.total()) {
+            (Some(units), Some(cost_per_unit), _) => Some(UnitsAndCostPerUnit {
+                units,
                 cost_per_unit: Some(cost_per_unit),
-            })
-    } else if let Some(price_spec) = posting.price() {
-        price_spec
-            .per_unit()
-            .map(|price_per_unit| UnitsAndCostPerUnit {
-                units: units / price_per_unit,
+            }),
+            (None, Some(cost_per_unit), _) => Some(UnitsAndCostPerUnit {
+                units: weight / cost_per_unit,
+                cost_per_unit: Some(cost_per_unit),
+            }),
+            (Some(units), None, Some(cost_total)) => Some(UnitsAndCostPerUnit {
+                units,
+                cost_per_unit: Some(cost_total / units),
+            }),
+            (Some(units), None, None) => Some(UnitsAndCostPerUnit {
+                units,
                 cost_per_unit: None,
-            })
+            }),
+            (None, None, _) => None, // TODO is this correct?
+        }
+    } else if let Some(price_spec) = posting.price() {
+        match (posting.units(), price_spec.per_unit(), price_spec.total()) {
+            (Some(units), _, _) => Some(UnitsAndCostPerUnit {
+                units,
+                cost_per_unit: None,
+            }),
+            (None, Some(price_per_unit), _) => Some(UnitsAndCostPerUnit {
+                units: weight / price_per_unit,
+                cost_per_unit: None,
+            }),
+            (None, None, _) => None,
+        }
     } else {
-        Some(UnitsAndCostPerUnit {
+        posting.units().map(|units| UnitsAndCostPerUnit {
             units,
             cost_per_unit: None,
         })
