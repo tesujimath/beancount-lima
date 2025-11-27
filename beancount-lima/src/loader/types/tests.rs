@@ -13,13 +13,13 @@ static USD: LazyLock<parser::Currency<'static>> = LazyLock::new(|| "USD".try_int
 const fn cost(
     date: Date,
     per_unit: Decimal,
-    currency: &'static parser::Currency<'static>,
+    currency: &parser::Currency<'static>,
     label: Option<&'static str>,
     merge: bool,
 ) -> Cost<'static> {
     Cost {
         per_unit,
-        currency,
+        currency: *currency,
         date,
         label,
         merge,

@@ -293,7 +293,7 @@ impl<'a, T> Loader<'a, T> {
         &mut self,
         element: &parser::Spanned<Element>,
         account_name: &'a str,
-        currency: &'a parser::Currency<'a>,
+        currency: parser::Currency<'a>,
     ) -> Result<&mut AccountBuilder<'a>, parser::AnnotatedError> {
         let account = self.validate_account(element, account_name)?;
 
@@ -601,7 +601,7 @@ impl<'a, T> Loader<'a, T> {
                     self.accounts.insert(
                         open.account().item().as_ref(),
                         AccountBuilder::new(
-                            open.currencies().map(|c| c.item()),
+                            open.currencies().map(|c| *c.item()),
                             open.booking()
                                 .map(|booking| *booking.item())
                                 .unwrap_or(self.default_booking),
@@ -697,7 +697,7 @@ impl<'a, T> Loader<'a, T> {
 #[derive(Debug)]
 struct AccountBuilder<'a> {
     // TODO support cost in inventory
-    allowed_currencies: HashSet<&'a parser::Currency<'a>>,
+    allowed_currencies: HashSet<parser::Currency<'a>>,
     // TODO replace all use of inventory with positions
     positions: beancount_lima_booking::Positions<Date, Decimal, parser::Currency<'a>, &'a str>,
     opened: Span,
@@ -711,7 +711,7 @@ struct AccountBuilder<'a> {
 impl<'a> AccountBuilder<'a> {
     fn new<I>(allowed_currencies: I, booking: parser::Booking, opened: Span) -> Self
     where
-        I: Iterator<Item = &'a parser::Currency<'a>>,
+        I: Iterator<Item = parser::Currency<'a>>,
     {
         AccountBuilder {
             allowed_currencies: allowed_currencies.collect(),
@@ -724,8 +724,8 @@ impl<'a> AccountBuilder<'a> {
     }
 
     /// all currencies are valid unless any were specified during open
-    fn is_currency_valid(&self, currency: &parser::Currency<'_>) -> bool {
-        self.allowed_currencies.is_empty() || self.allowed_currencies.contains(currency)
+    fn is_currency_valid(&self, currency: parser::Currency<'_>) -> bool {
+        self.allowed_currencies.is_empty() || self.allowed_currencies.contains(&currency)
     }
 }
 

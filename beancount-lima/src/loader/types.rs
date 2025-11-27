@@ -42,7 +42,7 @@ pub(crate) struct Posting<'a> {
     pub(crate) units: Decimal,
     pub(crate) currency: parser::Currency<'a>,
     // pub(crate) cost: Option<
-    //     beancount_lima_booking::PostingCosts<Date, Decimal, &'a parser::Currency<'a>, &'a str>,
+    //     beancount_lima_booking::PostingCosts<Date, Decimal, parser::Currency<'a>, &'a str>,
     // >,
     // TODO price
     // pub(crate) price: Option<Price<'a>>,
@@ -90,7 +90,7 @@ impl<'a> beancount_lima_booking::PostingSpec for Posting<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Cost<'a> {
     pub(crate) per_unit: Decimal,
-    pub(crate) currency: &'a parser::Currency<'a>,
+    pub(crate) currency: parser::Currency<'a>,
     pub(crate) date: Date,
     pub(crate) label: Option<&'a str>,
     pub(crate) merge: bool,
@@ -120,7 +120,7 @@ impl<'a> PartialOrd for Cost<'a> {
             Some(core::cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        match self.currency.partial_cmp(other.currency) {
+        match self.currency.partial_cmp(&other.currency) {
             Some(core::cmp::Ordering::Equal) => {}
             ord => return ord,
         }
@@ -143,20 +143,20 @@ impl<'a> PartialOrd for Cost<'a> {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Price<'a> {
     pub(crate) per_unit: Decimal,
-    pub(crate) currency: &'a parser::Currency<'a>,
+    pub(crate) currency: parser::Currency<'a>,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Amount<'a> {
     pub(crate) number: Decimal,
-    pub(crate) currency: &'a parser::Currency<'a>,
+    pub(crate) currency: parser::Currency<'a>,
 }
 
 impl<'a> From<&'a parser::Amount<'a>> for Amount<'a> {
     fn from(value: &'a parser::Amount<'a>) -> Self {
         Amount {
             number: value.number().value(),
-            currency: value.currency().item(),
+            currency: *value.currency().item(),
         }
     }
 }
@@ -189,7 +189,7 @@ impl<'a> CurrencyPosition<'a> {
     pub(crate) fn format(
         &self,
         f: &mut std::fmt::Formatter<'_>,
-        cur: &'a parser::Currency<'a>,
+        cur: parser::Currency<'a>,
     ) -> fmt::Result {
         write!(f, "{} {}", self.units, cur)?;
         format(f, &self.cost, plain, EMPTY, Some(SPACE))
