@@ -156,6 +156,8 @@ impl<'a> Tolerance for &parser::Options<'a> {
         let residual = s.sum;
         let abs_residual = residual.abs();
 
+        tracing::debug!("min_nonzero_scale {:?}", s.min_nonzero_scale);
+
         // TODO remove result
         let result = if let Some(min_nonzero_scale) = s.min_nonzero_scale.as_ref() {
             (abs_residual >= Decimal::new(1, *min_nonzero_scale) * multiplier).then_some(residual)

@@ -162,13 +162,20 @@ where
                 if let Some(cost_spec) = p.cost() {
                     match (cost_spec.total(), cost_spec.per_unit(), p.units()) {
                         (Some(cost_total), _, _) => Some(cost_total),
-                        (None, Some(cost_per_unit), Some(units)) => Some(cost_per_unit * units),
+                        (None, Some(cost_per_unit), Some(units)) => {
+                            let weight = (cost_per_unit * units).rescaled(units.scale());
+                            Some(weight)
+                        }
                         _ => None,
                     }
                 } else if let Some(price_spec) = p.price() {
                     match (price_spec.total(), price_spec.per_unit(), p.units()) {
                         (Some(price_total), _, _) => Some(price_total),
-                        (None, Some(price_per_unit), Some(units)) => Some(price_per_unit * units),
+                        (None, Some(price_per_unit), Some(units)) => {
+                            let weight = (price_per_unit * units).rescaled(units.scale());
+                            tracing::debug!("weight {weight} from price_per_unit {price_per_unit} units {units}");
+                            Some(weight)
+                        }
                         _ => None,
                     }
                 } else {

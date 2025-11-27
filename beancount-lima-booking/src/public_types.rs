@@ -11,7 +11,7 @@ pub trait PostingSpec: Clone {
     type Date: Eq + Ord + Copy + Display + Debug;
     type Account: Eq + Hash + Clone + Display + Debug;
     type Currency: Eq + Hash + Ord + Clone + Display + Debug;
-    type Number: Number + Eq + Copy + Display + Debug;
+    type Number: Number + Display + Debug;
     type CostSpec: CostSpec<
             Date = Self::Date,
             Currency = Self::Currency,
@@ -33,7 +33,7 @@ pub trait Posting: Clone {
     type Date: Eq + Ord + Copy + Display + Debug;
     type Account: Eq + Hash + Clone + Display + Debug;
     type Currency: Eq + Hash + Ord + Clone + Display + Debug;
-    type Number: Number + Eq + Copy + Display + Debug;
+    type Number: Number + Display + Debug;
     type Label: Eq + Ord + Clone + Display + Debug;
 
     fn account(&self) -> Self::Account;
@@ -46,7 +46,7 @@ pub trait Posting: Clone {
 pub trait CostSpec: Clone {
     type Date: Eq + Ord + Copy + Display + Debug;
     type Currency: Eq + Hash + Ord + Clone + Display + Debug;
-    type Number: Number + Eq + Copy + Display + Debug;
+    type Number: Number + Display + Debug;
     type Label: Eq + Ord + Clone + Display + Debug;
 
     fn date(&self) -> Option<Self::Date>;
@@ -59,7 +59,7 @@ pub trait CostSpec: Clone {
 
 pub trait PriceSpec: Clone {
     type Currency: Eq + Hash + Ord + Clone + Display + Debug;
-    type Number: Number + Eq + Copy + Display + Debug;
+    type Number: Number + Display + Debug;
 
     fn currency(&self) -> Option<Self::Currency>;
     fn per_unit(&self) -> Option<Self::Number>;
@@ -350,7 +350,8 @@ pub trait Tolerance {
 }
 
 pub trait Number:
-    Add<Output = Self>
+    Copy
+    + Add<Output = Self>
     + AddAssign
     + Neg<Output = Self>
     + Mul<Output = Self>
@@ -366,6 +367,12 @@ pub trait Number:
     fn sign(&self) -> Option<Sign>;
 
     fn zero() -> Self;
+
+    // Returns the scale of the decimal number, otherwise known as e.
+    fn scale(&self) -> u32;
+
+    // Returns a new number with specified scale, rounding as required.
+    fn rescaled(self, scale: u32) -> Self;
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Display, Debug)]
@@ -391,14 +398,14 @@ pub enum Booking {
 pub struct Positions<D, N, C, L>(Vec<Position<D, N, C, L>>)
 where
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug;
 
 impl<D, N, C, L> Display for Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug + Display,
-    N: Number + Copy + Debug + Display,
+    N: Number + Debug + Display,
     C: Eq + Hash + Ord + Clone + Debug + Display,
     L: Eq + Ord + Clone + Debug + Display,
 {
@@ -413,7 +420,7 @@ where
 impl<D, N, C, L> Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
@@ -448,7 +455,7 @@ where
 impl<D, N, C, L> Default for Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
@@ -460,7 +467,7 @@ where
 impl<D, N, C, L> Deref for Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
@@ -476,7 +483,7 @@ pub struct Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
@@ -487,7 +494,7 @@ impl<A, D, N, C, L> Default for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
@@ -502,7 +509,7 @@ impl<A, D, N, C, L> From<HashMap<A, Positions<D, N, C, L>>> for Inventory<A, D, 
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
@@ -515,7 +522,7 @@ impl<A, D, N, C, L> Deref for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
@@ -530,7 +537,7 @@ impl<A, D, N, C, L> IntoIterator for Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
@@ -546,7 +553,7 @@ impl<A, D, N, C, L> Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,
     D: Eq + Ord + Copy + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {

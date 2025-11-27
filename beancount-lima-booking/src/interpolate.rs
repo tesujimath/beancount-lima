@@ -4,7 +4,7 @@
 use std::fmt::Debug;
 
 use super::{
-    BookedOrUnbookedPosting, BookingError, CostSpec, Interpolated, PostingBookingError,
+    BookedOrUnbookedPosting, BookingError, CostSpec, Interpolated, Number, PostingBookingError,
     PostingCost, PostingCosts, PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
 };
 
@@ -186,14 +186,20 @@ where
                 units,
                 cost_per_unit: Some(cost_per_unit),
             }),
-            (None, Some(cost_per_unit), _) => Some(UnitsAndCostPerUnit {
-                units: weight / cost_per_unit,
-                cost_per_unit: Some(cost_per_unit),
-            }),
-            (Some(units), None, Some(cost_total)) => Some(UnitsAndCostPerUnit {
-                units,
-                cost_per_unit: Some(cost_total / units),
-            }),
+            (None, Some(cost_per_unit), _) => {
+                let units = (weight / cost_per_unit).rescaled(weight.scale());
+                Some(UnitsAndCostPerUnit {
+                    units,
+                    cost_per_unit: Some(cost_per_unit),
+                })
+            }
+            (Some(units), None, Some(cost_total)) => {
+                let cost_per_unit = cost_total / units;
+                Some(UnitsAndCostPerUnit {
+                    units,
+                    cost_per_unit: Some(cost_per_unit),
+                })
+            }
             (Some(units), None, None) => Some(UnitsAndCostPerUnit {
                 units,
                 cost_per_unit: None,
@@ -206,10 +212,13 @@ where
                 units,
                 cost_per_unit: None,
             }),
-            (None, Some(price_per_unit), _) => Some(UnitsAndCostPerUnit {
-                units: weight / price_per_unit,
-                cost_per_unit: None,
-            }),
+            (None, Some(price_per_unit), _) => {
+                let units = (weight / price_per_unit).rescaled(weight.scale());
+                Some(UnitsAndCostPerUnit {
+                    units,
+                    cost_per_unit: None,
+                })
+            }
             (None, None, _) => None,
         }
     } else {

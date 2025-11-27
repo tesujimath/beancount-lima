@@ -310,7 +310,8 @@ where
                                 let cost_units: P::Number = matched_positions
                                     .iter()
                                     .map(|(_i, pos)| {
-                                        pos.cost.as_ref().unwrap().per_unit * posting_units
+                                        (pos.cost.as_ref().unwrap().per_unit * posting_units)
+                                            .rescaled(posting_units.scale())
                                     })
                                     .sum();
 
@@ -573,7 +574,7 @@ where
     A: Eq + Hash + Clone,
     D: Eq + Ord + Copy + Debug + 'i,
     C: Eq + Hash + Ord + Clone + Debug + 'i,
-    N: Number + Copy + Debug + 'i,
+    N: Number + Debug + 'i,
     L: Eq + Ord + Clone + Debug + 'i,
     I: Fn(A) -> Option<&'i Positions<D, N, C, L>> + Copy, // 'i for inventory
 {
@@ -648,7 +649,7 @@ impl<D, N, C, L> Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
     C: Eq + Hash + Ord + Clone + Debug,
-    N: Number + Copy + Debug,
+    N: Number + Debug,
     L: Eq + Ord + Clone + Debug,
 {
     fn accumulate<A, M>(
