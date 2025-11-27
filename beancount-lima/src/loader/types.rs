@@ -37,11 +37,10 @@ pub(crate) struct Pad<'a> {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Posting<'a> {
-    pub(crate) parsed: Option<&'a parser::Spanned<parser::Posting<'a>>>,
     pub(crate) flag: Option<parser::Flag>,
     pub(crate) account: &'a str,
     pub(crate) units: Decimal,
-    pub(crate) currency: &'a parser::Currency<'a>,
+    pub(crate) currency: parser::Currency<'a>,
     // pub(crate) cost: Option<
     //     beancount_lima_booking::PostingCosts<Date, Decimal, &'a parser::Currency<'a>, &'a str>,
     // >,

@@ -2,7 +2,12 @@
 #![allow(dead_code, unused_variables)]
 
 use hashbrown::{hash_map::Entry, HashMap, HashSet};
-use std::{cmp::Ordering, fmt::Debug, hash::Hash, iter::once};
+use std::{
+    cmp::Ordering,
+    fmt::Debug,
+    hash::Hash,
+    iter::{once, repeat},
+};
 
 use super::{
     interpolate_from_costed, AnnotatedPosting, BookedOrUnbookedPosting, Booking, BookingError,
@@ -25,6 +30,7 @@ where
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
     'a: 'b,
 {
+    let mut interpolated_postings = repeat(None).take(postings.len()).collect::<Vec<_>>();
     let mut updated_inventory = Inventory::default();
 
     let currency_groups = categorize_by_currency(postings, inventory)?;
@@ -51,14 +57,17 @@ where
             updated_inventory.insert(account, positions);
         }
 
-        let Interpolation { unbooked_postings } =
-            interpolate_from_costed(date, &cur, costed_postings, tolerance)?;
-        tracing::debug!("weights {:?}", &unbooked_postings);
+        let Interpolation {
+            booked_and_unbooked_postings,
+        } = interpolate_from_costed(date, &cur, costed_postings, tolerance)?;
+        tracing::debug!("weights {:?}", &booked_and_unbooked_postings);
 
         let updated_inventory_for_cur = book_augmentations(
             date,
             cur.clone(),
-            unbooked_postings,
+            booked_and_unbooked_postings
+                .iter()
+                .filter_map(|(p, booked)| (!booked).then_some(p)),
             tolerance,
             |account| {
                 updated_inventory
@@ -76,9 +85,17 @@ where
         for (account, positions) in updated_inventory_for_cur {
             updated_inventory.insert(account, positions);
         }
+
+        for (p, _) in booked_and_unbooked_postings.into_iter() {
+            let idx = p.idx;
+            interpolated_postings[idx] = Some(p);
+        }
     }
 
-    let interpolated_postings = Vec::default(); // TODO
+    let interpolated_postings = interpolated_postings
+        .into_iter()
+        .map(|p| p.unwrap())
+        .collect::<Vec<_>>();
 
     Ok(Bookings {
         interpolated_postings,
@@ -585,7 +602,7 @@ where
 fn book_augmentations<'a, 'b, P, T, I, M>(
     date: P::Date,
     currency: P::Currency,
-    interpolateds: Vec<Interpolated<P, P::Date, P::Number, P::Currency, P::Label>>,
+    interpolateds: impl Iterator<Item = &'b Interpolated<P, P::Date, P::Number, P::Currency, P::Label>>,
     tolerance: &T,
     inventory: I,
     method: M,
@@ -595,13 +612,14 @@ where
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
     I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+    'a: 'b,
 {
     let mut updated_inventory = HashMap::default();
 
     for interpolated in interpolateds {
         use Entry::*;
 
-        let posting = interpolated.posting;
+        let posting = &interpolated.posting;
         let account = posting.account();
 
         let previous_positions = match updated_inventory.entry(account.clone()) {

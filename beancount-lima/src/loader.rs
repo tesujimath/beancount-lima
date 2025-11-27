@@ -238,8 +238,21 @@ impl<'a, T> Loader<'a, T> {
                 //         currency: interpolated.currency,
                 //     });
 
-                // TODO return postings
-                Ok(Vec::default())
+                let postings = interpolated_postings
+                    .into_iter()
+                    .enumerate()
+                    .map(|(idx, interpolated)| {
+                        let posting = &postings[idx];
+
+                        Posting {
+                            flag: None, // TODO carry through flag
+                            account: posting.account(),
+                            units: interpolated.units,
+                            currency: interpolated.currency,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                Ok(postings)
             }
             Err(e) => {
                 tracing::error!("booking error {}", &e);

@@ -13,7 +13,10 @@ pub(crate) struct Interpolation<P>
 where
     P: PostingSpec,
 {
-    pub(crate) unbooked_postings: Vec<Interpolated<P, P::Date, P::Number, P::Currency, P::Label>>,
+    pub(crate) booked_and_unbooked_postings: Vec<(
+        Interpolated<P, P::Date, P::Number, P::Currency, P::Label>,
+        bool, // booked
+    )>,
 }
 
 pub(crate) fn interpolate_from_costed<'i, 'b, P, T>(
@@ -52,96 +55,105 @@ where
         ))?,
     }
 
-    // only return weighted postings for the unbooked
-    let weighted_postings = costeds
+    let booked_and_unbooked_postings = costeds
         .into_iter()
         .zip(weights)
-        .filter_map(|(c, w)| {
-            if let BookedOrUnbookedPosting::Unbooked(a) = c {
-                let w = w.unwrap();
+        .map(|(c, w)| {
+            match c {
+                BookedOrUnbookedPosting::Unbooked(a) => {
+                    let w = w.unwrap();
 
-                if a.posting.cost().is_none() && a.posting.price().is_none() {
-                    // simple case with no cost or price
-                    Some(Ok(Interpolated {
-                        posting: a.posting,
-                        idx: a.idx,
-                        units: w,
-                        currency: currency.clone(),
-                        cost: None,
-                        price: None,
-                    }))
-                } else {
-                    match (units(&a.posting, w), a.currency, a.posting.cost()) {
-                        (
-                            Some(UnitsAndCostPerUnit {
-                                units,
-                                cost_per_unit,
-                            }),
-                            Some(currency),
-                            Some(cost),
-                        ) => {
-                            Some(Ok(Interpolated {
+                    if a.posting.cost().is_none() && a.posting.price().is_none() {
+                        // simple case with no cost or price
+                        Ok((
+                            Interpolated {
                                 posting: a.posting,
                                 idx: a.idx,
-                                units,
-                                currency,
-                                cost: Some(PostingCosts {
-                                    cost_currency: a.cost_currency.unwrap(),
-                                    adjustments: vec![PostingCost {
-                                        date,
-                                        units,
-                                        per_unit: (cost_per_unit.unwrap()), // can't fail, since we have cost
-                                        label: cost.label(),
-                                        merge: cost.merge(),
-                                    }],
-                                    // I don't think these can fail, but let's see during testing:
-                                    // per_unit: cost_per_unit.unwrap(),
-                                    // currency: a.cost_currency.unwrap(),
-                                }),
-                                price: None, // TODO price
-                            }))
-                        }
-                        (
-                            Some(UnitsAndCostPerUnit {
-                                units,
-                                cost_per_unit: _,
-                            }),
-                            Some(currency),
-                            None,
-                        ) => {
-                            // TODO price
-                            Some(Ok(Interpolated {
-                                posting: a.posting,
-                                idx: a.idx,
-                                units,
-                                currency,
+                                units: w,
+                                currency: currency.clone(),
                                 cost: None,
                                 price: None,
-                            }))
-                        }
+                            },
+                            false,
+                        ))
+                    } else {
+                        match (units(&a.posting, w), a.currency, a.posting.cost()) {
+                            (
+                                Some(UnitsAndCostPerUnit {
+                                    units,
+                                    cost_per_unit,
+                                }),
+                                Some(currency),
+                                Some(cost),
+                            ) => {
+                                Ok((
+                                    Interpolated {
+                                        posting: a.posting,
+                                        idx: a.idx,
+                                        units,
+                                        currency,
+                                        cost: Some(PostingCosts {
+                                            cost_currency: a.cost_currency.unwrap(),
+                                            adjustments: vec![PostingCost {
+                                                date,
+                                                units,
+                                                per_unit: (cost_per_unit.unwrap()), // can't fail, since we have cost
+                                                label: cost.label(),
+                                                merge: cost.merge(),
+                                            }],
+                                            // I don't think these can fail, but let's see during testing:
+                                            // per_unit: cost_per_unit.unwrap(),
+                                            // currency: a.cost_currency.unwrap(),
+                                        }),
+                                        price: None, // TODO price
+                                    },
+                                    false,
+                                ))
+                            }
+                            (
+                                Some(UnitsAndCostPerUnit {
+                                    units,
+                                    cost_per_unit: _,
+                                }),
+                                Some(currency),
+                                None,
+                            ) => {
+                                // TODO price
+                                Ok((
+                                    Interpolated {
+                                        posting: a.posting,
+                                        idx: a.idx,
+                                        units,
+                                        currency,
+                                        cost: None,
+                                        price: None,
+                                    },
+                                    false,
+                                ))
+                            }
 
-                        (None, Some(_), _) => Some(Err(BookingError::Posting(
-                            a.idx,
-                            PostingBookingError::CannotInferUnits,
-                        ))),
-                        (Some(_), None, _) => Some(Err(BookingError::Posting(
-                            a.idx,
-                            PostingBookingError::CannotInferCurrency,
-                        ))),
-                        (None, None, _) => Some(Err(BookingError::Posting(
-                            a.idx,
-                            PostingBookingError::CannotInferAnything,
-                        ))),
+                            (None, Some(_), _) => Err(BookingError::Posting(
+                                a.idx,
+                                PostingBookingError::CannotInferUnits,
+                            )),
+                            (Some(_), None, _) => Err(BookingError::Posting(
+                                a.idx,
+                                PostingBookingError::CannotInferCurrency,
+                            )),
+                            (None, None, _) => Err(BookingError::Posting(
+                                a.idx,
+                                PostingBookingError::CannotInferAnything,
+                            )),
+                        }
                     }
                 }
-            } else {
-                None
+                BookedOrUnbookedPosting::Booked(i) => Ok((i, true)),
             }
         })
         .collect::<Result<Vec<_>, BookingError>>()?;
 
     Ok(Interpolation {
-        unbooked_postings: weighted_postings,
+        booked_and_unbooked_postings,
     })
 }
 
