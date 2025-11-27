@@ -7,13 +7,12 @@ use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
 use std::{
     collections::{HashMap, HashSet},
-    fmt::Display,
-    ops::{Deref, DerefMut},
+    fmt::Debug,
 };
 use tabulator::{Align, Cell};
 use time::Date;
 
-use crate::format::{format, GUTTER_MEDIUM};
+use crate::format::GUTTER_MEDIUM;
 use crate::{config::LoaderConfig, format::GUTTER_MINOR};
 
 #[derive(Debug)]
@@ -153,9 +152,39 @@ impl<'a, T> Loader<'a, T> {
             |payee| payee.item(),
         );
 
+        let postings = transaction.postings().collect::<Vec<_>>();
+        match self.book(&element, date, &postings, description) {
+            Ok(postings) => Ok(DirectiveVariant::Transaction(Transaction { postings })),
+            Err(e) => {
+                self.errors.push(e);
+                Err(())
+            }
+        }
+    }
+
+    fn book<P>(
+        &mut self,
+        element: &parser::Spanned<Element>,
+        date: Date,
+        postings: &[P],
+        description: &'a str,
+    ) -> Result<Vec<Posting<'a>>, parser::AnnotatedError>
+    where
+        P: beancount_lima_booking::PostingSpec<
+                Date = time::Date,
+                Account = &'a str,
+                Currency = parser::Currency<'a>,
+                Number = Decimal,
+                CostSpec = &'a parser::CostSpec<'a>,
+                PriceSpec = &'a parser::PriceSpec<'a>,
+                Label = &'a str,
+            > + Debug
+            + 'a,
+        T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
+    {
         match beancount_lima_booking::book(
             date,
-            transaction.postings(),
+            postings,
             &self.tolerance,
             |accname| self.accounts.get(accname).map(|acc| &acc.positions),
             |accname| {
@@ -171,122 +200,64 @@ impl<'a, T> Loader<'a, T> {
                 updated_inventory,
             }) => {
                 tracing::debug!(
-                    "booking {:?} {:?} for transaction {:?}",
+                    "booking {:?} {:?} for {:?}",
                     &interpolated_postings,
                     &updated_inventory,
-                    transaction
+                    element
                 );
 
                 for interpolated in &interpolated_postings {
                     self.tally_currency_usage(interpolated.currency);
                 }
 
-                if let Err(e) = self.book(
-                    &element,
-                    date,
-                    updated_inventory,
-                    interpolated_postings.into_iter(),
-                    description,
-                ) {
-                    self.errors.push(e);
+                // use hashbrown::hash_map::Entry::*;
+
+                for (account_name, updated_positions) in updated_inventory {
+                    let account = self.validate_account(element, account_name)?;
+
+                    account.positions = updated_positions;
+
+                    // account.post(posting.clone(), Some(amount.currency), None);
+
+                    // TODO
+                    // account.balance_diagnostics.push(BalanceDiagnostic {
+                    //     date,
+                    //     description: Some(description),
+                    //     amount: Some(amount.clone()),
+                    //     balance,
+                    // });
                 }
+
+                // let postings = interpolated_postings
+                //     .into_iter()
+                //     .map(|interpolated| Posting {
+                //         Some(parsed: interpolated.posting),
+                //         flag: None, // TODO pass through flag
+                //         account: interpolated.posting.account(),
+                //         units: interpolated.units,
+                //         currency: interpolated.currency,
+                //     });
+
+                // TODO return postings
+                Ok(Vec::default())
             }
             Err(e) => {
+                tracing::error!("booking error {}", &e);
                 use beancount_lima_booking::BookingError::*;
 
                 match &e {
-                    Transaction(e) => {
-                        self.errors.push(element.error(e.to_string()).into());
-                    }
+                    Transaction(e) => Err(element.error(e.to_string()).into()),
                     Posting(idx, e) => {
-                        let bad_posting = transaction.postings().nth(*idx).unwrap();
-                        self.errors.push(bad_posting.error(e.to_string()).into());
+                        // TODO attach posting error to actual posting
+                        // let bad_posting = postings[*idx];
+                        // bad_posting.error(e.to_string()).into()
+                        Err(element
+                            .error(format!("{} on posting {}", e.to_string(), idx))
+                            .into())
                     }
                 }
-                tracing::error!("booking error {}", &e);
             }
         }
-
-        // TODO remove legacy booking:
-        match balance_transaction(transaction, &self.inferred_tolerance, &element) {
-            Ok(weights) => {
-                let mut postings = Vec::default();
-
-                for (posting, weight) in transaction.postings().zip(weights) {
-                    use WeightSource::*;
-                    let (posting_amount, posting_currency) = match weight.source {
-                        Native => (weight.number, weight.currency),
-                        Cost(number, currency) => (number, currency),
-                        Price(number, currency) => (number, currency),
-                    };
-
-                    match self.post(
-                        Some(posting),
-                        into_spanned_element(posting),
-                        date,
-                        posting.account().item().as_ref(),
-                        &weight,
-                        posting.flag().map(|flag| *flag.item()),
-                        posting.cost_spec().map(parser::Spanned::item),
-                        description,
-                    ) {
-                        Ok(posting) => {
-                            postings.push(posting);
-                        }
-                        Err(e) => {
-                            self.errors.push(e);
-                        }
-                    }
-
-                    self.tally_currency_usage(*weight.amount_for_post().currency);
-                }
-
-                Ok(DirectiveVariant::Transaction(Transaction { postings }))
-            }
-            Err(e) => {
-                self.errors.push(e);
-
-                Err(())
-            }
-        }
-    }
-
-    fn book<P>(
-        &mut self,
-        element: &parser::Spanned<Element>,
-        date: Date,
-        updated_inventory: beancount_lima_booking::Inventory<
-            &'a str,
-            Date,
-            Decimal,
-            parser::Currency<'a>,
-            &'a str,
-        >,
-        postings: impl Iterator<Item = P>,
-        description: &'a str,
-    ) -> Result<(), parser::AnnotatedError>
-    where
-        P: beancount_lima_booking::Posting,
-    {
-        use hashbrown::hash_map::Entry::*;
-
-        for (account_name, updated_positions) in updated_inventory {
-            let account = self.validate_account(element, account_name)?;
-
-            account.positions = updated_positions;
-
-            // account.post(posting.clone(), Some(amount.currency), None);
-
-            // TODO
-            // account.balance_diagnostics.push(BalanceDiagnostic {
-            //     date,
-            //     description: Some(description),
-            //     amount: Some(amount.clone()),
-            //     balance,
-            // });
-        }
-
-        Ok(())
     }
 
     fn validate_account(
@@ -339,114 +310,30 @@ impl<'a, T> Loader<'a, T> {
         }
     }
 
-    // not without guilt, but oh well
-    #[allow(clippy::too_many_arguments)]
-    // accumulate the post and return its alist attrs, or record error and return None
-    fn post(
-        &mut self,
-        parsed: Option<&'a parser::Spanned<parser::Posting<'a>>>,
-        element: parser::Spanned<Element>,
-        date: Date,
-        account_name: &'a str,
-        weight: &Weight<'a>,
-        flag: Option<parser::Flag>,
-        cost_spec: Option<&'a parser::CostSpec>,
-        description: &'a str,
-    ) -> Result<Posting<'a>, parser::AnnotatedError> {
-        tracing::debug!(
-            "post {description} {:?} for {} with weight {:?}, cost_spec {:?}",
-            parsed,
-            account_name,
-            weight,
-            cost_spec
-        );
-        use hashbrown::hash_map::Entry::*;
-
-        let account = self.validate_account_and_currency(
-            &element,
-            account_name,
-            weight.amount_for_post().currency,
-        )?;
-
-        let amount = weight.amount_for_post();
-
-        let booked = match account.inventory.entry(amount.currency) {
-            Occupied(mut position) => {
-                let value = position.get_mut();
-                let booked = value.book(date, amount.number, cost_spec, account.booking);
-
-                if value.is_empty() {
-                    position.remove_entry();
-                }
-
-                booked
-            }
-
-            Vacant(position) => position.insert(CurrencyPositionsBuilder::default()).book(
-                date,
-                amount.number,
-                cost_spec,
-                account.booking,
-            ),
-        }
-        .map_err(|message| element.error(message))?;
-
-        // collate balance from inventory across all currencies, sorted so deterministic
-        let mut currencies = account.inventory.keys().copied().collect::<Vec<_>>();
-        currencies.sort();
-        let balance = currencies
-            .into_iter()
-            .map(|cur| Amount {
-                number: account.inventory.get(cur).unwrap().units(),
-                currency: amount.currency,
-            })
-            .collect::<Vec<Amount>>();
-
-        let posting = Posting {
-            parsed,
-            flag,
-            account: account_name,
-            units: amount.number,
-            currency: amount.currency,
-            // cost: None,  // TODO cost
-            // price: None, // TODO price
-        }; // ::new(account_name, amount.clone(), flag, cost);
-
-        account.balance_diagnostics.push(BalanceDiagnostic {
-            date,
-            description: Some(description),
-            amount: Some(amount.clone()),
-            balance,
-        });
-
-        Ok(posting)
-        // TODO cost, price, flag, metadata
-    }
-
     // base account is known
     fn rollup_units(
         &self,
         base_account_name: &str,
-    ) -> hashbrown::HashMap<&'a parser::Currency<'a>, Decimal> {
+    ) -> hashbrown::HashMap<parser::Currency<'a>, Decimal> {
         if self.config.balance_rollup {
             let mut rollup_inventory =
-                hashbrown::HashMap::<&'a parser::Currency<'a>, Decimal>::default();
+                hashbrown::HashMap::<parser::Currency<'a>, Decimal>::default();
             self.accounts
                 .keys()
                 .filter_map(|s| {
                     s.starts_with(base_account_name)
-                        .then_some(&self.accounts.get(s).unwrap().inventory)
+                        .then_some(self.accounts.get(s).unwrap().positions.units())
                 })
-                .for_each(|inv| {
-                    inv.iter().for_each(|(cur, number)| {
+                .for_each(|account| {
+                    account.into_iter().for_each(|(cur, number)| {
                         use hashbrown::hash_map::Entry::*;
-                        match rollup_inventory.entry(cur) {
+                        match rollup_inventory.entry(*cur) {
                             Occupied(mut entry) => {
                                 let existing_number = entry.get_mut();
-                                *existing_number += number.units();
+                                *existing_number += number;
                             }
                             Vacant(entry) => {
-                                entry.insert(number.units());
+                                entry.insert(number);
                             }
                         }
                     });
@@ -462,9 +349,10 @@ impl<'a, T> Loader<'a, T> {
             self.accounts
                 .get(base_account_name)
                 .unwrap()
-                .inventory
+                .positions
+                .units()
                 .iter()
-                .map(|(cur, positions)| (*cur, positions.units()))
+                .map(|(cur, number)| (**cur, *number))
                 .collect::<hashbrown::HashMap<_, _>>()
         }
     }
@@ -476,14 +364,15 @@ impl<'a, T> Loader<'a, T> {
         element: parser::Spanned<Element>,
     ) -> Result<DirectiveVariant<'a>, ()> {
         let account_name = balance.account().item().as_ref();
+        let account_rollup = self.rollup_units(account_name);
+        let account = self.accounts.get_mut(&account_name).unwrap();
         let (margin, pad_idx) = if self.open_accounts.contains_key(&account_name) {
             // what's the gap between what we have and what the balance says we should have?
             let mut inventory_has_balance_currency = false;
-            let mut margin = self
-                .rollup_units(account_name)
+            let mut margin = account_rollup
                 .into_iter()
                 .map(|(cur, number)| {
-                    if balance.atol().amount().currency().item() == cur {
+                    if *balance.atol().amount().currency().item() == cur {
                         inventory_has_balance_currency = true;
                         (
                             cur,
@@ -506,8 +395,6 @@ impl<'a, T> Loader<'a, T> {
                 })
                 .collect::<HashMap<_, _>>();
 
-            let account = self.accounts.get_mut(&account_name).unwrap();
-
             // cope with the case of balance currency wasn't in inventory
             if !inventory_has_balance_currency
                 && (balance.atol().amount().number().item().value().abs()
@@ -518,7 +405,7 @@ impl<'a, T> Loader<'a, T> {
                         .unwrap_or(Decimal::ZERO))
             {
                 margin.insert(
-                    balance.atol().amount().currency().item(),
+                    *balance.atol().amount().currency().item(),
                     balance.atol().amount().number().item().value(),
                 );
             }
@@ -559,29 +446,47 @@ impl<'a, T> Loader<'a, T> {
                         number,
                         cur
                     );
-                    let pad_weight = Weight {
-                        number: *number,
-                        currency: cur,
-                        source: WeightSource::Native,
-                    };
 
-                    match self.post(
-                        None,
-                        pad_element.clone(),
-                        pad_date,
-                        account_name,
-                        &pad_weight,
-                        flag,
-                        None,
-                        "pad",
-                    ) {
-                        Ok(posting) => {
-                            pad_postings.push(posting);
-                        }
-                        Err(e) => {
-                            self.errors.push(e);
-                        }
-                    }
+                    // let pad_weight = Weight {
+                    //     number: *number,
+                    //     currency: cur,
+                    //     source: WeightSource::Native,
+                    // };
+
+                    // TODO actually book something
+                    // if let Err(e) = self.book(
+                    //     &element,
+                    //     date,
+                    //     updated_inventory,
+                    //     interpolated_postings.into_iter(),
+                    //     description,
+                    // ) {
+                    //     self.errors.push(e);
+                    //     Err(())
+                    // } else {
+                    //     // where does this come from?
+                    //     todo!()
+                    //     // Ok(DirectiveVariant::Transaction(Transaction { postings }))
+                    // }
+
+                    // TODO use book instead of post
+                    // match self.post(
+                    //     None,
+                    //     pad_element.clone(),
+                    //     pad_date,
+                    //     account_name,
+                    //     &pad_weight,
+                    //     flag,
+                    //     None,
+                    //     "pad",
+                    // ) {
+                    //     Ok(posting) => {
+                    //         pad_postings.push(posting);
+                    //     }
+                    //     Err(e) => {
+                    //         self.errors.push(e);
+                    //     }
+                    // }
                 }
 
                 if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded {
@@ -594,14 +499,12 @@ impl<'a, T> Loader<'a, T> {
                 }
             }
             (Some(margin), None) => {
-                let account = self.accounts.get_mut(&account_name).unwrap();
-
                 let reason = format!(
                     "accumulated {}, error {}",
-                    if account.inventory.is_empty() {
+                    if account.positions.is_empty() {
                         "zero".to_string()
                     } else {
-                        account.inventory.to_string()
+                        account.positions.to_string()
                     },
                     margin
                         .iter()
@@ -644,32 +547,33 @@ impl<'a, T> Loader<'a, T> {
                 );
 
                 tracing::debug!(
-                    "adjusting inventory {:?} for {:?}",
-                    &account.inventory,
+                    "adjusting positions {:?} for {:?}",
+                    &account.positions,
                     &margin
                 );
 
+                // TODO for new booking approach
                 // reset accumulated balance to what was asserted, to localise errors
-                for (cur, units) in margin.into_iter() {
-                    match account.inventory.entry(cur) {
-                        hashbrown::hash_map::Entry::Occupied(mut entry) => {
-                            let accumulated = entry.get_mut();
-                            tracing::debug!(
-                                "adjusting inventory {cur}.{:?} for {:?} by {}",
-                                accumulated,
-                                balance,
-                                &units
-                            );
-                            accumulated.adjust_for_better_balance_violation_reporting(units);
-                        }
-                        hashbrown::hash_map::Entry::Vacant(entry) => {
-                            tracing::debug!("adjusting empty inventory for balance to {}", &units);
-                            entry
-                                .insert(CurrencyPositionsBuilder::default())
-                                .adjust_for_better_balance_violation_reporting(units);
-                        }
-                    };
-                }
+                // for (cur, units) in margin.into_iter() {
+                //     match account.inventory.entry(cur) {
+                //         hashbrown::hash_map::Entry::Occupied(mut entry) => {
+                //             let accumulated = entry.get_mut();
+                //             tracing::debug!(
+                //                 "adjusting inventory {cur}.{:?} for {:?} by {}",
+                //                 accumulated,
+                //                 balance,
+                //                 &units
+                //             );
+                //             accumulated.adjust_for_better_balance_violation_reporting(units);
+                //         }
+                //         hashbrown::hash_map::Entry::Vacant(entry) => {
+                //             tracing::debug!("adjusting empty inventory for balance to {}", &units);
+                //             entry
+                //                 .insert(CurrencyPositionsBuilder::default())
+                //                 .adjust_for_better_balance_violation_reporting(units);
+                //         }
+                //     };
+                // }
             }
             (None, Some(pad)) => {}
             (None, None) => {}
@@ -816,44 +720,10 @@ impl<'a, T> Loader<'a, T> {
     }
 }
 
-#[derive(Default, Debug)]
-struct Inventory<'a>(hashbrown::HashMap<&'a parser::Currency<'a>, CurrencyPositionsBuilder<'a>>); // only non-empty positions are maintained
-
-impl<'a> Deref for Inventory<'a> {
-    type Target = hashbrown::HashMap<&'a parser::Currency<'a>, CurrencyPositionsBuilder<'a>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a> DerefMut for Inventory<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl<'a> Display for Inventory<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // sort currencies for deterministic output
-        let mut sorted_currency_positions =
-            self.iter().map(|(cur, ps)| (*cur, ps)).collect::<Vec<_>>();
-        sorted_currency_positions.sort_by_key(|(cur, ps)| *cur);
-        format(
-            f,
-            &sorted_currency_positions,
-            |f1, (cur, ps)| ps.format(f1, cur),
-            ", ",
-            None,
-        )
-    }
-}
-
 #[derive(Debug)]
 struct AccountBuilder<'a> {
     // TODO support cost in inventory
     allowed_currencies: HashSet<&'a parser::Currency<'a>>,
-    inventory: Inventory<'a>,
     // TODO replace all use of inventory with positions
     positions: beancount_lima_booking::Positions<Date, Decimal, parser::Currency<'a>, &'a str>,
     opened: Span,
@@ -871,7 +741,6 @@ impl<'a> AccountBuilder<'a> {
     {
         AccountBuilder {
             allowed_currencies: allowed_currencies.collect(),
-            inventory: Inventory::default(),
             positions: beancount_lima_booking::Positions::default(),
             opened,
             pad_idx: None,
@@ -897,12 +766,6 @@ struct BalanceDiagnostic<'a> {
 pub(crate) fn pad_flag() -> parser::Flag {
     parser::Flag::Letter(TryInto::<parser::FlagLetter>::try_into('P').unwrap())
 }
-
-mod balancing;
-use balancing::{balance_transaction, Weight, WeightSource};
-
-mod booking;
-use booking::CurrencyPositionsBuilder;
 
 mod types;
 pub(crate) use types::*;

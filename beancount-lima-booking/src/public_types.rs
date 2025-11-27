@@ -83,6 +83,22 @@ where
     pub cost: Option<Cost<D, N, C, L>>,
 }
 
+impl<D, N, C, L> Display for Position<D, N, C, L>
+where
+    D: Copy + Display,
+    N: Copy + Display,
+    C: Clone + Display,
+    L: Clone + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", &self.currency, self.units)?;
+        if let Some(cost) = self.cost.as_ref() {
+            write!(f, " {cost}")?;
+        }
+        Ok(())
+    }
+}
+
 impl<D, N, C, L> Position<D, N, C, L>
 where
     D: Copy,
@@ -383,6 +399,21 @@ where
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug;
 
+impl<D, N, C, L> Display for Positions<D, N, C, L>
+where
+    D: Eq + Ord + Copy + Debug + Display,
+    N: Number + Copy + Debug + Display,
+    C: Eq + Hash + Ord + Clone + Debug + Display,
+    L: Eq + Ord + Clone + Debug + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, p) in self.0.iter().enumerate() {
+            write!(f, "{}{}", if i > 0 { ", " } else { "" }, p)?;
+        }
+        Ok(())
+    }
+}
+
 impl<D, N, C, L> Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
@@ -402,7 +433,7 @@ where
         self.0.insert(i, element)
     }
 
-    pub(crate) fn units(&self) -> HashMap<C, N> {
+    pub fn units(&self) -> HashMap<&C, N> {
         let mut units_by_currency = HashMap::default();
         for Position {
             currency, units, ..
@@ -411,7 +442,7 @@ where
             if units_by_currency.contains_key(currency) {
                 *units_by_currency.get_mut(currency).unwrap() += *units;
             } else {
-                units_by_currency.insert(currency.clone(), *units);
+                units_by_currency.insert(currency, *units);
             }
         }
         units_by_currency

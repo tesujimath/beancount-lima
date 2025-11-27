@@ -11,23 +11,23 @@ use super::{
     PriceSpec, Tolerance, TransactionBookingError,
 };
 
-pub fn book<'a, P, T, I, M>(
+pub fn book<'a, 'b, P, T, I, M>(
     date: P::Date,
-    postings: impl Iterator<Item = P>,
-    tolerance: &T,
+    postings: &[P],
+    tolerance: &'b T,
     inventory: I,
     method: M,
 ) -> Result<Bookings<P>, BookingError>
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'b Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+    'a: 'b,
 {
-    let postings = postings.collect::<Vec<_>>();
     let mut updated_inventory = Inventory::default();
 
-    let currency_groups = categorize_by_currency(&postings, inventory)?;
+    let currency_groups = categorize_by_currency(postings, inventory)?;
 
     for (cur, annotated_postings) in currency_groups {
         let Reductions {
