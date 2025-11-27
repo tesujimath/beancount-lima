@@ -1,9 +1,6 @@
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
-use std::{
-    collections::HashMap,
-    fmt::{self, Display},
-};
+use std::{collections::HashMap, fmt};
 use tabulator::{Align, Cell};
 use time::Date;
 
@@ -87,69 +84,42 @@ impl<'a> beancount_lima_booking::PostingSpec for Posting<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub(crate) struct Cost<'a> {
-    pub(crate) per_unit: Decimal,
-    pub(crate) currency: parser::Currency<'a>,
-    pub(crate) date: Date,
-    pub(crate) label: Option<&'a str>,
-    pub(crate) merge: bool,
-}
+pub(crate) type Cost<'a> =
+    beancount_lima_booking::Cost<Date, Decimal, parser::Currency<'a>, &'a str>;
 
-impl<'a> Display for Cost<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{{{}, {} {}", &self.date, &self.per_unit, &self.currency)?;
-
-        if let Some(label) = &self.label {
-            write!(f, ", \"{label}\"")?;
-        }
-
-        if self.merge {
-            write!(f, ", *",)?;
-        }
-
-        f.write_str("}")
+pub(crate) fn cost_to_cell<'a, 'b>(cost: &'b Cost<'a>) -> Cell<'a>
+where
+    'b: 'a,
+{
+    let mut cells = vec![
+        (cost.date.to_string(), Align::Left).into(),
+        cost.per_unit.into(),
+        (cost.currency.as_ref(), Align::Left).into(),
+    ];
+    if let Some(label) = &cost.label {
+        cells.push((*label, Align::Left).into())
     }
-}
-
-// costs with all the same non-numeric fields are equal if the per-unit is
-// equal, otherwise incomparable
-impl<'a> PartialOrd for Cost<'a> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.date.partial_cmp(&other.date) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.currency.partial_cmp(&other.currency) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.label.partial_cmp(&other.label) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.merge.partial_cmp(&other.merge) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-
-        match self.per_unit.partial_cmp(&other.per_unit) {
-            equal @ Some(core::cmp::Ordering::Equal) => equal,
-            ord => None,
-        }
+    if cost.merge {
+        cells.push(("*", Align::Left).into())
     }
+    Cell::Row(cells, GUTTER_MINOR)
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub(crate) struct Price<'a> {
-    pub(crate) per_unit: Decimal,
-    pub(crate) currency: parser::Currency<'a>,
-}
+pub(crate) type Price<'a> = beancount_lima_booking::Price<Decimal, parser::Currency<'a>>;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub(crate) struct Amount<'a> {
     pub(crate) number: Decimal,
     pub(crate) currency: parser::Currency<'a>,
+}
+
+impl<'a> From<(Decimal, parser::Currency<'a>)> for Amount<'a> {
+    fn from(value: (Decimal, parser::Currency<'a>)) -> Self {
+        Self {
+            number: value.0,
+            currency: value.1,
+        }
+    }
 }
 
 impl<'a> From<&'a parser::Amount<'a>> for Amount<'a> {
@@ -171,6 +141,49 @@ impl<'a> From<Amount<'a>> for Cell<'static> {
             GUTTER_MINOR,
         )
     }
+}
+
+impl<'a, 'b> From<&'b Amount<'a>> for Cell<'a>
+where
+    'b: 'a,
+{
+    fn from(value: &'b Amount<'a>) -> Self {
+        Cell::Row(
+            vec![
+                value.number.into(),
+                (value.currency.as_ref(), Align::Left).into(),
+            ],
+            GUTTER_MINOR,
+        )
+    }
+}
+
+pub(crate) type Positions<'a> =
+    beancount_lima_booking::Positions<Date, Decimal, parser::Currency<'a>, &'a str>;
+
+// should be From, but both types are third-party
+pub(crate) fn positions_to_cell<'a, 'b>(positions: &'b Positions<'a>) -> Cell<'a>
+where
+    'b: 'a,
+{
+    Cell::Stack(positions.iter().map(position_to_cell).collect::<Vec<_>>())
+}
+
+pub(crate) type Position<'a> =
+    beancount_lima_booking::Position<Date, Decimal, parser::Currency<'a>, &'a str>;
+
+pub(crate) fn position_to_cell<'a, 'b>(position: &'b Position<'a>) -> Cell<'a>
+where
+    'b: 'a,
+{
+    let mut cells = vec![
+        position.units.into(),
+        (position.currency.as_ref(), Align::Left).into(),
+    ];
+    if let Some(cost) = &position.cost {
+        cells.push(cost_to_cell(cost))
+    }
+    Cell::Row(cells, GUTTER_MINOR)
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]

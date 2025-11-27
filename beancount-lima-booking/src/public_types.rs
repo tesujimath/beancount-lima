@@ -95,6 +95,22 @@ where
     }
 }
 
+impl<D, N, C, L> From<(N, C)> for Position<D, N, C, L>
+where
+    D: Copy + Display,
+    N: Copy + Display,
+    C: Clone + Display,
+    L: Clone + Display,
+{
+    fn from(value: (N, C)) -> Self {
+        Self {
+            currency: value.1,
+            units: value.0,
+            cost: None,
+        }
+    }
+}
+
 impl<D, N, C, L> Position<D, N, C, L>
 where
     D: Copy,
@@ -414,6 +430,18 @@ where
             write!(f, "{}{}", if i > 0 { ", " } else { "" }, p)?;
         }
         Ok(())
+    }
+}
+
+impl<D, N, C, L> From<Position<D, N, C, L>> for Positions<D, N, C, L>
+where
+    D: Eq + Ord + Copy + Debug,
+    N: Number + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    L: Eq + Ord + Clone + Debug,
+{
+    fn from(value: Position<D, N, C, L>) -> Self {
+        Self(vec![value])
     }
 }
 

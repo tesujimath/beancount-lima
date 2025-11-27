@@ -6,7 +6,7 @@ use beancount_parser_lima::{self as parser, Span, Spanned};
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fmt::Debug,
 };
 use tabulator::{Align, Cell};
@@ -206,37 +206,58 @@ impl<'a, T> Loader<'a, T> {
                     element
                 );
 
+                // group postings by account and currency for balance diagnostics
+                let mut account_posting_amounts =
+                    hashbrown::HashMap::<&str, VecDeque<Amount<'_>>>::new();
                 for interpolated in &interpolated_postings {
-                    self.tally_currency_usage(interpolated.currency);
-                }
+                    use hashbrown::hash_map::Entry::*;
 
-                // use hashbrown::hash_map::Entry::*;
+                    let currency = interpolated.currency;
+                    let units = interpolated.units;
+
+                    self.tally_currency_usage(currency);
+
+                    let account_name = interpolated.posting.account();
+                    let account = self.validate_account(element, account_name)?;
+
+                    match account_posting_amounts.entry(account_name) {
+                        Occupied(entry) => {
+                            entry.into_mut().push_back((units, currency).into());
+                        }
+                        Vacant(entry) => {
+                            let mut amounts = VecDeque::new();
+                            amounts.push_back((units, currency).into());
+                            entry.insert(amounts);
+                        }
+                    }
+                }
 
                 for (account_name, updated_positions) in updated_inventory {
                     let account = self.validate_account(element, account_name)?;
 
                     account.positions = updated_positions;
 
-                    // account.post(posting.clone(), Some(amount.currency), None);
+                    if let Some(mut posting_amounts) = account_posting_amounts.remove(account_name)
+                    {
+                        let last_amount = posting_amounts.pop_back().unwrap();
 
-                    // TODO
-                    // account.balance_diagnostics.push(BalanceDiagnostic {
-                    //     date,
-                    //     description: Some(description),
-                    //     amount: Some(amount.clone()),
-                    //     balance,
-                    // });
+                        for amount in posting_amounts {
+                            account.balance_diagnostics.push(BalanceDiagnostic {
+                                date,
+                                description: Some(description),
+                                amount: Some(amount),
+                                positions: None,
+                            });
+                        }
+
+                        account.balance_diagnostics.push(BalanceDiagnostic {
+                            date,
+                            description: Some(description),
+                            amount: Some(last_amount),
+                            positions: Some(account.positions.clone()),
+                        });
+                    }
                 }
-
-                // let postings = interpolated_postings
-                //     .into_iter()
-                //     .map(|interpolated| Posting {
-                //         Some(parsed: interpolated.posting),
-                //         flag: None, // TODO pass through flag
-                //         account: interpolated.posting.account(),
-                //         units: interpolated.units,
-                //         currency: interpolated.currency,
-                //     });
 
                 let postings = interpolated_postings
                     .into_iter()
@@ -511,19 +532,19 @@ impl<'a, T> Loader<'a, T> {
                 let annotation = Cell::Stack(
                     account
                         .balance_diagnostics
-                        .drain(..)
+                        .iter()
                         .map(|bd| {
                             Cell::Row(
                                 vec![
                                     (bd.date.to_string(), Align::Left).into(),
-                                    bd.amount.map(|amt| amt.into()).unwrap_or(Cell::Empty),
-                                    Cell::Row(
-                                        bd.balance
-                                            .into_iter()
-                                            .map(|amt| amt.into())
-                                            .collect::<Vec<_>>(),
-                                        GUTTER_MINOR,
-                                    ),
+                                    bd.amount
+                                        .as_ref()
+                                        .map(|amt| amt.into())
+                                        .unwrap_or(Cell::Empty),
+                                    bd.positions
+                                        .as_ref()
+                                        .map(positions_to_cell)
+                                        .unwrap_or(Cell::Empty),
                                     bd.description
                                         .map(|d| (d, Align::Left).into())
                                         .unwrap_or(Cell::Empty),
@@ -575,11 +596,14 @@ impl<'a, T> Loader<'a, T> {
 
         let account = self.accounts.get_mut(&account_name).unwrap();
         account.balance_diagnostics.clear();
+        let balance_amount = balance.atol().amount().item();
+        let balance_units = balance_amount.number().item().value();
+        let balance_cur = *balance_amount.currency().item();
         account.balance_diagnostics.push(BalanceDiagnostic {
             date,
             description: None,
             amount: None,
-            balance: vec![balance.atol().amount().item().into()],
+            positions: Some(Into::<Position<'_>>::into((balance_units, balance_cur)).into()),
         });
 
         Ok(DirectiveVariant::NA)
@@ -719,7 +743,7 @@ struct AccountBuilder<'a> {
     // TODO support cost in inventory
     allowed_currencies: HashSet<parser::Currency<'a>>,
     // TODO replace all use of inventory with positions
-    positions: beancount_lima_booking::Positions<Date, Decimal, parser::Currency<'a>, &'a str>,
+    positions: Positions<'a>,
     opened: Span,
     // TODO booking
     //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
@@ -735,7 +759,7 @@ impl<'a> AccountBuilder<'a> {
     {
         AccountBuilder {
             allowed_currencies: allowed_currencies.collect(),
-            positions: beancount_lima_booking::Positions::default(),
+            positions: Positions::default(),
             opened,
             pad_idx: None,
             balance_diagnostics: Vec::default(),
@@ -754,7 +778,7 @@ struct BalanceDiagnostic<'a> {
     date: Date,
     description: Option<&'a str>,
     amount: Option<Amount<'a>>,
-    balance: Vec<Amount<'a>>,
+    positions: Option<Positions<'a>>,
 }
 
 pub(crate) fn pad_flag() -> parser::Flag {
