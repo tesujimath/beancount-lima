@@ -38,11 +38,8 @@ pub(crate) struct Posting<'a> {
     pub(crate) account: &'a str,
     pub(crate) units: Decimal,
     pub(crate) currency: parser::Currency<'a>,
-    // pub(crate) cost: Option<
-    //     beancount_lima_booking::PostingCosts<Date, Decimal, parser::Currency<'a>, &'a str>,
-    // >,
-    // TODO price
-    // pub(crate) price: Option<Price<'a>>,
+    pub(crate) cost: Option<Cost<'a>>,
+    pub(crate) price: Option<Price<'a>>,
     // pub(crate) metadata: Metadata<'a>,
 }
 
@@ -74,12 +71,12 @@ impl<'a> beancount_lima_booking::PostingSpec for Posting<'a> {
     }
 
     fn cost(&self) -> Option<Self::CostSpec> {
-        // TODO cost
+        // TODO cost_spec from cost
         None
     }
 
     fn price(&self) -> Option<Self::PriceSpec> {
-        // TODO price
+        // TODO price_spec from price
         None
     }
 }
@@ -104,6 +101,24 @@ where
     }
     Cell::Row(cells, GUTTER_MINOR)
 }
+
+pub(crate) type PostingCost<'a> = beancount_lima_booking::PostingCost<Date, Decimal, &'a str>;
+
+pub(crate) fn cur_posting_cost_to_cost<'a>(
+    currency: parser::Currency<'a>,
+    cost: PostingCost<'a>,
+) -> Cost<'a> {
+    Cost {
+        date: cost.date,
+        per_unit: cost.per_unit,
+        currency,
+        label: cost.label,
+        merge: cost.merge,
+    }
+}
+
+pub(crate) type PostingCosts<'a> =
+    beancount_lima_booking::PostingCosts<Date, Decimal, parser::Currency<'a>, &'a str>;
 
 pub(crate) type Price<'a> = beancount_lima_booking::Price<Decimal, parser::Currency<'a>>;
 

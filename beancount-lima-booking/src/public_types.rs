@@ -222,8 +222,8 @@ where
     C: Clone,
     L: Clone,
 {
-    pub cost_currency: C,
-    pub adjustments: Vec<PostingCost<D, N, L>>,
+    pub(crate) cost_currency: C,
+    pub(crate) adjustments: Vec<PostingCost<D, N, L>>,
 }
 
 impl<D, N, C, L> PostingCosts<D, N, C, L>
@@ -242,6 +242,10 @@ where
 
     pub fn iter(&self) -> impl Iterator<Item = (&C, &PostingCost<D, N, L>)> {
         repeat(&self.cost_currency).zip(self.adjustments.iter())
+    }
+
+    pub fn into_currency_costs(self) -> impl Iterator<Item = (C, PostingCost<D, N, L>)> {
+        repeat(self.cost_currency).zip(self.adjustments)
     }
 }
 

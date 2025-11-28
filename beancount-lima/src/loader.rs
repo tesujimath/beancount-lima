@@ -1,7 +1,7 @@
 // TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
 
-use beancount_lima_booking::Bookings;
+use beancount_lima_booking::{Bookings, Interpolated};
 use beancount_parser_lima::{self as parser, Span, Spanned};
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
@@ -206,18 +206,56 @@ impl<'a, T> Loader<'a, T> {
                     element
                 );
 
+                // an interpolated posting arising from a reduction with multiple costs is mapped here to several postings,
+                // each with a simple cost, so we don't have to deal with composite costs for a posting elsewhere
+                let booked_postings = interpolated_postings
+                    .into_iter()
+                    .flat_map(|interpolated| {
+                        let Interpolated {
+                            posting,
+                            units,
+                            currency,
+                            cost,
+                            price,
+                            ..
+                        } = interpolated;
+                        if let Some(costs) = cost {
+                            costs
+                                .into_currency_costs()
+                                .map(|(cur, cost)| Posting {
+                                    flag: None, // TODO pass through posting flag
+                                    account: posting.account(),
+                                    units: cost.units,
+                                    currency,
+                                    cost: Some(cur_posting_cost_to_cost(cur, cost)),
+                                    price: price.as_ref().cloned(),
+                                })
+                                .collect::<Vec<_>>()
+                        } else {
+                            vec![Posting {
+                                flag: None, // TODO pass through posting flag
+                                account: posting.account(),
+                                units,
+                                currency,
+                                cost: None,
+                                price,
+                            }]
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
                 // group postings by account and currency for balance diagnostics
                 let mut account_posting_amounts =
                     hashbrown::HashMap::<&str, VecDeque<Amount<'_>>>::new();
-                for interpolated in &interpolated_postings {
+                for booked in &booked_postings {
                     use hashbrown::hash_map::Entry::*;
 
-                    let currency = interpolated.currency;
-                    let units = interpolated.units;
+                    let currency = booked.currency;
+                    let units = booked.units;
 
                     self.tally_currency_usage(currency);
 
-                    let account_name = interpolated.posting.account();
+                    let account_name = booked.account;
                     let account = self.validate_account(element, account_name)?;
 
                     match account_posting_amounts.entry(account_name) {
@@ -259,21 +297,7 @@ impl<'a, T> Loader<'a, T> {
                     }
                 }
 
-                let postings = interpolated_postings
-                    .into_iter()
-                    .enumerate()
-                    .map(|(idx, interpolated)| {
-                        let posting = &postings[idx];
-
-                        Posting {
-                            flag: None, // TODO carry through flag
-                            account: posting.account(),
-                            units: interpolated.units,
-                            currency: interpolated.currency,
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                Ok(postings)
+                Ok(booked_postings)
             }
             Err(e) => {
                 tracing::error!("booking error {}", &e);
@@ -487,12 +511,16 @@ impl<'a, T> Loader<'a, T> {
                                     account: balance.account().item().as_ref(),
                                     units: *number,
                                     currency: *cur,
+                                    cost: None,
+                                    price: None,
                                 },
                                 Posting {
                                     flag: Some(pad_flag()),
                                     account: pad_source,
                                     units: -*number,
                                     currency: *cur,
+                                    cost: None,
+                                    price: None,
                                 },
                             ]
                         })
