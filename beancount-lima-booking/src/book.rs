@@ -724,7 +724,9 @@ where
                 (None, None) => Equal,
                 (None, Some(_)) => Less,
                 (Some(_), None) => Greater,
-                (Some((cost, units)), Some(position_cost)) => cost.cmp(position_cost),
+                (Some((cost, units)), Some(position_cost)) => {
+                    cost.partial_cmp(position_cost).unwrap_or(Equal)
+                }
             });
         match (insertion_idx, posting_cost) {
             (Ok(i), None) => {

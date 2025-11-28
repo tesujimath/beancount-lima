@@ -49,7 +49,7 @@
           ];
 
           beancount-lima =
-            let cargo = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+            let cargo = builtins.fromTOML (builtins.readFile ./beancount-lima/Cargo.toml);
             in pkgs.rustPlatform.buildRustPackage
               {
                 pname = "beancount-lima";
