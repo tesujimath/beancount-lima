@@ -52,7 +52,11 @@ where
             method,
         )?;
 
-        tracing::debug!("book reductions {:?} {:?}", &cur, updated_inventory_for_cur);
+        tracing::debug!(
+            "{date} booked reductions {:?} {:?}",
+            &cur,
+            updated_inventory_for_cur
+        );
         for (account, positions) in updated_inventory_for_cur {
             updated_inventory.insert(account, positions);
         }
@@ -60,11 +64,9 @@ where
         let Interpolation {
             booked_and_unbooked_postings,
         } = interpolate_from_costed(date, &cur, costed_postings, tolerance)?;
-        tracing::debug!("weights {:?}", &booked_and_unbooked_postings);
 
         let updated_inventory_for_cur = book_augmentations(
             date,
-            cur.clone(),
             booked_and_unbooked_postings
                 .iter()
                 .filter_map(|(p, booked)| (!booked).then_some(p)),
@@ -159,7 +161,7 @@ where
 
 fn book_reductions<'a, 'b, P, T, I, M>(
     date: P::Date,
-    currency: P::Currency,
+    bucket_currency: P::Currency,
     annotateds: Vec<AnnotatedPosting<P, P::Currency>>,
     tolerance: &T,
     inventory: I,
@@ -175,19 +177,34 @@ where
 
     let mut updated_inventory = HashMap::default();
 
+    tracing::debug!(
+        "{date} {bucket_currency} book_reductions {:?} {:?}",
+        bucket_currency,
+        annotateds
+            .iter()
+            .map(|a| (&a.idx, &a.currency, &a.cost_currency, &a.price_currency,))
+            .collect::<Vec<_>>()
+    );
+
     let costed_postings = annotateds
         .into_iter()
         .map(|annotated| {
             let account = annotated.posting.account();
 
             match (
+                &annotated.currency,
                 &annotated.cost_currency,
                 annotated.posting.units(),
                 updated_inventory
                     .get(&account)
                     .or_else(|| inventory(account.clone())),
             ) {
-                (Some(posting_cost_currency), Some(posting_units), Some(previous_positions)) => {
+                (
+                    Some(posting_currency),
+                    Some(posting_cost_currency),
+                    Some(posting_units),
+                    Some(previous_positions),
+                ) => {
                     // TODO booking methods other than strict
                     // let method = method(account.clone());
                     // we already warn about this, so we simply ignore it here
@@ -199,10 +216,18 @@ where
                     //         ),
                     //     ))
                     // } else
+                    tracing::debug!(
+                        "{date} {bucket_currency} book_reductions 1 {:?} {:?} {:?} {:?}",
+                        posting_currency,
+                        posting_cost_currency,
+                        posting_units,
+                        previous_positions
+                    );
+
                     if let Some(ann_sign) = posting_units.sign()
                         && previous_positions
                             .iter()
-                            .filter(|pos| pos.currency == currency && pos.cost.is_some())
+                            .filter(|pos| &pos.currency == posting_currency && pos.cost.is_some())
                             .any(|pos| {
                                 pos.units
                                     .sign()
@@ -218,7 +243,9 @@ where
                             .filter_map(|(i, pos)| {
                                 match (pos.cost.as_ref(), annotated.posting.cost().as_ref()) {
                                     (Some(pos_cost), Some(cost_spec)) => {
-                                        cost_matches_spec(pos_cost, cost_spec, date)
+                                        tracing::debug!("{date} {bucket_currency} book_reductions check match {:?} {:?} {:?} {}",
+                                        pos_cost, cost_spec, date, cost_matches_spec(pos_cost, cost_spec ));
+                                        cost_matches_spec(pos_cost, cost_spec )
                                             .then_some((i, pos.clone()))
                                     }
                                     _ => None,
@@ -227,7 +254,7 @@ where
                             .collect::<Vec<_>>();
 
                         tracing::debug!(
-                            "book_reductions matched {:?} with {:?}",
+                            "{date} {bucket_currency} book_reductions matched {:?} with {:?}",
                             &annotated,
                             &matched_positions
                         );
@@ -274,7 +301,7 @@ where
                                 posting: annotated.posting,
                                 idx: annotated.idx,
                                 units: posting_units,
-                                currency: currency.clone(),
+                                currency: posting_currency.clone(),
                                 cost: Some(PostingCosts {
                                     cost_currency: matched_currency.clone(),
                                     adjustments: vec![PostingCost {
@@ -294,7 +321,7 @@ where
                                     .iter()
                                     .filter_map(|pos| pos.cost.is_some().then_some(pos.units))
                                     .chain(once(posting_units)),
-                                &currency,
+                                posting_currency,
                             )
                             .is_none()
                         {
@@ -337,7 +364,7 @@ where
                                     posting: annotated.posting,
                                     idx: annotated.idx,
                                     units: posting_units,
-                                    currency: currency.clone(),
+                                    currency: posting_currency.clone(),
                                     cost: Some(PostingCosts {
                                         cost_currency,
                                         adjustments: matched_positions
@@ -371,10 +398,20 @@ where
                             ))
                         }
                     } else {
+                        tracing::debug!(
+                            "{date} {bucket_currency} book_reductions failed with {:?} {:?}",
+                            posting_units.sign(),
+                            previous_positions
+                        );
+
                         Ok(Unbooked(annotated))
                     }
                 }
-                _ => Ok(Unbooked(annotated)),
+                x => {
+                    tracing::debug!("{date} {bucket_currency} book_reductions x {:?}", x,);
+
+                    Ok(Unbooked(annotated))
+                }
             }
         })
         .collect::<Result<Vec<_>, BookingError>>()?;
@@ -532,11 +569,7 @@ where
     Ok(currency_groups)
 }
 
-pub(crate) fn cost_matches_spec<D, N, C, L, CS>(
-    cost: &Cost<D, N, C, L>,
-    cost_spec: &CS,
-    default_date: D,
-) -> bool
+pub(crate) fn cost_matches_spec<D, N, C, L, CS>(cost: &Cost<D, N, C, L>, cost_spec: &CS) -> bool
 where
     D: Eq + Copy,
     N: Eq + Copy,
@@ -545,7 +578,7 @@ where
     CS: CostSpec<Date = D, Number = N, Currency = C, Label = L>,
 {
     !(
-        cost_spec.date().unwrap_or(default_date) != cost.date
+        cost_spec.date().is_some_and(|date| date != cost.date)
             || cost_spec
                 .currency()
                 .is_some_and(|cost_spec_currency| cost_spec_currency != cost.currency)
@@ -602,7 +635,6 @@ where
 
 fn book_augmentations<'a, 'b, P, T, I, M>(
     date: P::Date,
-    currency: P::Currency,
     interpolateds: impl Iterator<Item = &'b Interpolated<P, P::Date, P::Number, P::Currency, P::Label>>,
     tolerance: &T,
     inventory: I,
@@ -630,16 +662,32 @@ where
         // .or_else(|| inventory(account.clone()));
 
         if let Some(posting_costs) = interpolated.cost.as_ref() {
+            tracing::debug!(
+                "{date} book_augmentations with cost {:?} {:?} {:?}",
+                interpolated.units,
+                &interpolated.currency,
+                &posting_costs,
+            );
             for (currency, posting_cost) in posting_costs.iter() {
                 previous_positions.accumulate(
                     interpolated.units,
-                    currency.clone(),
+                    interpolated.currency.clone(),
                     Some(posting_cost.clone()),
                     method,
                 );
             }
         } else {
-            previous_positions.accumulate(interpolated.units, currency.clone(), None, method);
+            tracing::debug!(
+                "{date} book_augmentations without cost {:?} {:?}",
+                interpolated.units,
+                &interpolated.currency,
+            );
+            previous_positions.accumulate(
+                interpolated.units,
+                interpolated.currency.clone(),
+                None,
+                method,
+            );
         }
     }
     Ok(updated_inventory.into())

@@ -29,11 +29,6 @@ where
     P: PostingSpec + Debug + 'i,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
 {
-    tracing::debug!(
-        "interpolate_from_costed {date} {:?} {:?}",
-        &currency,
-        &costeds
-    );
     let mut weights = costeds.iter().map(|c| c.weight()).collect::<Vec<_>>();
     let residual = tolerance.residual(weights.iter().filter_map(|w| *w), currency);
     tracing::debug!("{date} weights for {:?} {:?}", &currency, &weights);
@@ -42,7 +37,7 @@ where
         .enumerate()
         .filter(|w| w.1.is_none())
         .collect::<Vec<_>>();
-    tracing::debug!("unknown values for {:?} {:?}", &currency, &unknown);
+    tracing::debug!("{date} unknown values for {:?} {:?}", &currency, &unknown);
     match (residual, unknown.len()) {
         (None, 0) => (),
         (None, 1) => Err(BookingError::Transaction(
@@ -91,6 +86,10 @@ where
                                 Some(currency),
                                 Some(cost),
                             ) => {
+                                tracing::debug!(
+                                    "{date} {currency} interpolate_from_costed {units} {:?}",
+                                    &cost
+                                );
                                 Ok((
                                     Interpolated {
                                         posting: a.posting,
