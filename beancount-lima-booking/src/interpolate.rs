@@ -87,8 +87,9 @@ where
                                 Some(cost),
                             ) => {
                                 tracing::debug!(
-                                    "{date} {currency} interpolate_from_costed {units} {:?}",
-                                    &cost
+                                    "{date} {currency} interpolate_from_costed {units} {:?} annotated cost currency {:?}",
+                                    &cost,
+                                    a.cost_currency,
                                 );
                                 Ok((
                                     Interpolated {

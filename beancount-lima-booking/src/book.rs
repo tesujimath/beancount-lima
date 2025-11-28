@@ -139,7 +139,7 @@ where
                     previous_positions.accumulate(
                         adj.units,
                         posting.currency(),
-                        Some(adj.clone()),
+                        Some((cur.clone(), adj.clone())),
                         method,
                     );
                 }
@@ -672,7 +672,7 @@ where
                 previous_positions.accumulate(
                     interpolated.units,
                     interpolated.currency.clone(),
-                    Some(posting_cost.clone()),
+                    Some((currency.clone(), posting_cost.clone())),
                     method,
                 );
             }
@@ -704,17 +704,17 @@ where
         &mut self,
         units: N,
         currency: C,
-        posting_cost: Option<PostingCost<D, N, L>>,
+        posting_cost: Option<(C, PostingCost<D, N, L>)>,
         method: M,
     ) where
         M: Fn(A) -> Booking + Copy, // 'i for inventory
     {
         use Ordering::*;
 
-        let posting_cost = posting_cost.map(|posting_cost| {
+        let posting_cost = posting_cost.map(|(posting_cost_currency, posting_cost)| {
             let units = posting_cost.units;
             (
-                Into::<Cost<D, N, C, L>>::into((currency.clone(), posting_cost)),
+                Into::<Cost<D, N, C, L>>::into((posting_cost_currency.clone(), posting_cost)),
                 units,
             )
         });

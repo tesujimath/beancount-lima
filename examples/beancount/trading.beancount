@@ -48,10 +48,11 @@
   Expenses:Financial:Commissions                                           9.95 USD
   Income:US:ETrade:PnL
 
-2014-05-02 * "Selling some newer blue chips."
-  Assets:US:ETrade:IBM                                                       -4 IBM {180.00 USD} @ 186.00 USD
-  Assets:US:ETrade:Cash                                                  744.00 USD
-  Expenses:Financial:Commissions                                           9.95 USD
-  Income:US:ETrade:PnL
+;; this is an error when using strict booking, becuase it matches the lots from both 2014-02-18 and 2014-04-26
+;; 2014-05-02 * "Selling some newer blue chips."
+;;   Assets:US:ETrade:IBM                                                       -4 IBM {180.00 USD} @ 186.00 USD
+;;   Assets:US:ETrade:Cash                                                  744.00 USD
+;;   Expenses:Financial:Commissions                                           9.95 USD
+;;   Income:US:ETrade:PnL
 
 ;; TODO dated lots
