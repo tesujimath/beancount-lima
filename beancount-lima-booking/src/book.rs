@@ -6,7 +6,7 @@ use std::{
     cmp::Ordering,
     fmt::Debug,
     hash::Hash,
-    iter::{once, repeat},
+    iter::{once, repeat_n},
 };
 
 use super::{
@@ -30,7 +30,7 @@ where
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
     'a: 'b,
 {
-    let mut interpolated_postings = repeat(None).take(postings.len()).collect::<Vec<_>>();
+    let mut interpolated_postings = repeat_n(None, postings.len()).collect::<Vec<_>>();
     let mut updated_inventory = Inventory::default();
 
     let currency_groups = categorize_by_currency(postings, inventory)?;

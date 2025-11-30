@@ -12,8 +12,8 @@ use std::{
 use tabulator::{Align, Cell};
 use time::Date;
 
+use crate::config::LoaderConfig;
 use crate::format::GUTTER_MEDIUM;
-use crate::{config::LoaderConfig, format::GUTTER_MINOR};
 
 #[derive(Debug)]
 pub(crate) struct Loader<'a, T> {
@@ -27,7 +27,6 @@ pub(crate) struct Loader<'a, T> {
     default_booking: parser::Booking,
     inferred_tolerance: InferredTolerance<'a>,
     tolerance: T,
-    errors: Vec<parser::AnnotatedError>,
     warnings: Vec<parser::AnnotatedWarning>,
 }
 
@@ -58,18 +57,19 @@ impl<'a, T> Loader<'a, T> {
             default_booking,
             tolerance,
             inferred_tolerance,
-            errors: Vec::default(),
             warnings: Vec::default(),
         }
     }
 
     // generate any errors before building
-    fn validate(self) -> Result<LoadSuccess<'a>, LoadError> {
+    fn validate(
+        self,
+        mut errors: Vec<parser::AnnotatedError>,
+    ) -> Result<LoadSuccess<'a>, LoadError> {
         let Self {
             directives,
             accounts,
             currency_usage,
-            mut errors,
             warnings,
             ..
         } = self;
@@ -96,14 +96,29 @@ impl<'a, T> Loader<'a, T> {
         I: IntoIterator<Item = &'a Spanned<parser::Directive<'a>>>,
         T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
+        let mut errors = Vec::default();
+
         for directive in directives {
-            self.directive(directive);
+            match self.directive(directive) {
+                Ok(loaded) => {
+                    self.directives.push(Directive {
+                        parsed: directive,
+                        loaded,
+                    });
+                }
+                Err(e) => {
+                    errors.push(e);
+                }
+            }
         }
 
-        self.validate()
+        self.validate(errors)
     }
 
-    fn directive(&mut self, directive: &'a Spanned<parser::Directive<'a>>)
+    fn directive(
+        &mut self,
+        directive: &'a Spanned<parser::Directive<'a>>,
+    ) -> Result<DirectiveVariant<'a>, parser::AnnotatedError>
     where
         T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
@@ -112,8 +127,7 @@ impl<'a, T> Loader<'a, T> {
         let date = *directive.date().item();
         let element = into_spanned_element(directive);
 
-        // errors and warnings are accumulated within these methods
-        if let Ok(loaded) = match directive.variant() {
+        match directive.variant() {
             Transaction(transaction) => self.transaction(transaction, date, element),
             Price(price) => Ok(DirectiveVariant::NA),
             Balance(balance) => self.balance(balance, date, element),
@@ -126,11 +140,6 @@ impl<'a, T> Loader<'a, T> {
             Event(event) => Ok(DirectiveVariant::NA),
             Query(query) => Ok(DirectiveVariant::NA),
             Custom(custom) => Ok(DirectiveVariant::NA),
-        } {
-            self.directives.push(Directive {
-                parsed: directive,
-                loaded,
-            });
         }
     }
 
@@ -139,7 +148,7 @@ impl<'a, T> Loader<'a, T> {
         transaction: &'a parser::Transaction<'a>,
         date: Date,
         element: parser::Spanned<Element>,
-    ) -> Result<DirectiveVariant<'a>, ()>
+    ) -> Result<DirectiveVariant<'a>, parser::AnnotatedError>
     where
         T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
@@ -153,13 +162,8 @@ impl<'a, T> Loader<'a, T> {
         );
 
         let postings = transaction.postings().collect::<Vec<_>>();
-        match self.book(&element, date, &postings, description) {
-            Ok(postings) => Ok(DirectiveVariant::Transaction(Transaction { postings })),
-            Err(e) => {
-                self.errors.push(e);
-                Err(())
-            }
-        }
+        self.book(&element, date, &postings, description)
+            .map(|postings| DirectiveVariant::Transaction(Transaction { postings }))
     }
 
     fn book<P>(
@@ -309,9 +313,7 @@ impl<'a, T> Loader<'a, T> {
                         // TODO attach posting error to actual posting
                         // let bad_posting = postings[*idx];
                         // bad_posting.error(e.to_string()).into()
-                        Err(element
-                            .error(format!("{} on posting {}", e.to_string(), idx))
-                            .into())
+                        Err(element.error(format!("{e} on posting {idx}")).into())
                     }
                 }
             }
@@ -420,14 +422,15 @@ impl<'a, T> Loader<'a, T> {
         balance: &'a parser::Balance,
         date: Date,
         element: parser::Spanned<Element>,
-    ) -> Result<DirectiveVariant<'a>, ()>
+    ) -> Result<DirectiveVariant<'a>, parser::AnnotatedError>
     where
         T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
         let account_name = balance.account().item().as_ref();
         let account_rollup = self.rollup_units(account_name);
-        let account = self.accounts.get_mut(&account_name).unwrap();
-        let (margin, pad_idx) = if self.open_accounts.contains_key(&account_name) {
+        let account = self.validate_account(&element, account_name)?;
+
+        let (margin, pad_idx) = {
             // what's the gap between what we have and what the balance says we should have?
             let mut inventory_has_balance_currency = false;
             let mut margin = account_rollup
@@ -476,10 +479,6 @@ impl<'a, T> Loader<'a, T> {
                 (!margin.is_empty()).then_some(margin),
                 account.pad_idx.take(),
             )
-        } else {
-            self.errors
-                .push(element.error("account not open".to_string()).into());
-            (None, None)
         };
 
         tracing::debug!("balance {:?} {:?}", &margin, pad_idx);
@@ -526,11 +525,9 @@ impl<'a, T> Loader<'a, T> {
                         })
                         .collect::<Vec<_>>();
 
-                    if let Err(e) = self.book(&element, date, &pad_postings, "pad") {
-                        self.errors.push(e);
-                        Err(())?
-                    } else if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded
-                    {
+                    self.book(&element, date, &pad_postings, "pad")?;
+
+                    if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded {
                         pad.postings = pad_postings;
                         tracing::debug!("pad postings inserted for {:?}", pad);
                     }
@@ -583,17 +580,9 @@ impl<'a, T> Loader<'a, T> {
                         .collect::<Vec<_>>(),
                 );
 
-                self.errors.push(
-                    element
-                        .error(reason)
-                        .with_annotation(annotation.to_string()),
-                );
-
-                tracing::debug!(
-                    "adjusting positions {:?} for {:?}",
-                    &account.positions,
-                    &margin
-                );
+                return Err(element
+                    .error(reason)
+                    .with_annotation(annotation.to_string()));
 
                 // TODO for new booking approach
                 // reset accumulated balance to what was asserted, to localise errors
@@ -642,18 +631,16 @@ impl<'a, T> Loader<'a, T> {
         open: &'a parser::Open,
         date: Date,
         element: parser::Spanned<Element>,
-    ) -> Result<DirectiveVariant<'a>, ()> {
+    ) -> Result<DirectiveVariant<'a>, parser::AnnotatedError> {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(open.account().item().as_ref()) {
             Occupied(open_entry) => {
-                self.errors.push(
-                    element
-                        .error_with_contexts(
-                            "account already opened",
-                            vec![("open".to_string(), *open_entry.get())],
-                        )
-                        .into(),
-                );
+                return Err(element
+                    .error_with_contexts(
+                        "account already opened",
+                        vec![("open".to_string(), *open_entry.get())],
+                    )
+                    .into());
             }
             Vacant(open_entry) => {
                 let span = element.span();
@@ -661,14 +648,12 @@ impl<'a, T> Loader<'a, T> {
 
                 // cannot reopen a closed account
                 if let Some(closed) = self.closed_accounts.get(&open.account().item().as_ref()) {
-                    self.errors.push(
-                        element
-                            .error_with_contexts(
-                                "account was closed",
-                                vec![("close".to_string(), *closed)],
-                            )
-                            .into(),
-                    );
+                    return Err(element
+                        .error_with_contexts(
+                            "account was closed",
+                            vec![("close".to_string(), *closed)],
+                        )
+                        .into());
                 } else {
                     self.accounts.insert(
                         open.account().item().as_ref(),
@@ -702,21 +687,19 @@ impl<'a, T> Loader<'a, T> {
         close: &'a parser::Close,
         date: Date,
         element: parser::Spanned<Element>,
-    ) -> Result<DirectiveVariant<'a>, ()> {
+    ) -> Result<DirectiveVariant<'a>, parser::AnnotatedError> {
         use hashbrown::hash_map::Entry::*;
         match self.open_accounts.entry(close.account().item().as_ref()) {
             Occupied(open_entry) => {
                 match self.closed_accounts.entry(close.account().item().as_ref()) {
                     Occupied(closed_entry) => {
                         // cannot reclose a closed account
-                        self.errors.push(
-                            element
-                                .error_with_contexts(
-                                    "account was already closed",
-                                    vec![("close".to_string(), *closed_entry.get())],
-                                )
-                                .into(),
-                        );
+                        return Err(element
+                            .error_with_contexts(
+                                "account was already closed",
+                                vec![("close".to_string(), *closed_entry.get())],
+                            )
+                            .into());
                     }
                     Vacant(closed_entry) => {
                         open_entry.remove_entry();
@@ -725,7 +708,7 @@ impl<'a, T> Loader<'a, T> {
                 }
             }
             Vacant(_) => {
-                self.errors.push(element.error("account not open").into());
+                return Err(element.error("account not open").into());
             }
         }
 
@@ -734,35 +717,29 @@ impl<'a, T> Loader<'a, T> {
 
     fn pad(
         &mut self,
-        pad: &parser::Pad,
+        pad: &'a parser::Pad<'a>,
         date: Date,
         element: parser::Spanned<Element>,
-    ) -> Result<DirectiveVariant<'a>, ()> {
+    ) -> Result<DirectiveVariant<'a>, parser::AnnotatedError> {
+        let n_directives = self.directives.len();
         let account_name = pad.account().item().as_ref();
-        if self.open_accounts.contains_key(account_name) {
-            let account = self.accounts.get_mut(account_name).unwrap();
-            let source = pad.source().to_string();
+        let account = self.validate_account(&element, account_name)?;
+        let source = pad.source().to_string();
 
-            let unused_pad_idx = account.pad_idx.replace(self.directives.len());
+        let unused_pad_idx = account.pad_idx.replace(n_directives);
 
-            // unused pad directives are errors
-            // https://beancount.github.io/docs/beancount_language_syntax.html#unused-pad-directives
-            if let Some(unused_pad_idx) = unused_pad_idx {
-                self.errors.push(
-                    self.directives[unused_pad_idx]
-                        .parsed
-                        .error("unused")
-                        .into(),
-                );
-            }
-
-            Ok(DirectiveVariant::Pad(Pad {
-                postings: Vec::default(),
-            }))
-        } else {
-            self.errors.push(element.error("account not open").into());
-            Err(())
+        // unused pad directives are errors
+        // https://beancount.github.io/docs/beancount_language_syntax.html#unused-pad-directives
+        if let Some(unused_pad_idx) = unused_pad_idx {
+            return Err(self.directives[unused_pad_idx]
+                .parsed
+                .error("unused")
+                .into());
         }
+
+        Ok(DirectiveVariant::Pad(Pad {
+            postings: Vec::default(),
+        }))
     }
 }
 
