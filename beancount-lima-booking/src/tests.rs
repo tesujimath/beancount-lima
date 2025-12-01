@@ -1,11 +1,12 @@
-use beancount_lima_booking::{
-    Booking, BookingError, Bookings, Inventory, Tolerance, TransactionBookingError,
-};
 use beancount_parser_lima as parser;
-use rust_decimal::Decimal;
 use std::io::stderr;
 use time::Date;
 use tracing_subscriber::EnvFilter;
+
+use super::{
+    book_with_residuals, Booking, BookingError, Bookings, Inventory, Tolerance,
+    TransactionBookingError,
+};
 
 // a subset of the tests from
 // https://github.com/beancount/beancount/blob/master/beancount/parser/booking_full_test.py
@@ -29,7 +30,7 @@ fn test_augment__from_empty__no_cost__pos() {
 2015-10-01 * #ex #booked #reduced
   Assets:Account           1 USD
 "#,
-        UNBALANCED,
+        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -44,7 +45,7 @@ fn test_augment__from_empty__no_cost__neg() {
 2015-10-01 * #ex #booked #reduced
   Assets:Account           -1 USD
 "#,
-        UNBALANCED,
+        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -62,7 +63,7 @@ fn test_augment__from_empty__at_cost__pos() {
 2015-10-01 * #reduced
   'S Assets:Account        1 HOOL {100.00 USD, 2015-10-01}
 "#,
-        UNBALANCED,
+        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -80,7 +81,7 @@ fn test_augment__from_empty__at_cost__neg() {
 2015-10-01 * #reduced
   'S Assets:Account        -1 HOOL {100.00 USD, 2015-10-01}
 "#,
-        UNBALANCED,
+        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -95,9 +96,9 @@ fn test_augment__from_empty__incomplete_cost__empty() {
 2015-10-01 * #booked
   error: "Failed to categorize posting"
 "#,
-        UNBALANCED,
+        NO_OPTIONS,
         Booking::Strict,
-        BookingError::Transaction(TransactionBookingError::AutoPostNoBuckets),
+        BookingError::Transaction(TransactionBookingError::CannotDetermineCurrencyForBalancing),
     );
 }
 
@@ -132,9 +133,12 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
             let mut ante_inventory = Inventory::default();
 
             if let Some((date, ante_postings)) = get_postings(&directives, ANTE_TAG) {
-                let Bookings {
-                    updated_inventory, ..
-                } = beancount_lima_booking::book(
+                let (
+                    Bookings {
+                        updated_inventory, ..
+                    },
+                    residuals,
+                ) = book_with_residuals(
                     date,
                     &ante_postings,
                     &tolerance,
@@ -152,7 +156,7 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                 get_postings(&directives, APPLY_TAG).expect("missing apply tag in test data");
 
             let actual_inventory = match (
-                beancount_lima_booking::book(
+                book_with_residuals(
                     date,
                     &postings,
                     &tolerance,
@@ -162,9 +166,12 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                 expected_err,
             ) {
                 (
-                    Ok(Bookings {
-                        updated_inventory, ..
-                    }),
+                    Ok((
+                        Bookings {
+                            updated_inventory, ..
+                        },
+                        residuals,
+                    )),
                     None,
                 ) => updated_inventory,
                 (Err(e), Some(expected_err)) => {
@@ -177,17 +184,14 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
 
             let (date, postings) =
                 get_postings(&directives, EX_TAG).expect("missing ex tag in test data");
-            let Bookings {
-                updated_inventory: expected_inventory,
-                ..
-            } = beancount_lima_booking::book(
-                date,
-                &postings,
-                &tolerance,
-                |_| None,
-                |_| Booking::Strict,
-            )
-            .unwrap();
+            let (
+                Bookings {
+                    updated_inventory: expected_inventory,
+                    ..
+                },
+                residuals,
+            ) = book_with_residuals(date, &postings, &tolerance, |_| None, |_| Booking::Strict)
+                .unwrap();
 
             assert_eq!(&actual_inventory, &expected_inventory);
 
@@ -213,10 +217,7 @@ fn get_postings<'a>(
         .next()
 }
 
-// options to enable booking unbalanced transactions
-const UNBALANCED: &str = r#"
-    option "inferred_tolerance_default" "*:1000000"
-"#;
+const NO_OPTIONS: &str = "";
 
 fn init_tracing() {
     static INIT: std::sync::Once = std::sync::Once::new();

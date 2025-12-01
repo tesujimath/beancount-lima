@@ -26,9 +26,8 @@ impl Display for BookingError {
 pub enum TransactionBookingError {
     UnsupportedBookingMethod(Booking, String),
     TooManyMissingNumbers,
-    NoResidualForInterpolation,
     Unbalanced(String),
-    AutoPostNoBuckets,
+    CannotDetermineCurrencyForBalancing,
     AutoPostMultipleBuckets(Vec<String>),
 }
 
@@ -41,9 +40,10 @@ impl Display for TransactionBookingError {
                 write!(f, "unsupported booking method {booking} for {account}")
             }
             TooManyMissingNumbers => f.write_str("too many missing numbers for interpolation"),
-            NoResidualForInterpolation => f.write_str("no residual for interpolation"),
             Unbalanced(residual) => write!(f, "unbalanced transaction with residual {residual}"),
-            AutoPostNoBuckets => f.write_str("can't have auto-post with no currencies"),
+            CannotDetermineCurrencyForBalancing => {
+                f.write_str("can't determine currency for balancing transaction")
+            }
             AutoPostMultipleBuckets(buckets) => write!(
                 f,
                 "can't have auto-post with multiple currencies {}",

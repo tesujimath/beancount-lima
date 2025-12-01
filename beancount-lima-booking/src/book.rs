@@ -30,10 +30,46 @@ where
     M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
     'a: 'b,
 {
+    let (bookings, residuals) = book_with_residuals(date, postings, tolerance, inventory, method)?;
+    if !residuals.is_empty() {
+        let mut currencies = residuals.keys().collect::<Vec<_>>();
+        currencies.sort();
+        let message = currencies
+            .into_iter()
+            .map(|cur| format!("{} {}", -*residuals.get(cur).unwrap(), cur))
+            .collect::<Vec<String>>()
+            .join(", ");
+        return Err(BookingError::Transaction(
+            TransactionBookingError::Unbalanced(message),
+        ));
+    }
+
+    Ok(bookings)
+}
+
+type Residuals<C, N> = HashMap<C, N>;
+
+// this exists so we can test the booking algorithm with unbalanced transactions
+// as per OG Beancount booking_full_test.py
+pub(crate) fn book_with_residuals<'a, 'b, P, T, I, M>(
+    date: P::Date,
+    postings: &[P],
+    tolerance: &'b T,
+    inventory: I,
+    method: M,
+) -> Result<(Bookings<P>, Residuals<P::Currency, P::Number>), BookingError>
+where
+    P: PostingSpec + Debug + 'a,
+    T: Tolerance<Currency = P::Currency, Number = P::Number>,
+    I: Fn(P::Account) -> Option<&'b Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
+    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+    'a: 'b,
+{
     let mut interpolated_postings = repeat_n(None, postings.len()).collect::<Vec<_>>();
     let mut updated_inventory = Inventory::default();
 
     let currency_groups = categorize_by_currency(postings, inventory)?;
+    let mut residuals = Residuals::<P::Currency, P::Number>::default();
 
     for (cur, annotated_postings) in currency_groups {
         let Reductions {
@@ -63,7 +99,12 @@ where
 
         let Interpolation {
             booked_and_unbooked_postings,
+            residual,
         } = interpolate_from_costed(date, &cur, costed_postings, tolerance)?;
+
+        if let Some(residual) = residual {
+            residuals.insert(cur.clone(), residual);
+        }
 
         let updated_inventory_for_cur = book_augmentations(
             date,
@@ -99,10 +140,13 @@ where
         .map(|p| p.unwrap())
         .collect::<Vec<_>>();
 
-    Ok(Bookings {
-        interpolated_postings,
-        updated_inventory,
-    })
+    Ok((
+        Bookings {
+            interpolated_postings,
+            updated_inventory,
+        },
+        residuals,
+    ))
 }
 
 /// book without the need for interpolation
@@ -549,7 +593,7 @@ where
         let all_buckets = currency_groups.keys().cloned().collect::<Vec<_>>();
         if all_buckets.is_empty() {
             return Err(BookingError::Transaction(
-                TransactionBookingError::AutoPostNoBuckets,
+                TransactionBookingError::CannotDetermineCurrencyForBalancing,
             ));
         } else if all_buckets.len() == 1 {
             let sole_bucket = all_buckets.into_iter().next().unwrap();

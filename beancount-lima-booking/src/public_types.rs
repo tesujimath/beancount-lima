@@ -372,6 +372,7 @@ pub trait Number:
     + Eq
     + Ord
     + Sized
+    + Default
 {
     fn abs(&self) -> Self;
 

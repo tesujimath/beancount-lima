@@ -1,5 +1,6 @@
 mod book;
 pub use book::book;
+pub(crate) use book::book_with_residuals;
 
 mod errors;
 pub use errors::{BookingError, PostingBookingError, TransactionBookingError};
@@ -17,3 +18,6 @@ pub use public_types::{
     Booking, Bookings, Cost, CostSpec, Interpolated, Inventory, Number, Position, Positions,
     Posting, PostingCost, PostingCosts, PostingSpec, Price, PriceSpec, Sign, Tolerance,
 };
+
+#[cfg(test)]
+mod tests;

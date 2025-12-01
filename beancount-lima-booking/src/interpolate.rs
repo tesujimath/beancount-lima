@@ -17,6 +17,8 @@ where
         Interpolated<P, P::Date, P::Number, P::Currency, P::Label>,
         bool, // booked
     )>,
+
+    pub(crate) residual: Option<P::Number>,
 }
 
 pub(crate) fn interpolate_from_costed<'i, 'b, P, T>(
@@ -30,7 +32,7 @@ where
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
 {
     let mut weights = costeds.iter().map(|c| c.weight()).collect::<Vec<_>>();
-    let residual = tolerance.residual(weights.iter().filter_map(|w| *w), currency);
+    let mut residual = tolerance.residual(weights.iter().filter_map(|w| *w), currency);
     tracing::debug!("{date} weights for {:?} {:?}", &currency, &weights);
     let unknown = weights
         .iter()
@@ -38,21 +40,14 @@ where
         .filter(|w| w.1.is_none())
         .collect::<Vec<_>>();
     tracing::debug!("{date} unknown values for {:?} {:?}", &currency, &unknown);
-    match (residual, unknown.len()) {
-        (None, 0) => (),
-        (None, 1) => Err(BookingError::Transaction(
-            TransactionBookingError::NoResidualForInterpolation,
-        ))?,
-        (Some(residual), 0) => Err(BookingError::Transaction(
-            TransactionBookingError::Unbalanced(residual.to_string()),
-        ))?,
-        (Some(residual), 1) => {
-            let i_unknown = unknown[0].0;
-            weights[i_unknown] = Some(-residual);
-        }
-        _ => Err(BookingError::Transaction(
+    if unknown.len() == 1 {
+        let i_unknown = unknown[0].0;
+        weights[i_unknown] = Some(-residual.unwrap_or_default());
+        residual = None;
+    } else if unknown.len() > 1 {
+        return Err(BookingError::Transaction(
             TransactionBookingError::TooManyMissingNumbers,
-        ))?,
+        ));
     }
 
     let booked_and_unbooked_postings = costeds
@@ -91,29 +86,31 @@ where
                                     &cost,
                                     a.cost_currency,
                                 );
-                                Ok((
-                                    Interpolated {
-                                        posting: a.posting,
-                                        idx: a.idx,
-                                        units,
-                                        currency,
-                                        cost: Some(PostingCosts {
-                                            cost_currency: a.cost_currency.unwrap(),
-                                            adjustments: vec![PostingCost {
-                                                date,
-                                                units,
-                                                per_unit: (cost_per_unit.unwrap()), // can't fail, since we have cost
-                                                label: cost.label(),
-                                                merge: cost.merge(),
-                                            }],
-                                            // I don't think these can fail, but let's see during testing:
-                                            // per_unit: cost_per_unit.unwrap(),
-                                            // currency: a.cost_currency.unwrap(),
-                                        }),
-                                        price: None, // TODO price with cost
-                                    },
-                                    false,
-                                ))
+                                if let Some(cost_currency) = a.cost_currency {
+                                    Ok((
+                                        Interpolated {
+                                            posting: a.posting,
+                                            idx: a.idx,
+                                            units,
+                                            currency,
+                                            cost: Some(PostingCosts {
+                                                cost_currency ,
+                                                adjustments: vec![PostingCost {
+                                                    date,
+                                                    units,
+                                                    per_unit: (cost_per_unit.unwrap()), // can't fail, since we have cost
+                                                    label: cost.label(),
+                                                    merge: cost.merge(),
+                                                }],
+                                            }),
+                                            price: None, // TODO price with cost
+                                        },
+                                        false,
+                                    ))    
+                                } else {
+                                    Err(BookingError::Transaction(TransactionBookingError::CannotDetermineCurrencyForBalancing))
+                                }
+                                
                             }
                             (
                                 Some(UnitsAndCostPerUnit {
@@ -166,6 +163,7 @@ where
 
     Ok(Interpolation {
         booked_and_unbooked_postings,
+        residual,
     })
 }
 
