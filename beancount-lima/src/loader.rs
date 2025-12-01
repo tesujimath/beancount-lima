@@ -376,8 +376,7 @@ impl<'a, T> Loader<'a, T> {
         base_account_name: &str,
     ) -> hashbrown::HashMap<parser::Currency<'a>, Decimal> {
         if self.config.balance_rollup {
-            let mut rollup_inventory =
-                hashbrown::HashMap::<parser::Currency<'a>, Decimal>::default();
+            let mut rollup_units = hashbrown::HashMap::<parser::Currency<'a>, Decimal>::default();
             self.accounts
                 .keys()
                 .filter_map(|s| {
@@ -387,7 +386,7 @@ impl<'a, T> Loader<'a, T> {
                 .for_each(|account| {
                     account.into_iter().for_each(|(cur, number)| {
                         use hashbrown::hash_map::Entry::*;
-                        match rollup_inventory.entry(*cur) {
+                        match rollup_units.entry(*cur) {
                             Occupied(mut entry) => {
                                 let existing_number = entry.get_mut();
                                 *existing_number += number;
@@ -398,22 +397,19 @@ impl<'a, T> Loader<'a, T> {
                         }
                     });
                 });
-            tracing::debug!(
-                "rollup inventory for {:?} with config {:?} is {:?}",
-                base_account_name,
-                &rollup_inventory,
-                &self.config
-            );
-            rollup_inventory
+            rollup_units
         } else {
             self.accounts
                 .get(base_account_name)
-                .unwrap()
-                .positions
-                .units()
-                .iter()
-                .map(|(cur, number)| (**cur, *number))
-                .collect::<hashbrown::HashMap<_, _>>()
+                .map(|account| {
+                    account
+                        .positions
+                        .units()
+                        .iter()
+                        .map(|(cur, number)| (**cur, *number))
+                        .collect::<hashbrown::HashMap<_, _>>()
+                })
+                .unwrap_or_default()
         }
     }
 
