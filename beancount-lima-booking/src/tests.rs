@@ -145,5 +145,33 @@ fn test_reduce__sign_change_simple() {
     );
 }
 
+#[test]
+fn test_reduce__no_match() {
+    booking_test_err(
+        r#"
+2016-01-01 * #ante
+  Assets:Account          10 HOOL {123.45 USD, 2016-04-15}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {123.00 USD}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {123.45 CAD}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {123.45 USD, 2016-04-16}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {123.45 USD, "lot1"}
+
+2016-05-02 * #booked
+  error: "No position matches"
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+        BookingError::Posting(0, PostingBookingError::NoPositionMatches),
+    );
+}
+
 mod helpers;
 use helpers::*;

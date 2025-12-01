@@ -96,7 +96,7 @@ where
                                             cost: Some(PostingCosts {
                                                 cost_currency ,
                                                 adjustments: vec![PostingCost {
-                                                    date,
+                                                    date: cost.date().unwrap_or(date),
                                                     units,
                                                     per_unit: cost_per_unit,
                                                     label: cost.label(),

@@ -49,12 +49,12 @@ pub(crate) fn booking_test(
             let tolerance = &options;
             let mut ante_inventory = Inventory::default();
 
-            if let Some((date, ante_postings)) = get_postings(&directives, ANTE_TAG) {
+            if let Some((date, ante_postings, _)) = get_postings(&directives, ANTE_TAG).next() {
                 let (
                     Bookings {
                         updated_inventory, ..
                     },
-                    residuals,
+                    _residuals,
                 ) = book_with_residuals(
                     date,
                     &ante_postings,
@@ -67,52 +67,52 @@ pub(crate) fn booking_test(
                 ante_inventory = updated_inventory;
             }
 
-            println!("ante inventory {:?}", &ante_inventory);
+            for (i_apply, (date, postings, apply_string)) in
+                get_postings(&directives, APPLY_TAG).enumerate()
+            {
+                let actual_inventory = match (
+                    book_with_residuals(
+                        date,
+                        &postings,
+                        &tolerance,
+                        |accname| ante_inventory.get(accname),
+                        |_| method,
+                    ),
+                    expected_err.as_ref(),
+                ) {
+                    (
+                        Ok((
+                            Bookings {
+                                updated_inventory, ..
+                            },
+                            _residuals,
+                        )),
+                        None,
+                    ) => updated_inventory,
+                    (Err(e), Some(expected_err)) => {
+                        assert_eq!(&e, expected_err);
+                        continue;
+                    }
+                    (Ok(_), Some(_)) => panic!("unexpected success at {i_apply}\n{apply_string}"),
+                    (Err(e), None) => panic!("unexpected failure at {i_apply}\n{apply_string}"),
+                };
 
-            let (date, postings) =
-                get_postings(&directives, APPLY_TAG).expect("missing apply tag in test data");
+                let (date, postings, _) = get_postings(&directives, EX_TAG)
+                    .next()
+                    .expect("missing ex tag in test data");
+                let (
+                    Bookings {
+                        updated_inventory: expected_inventory,
+                        ..
+                    },
+                    _residuals,
+                ) = book_with_residuals(date, &postings, &tolerance, |_| None, |_| Booking::Strict)
+                    .unwrap();
 
-            let actual_inventory = match (
-                book_with_residuals(
-                    date,
-                    &postings,
-                    &tolerance,
-                    |accname| ante_inventory.get(accname),
-                    |_| method,
-                ),
-                expected_err,
-            ) {
-                (
-                    Ok((
-                        Bookings {
-                            updated_inventory, ..
-                        },
-                        residuals,
-                    )),
-                    None,
-                ) => updated_inventory,
-                (Err(e), Some(expected_err)) => {
-                    assert_eq!(&e, &expected_err);
-                    return ();
-                }
-                (Ok(_), Some(_)) => panic!("unexpected success"),
-                (Err(e), None) => panic!("unexpected failure {e}"),
-            };
+                assert_eq!(&actual_inventory, &expected_inventory);
 
-            let (date, postings) =
-                get_postings(&directives, EX_TAG).expect("missing ex tag in test data");
-            let (
-                Bookings {
-                    updated_inventory: expected_inventory,
-                    ..
-                },
-                residuals,
-            ) = book_with_residuals(date, &postings, &tolerance, |_| None, |_| Booking::Strict)
-                .unwrap();
-
-            assert_eq!(&actual_inventory, &expected_inventory);
-
-            // TODO check booked
+                // TODO check booked
+            }
         }
     }
 }
@@ -120,18 +120,21 @@ pub(crate) fn booking_test(
 fn get_postings<'a>(
     directives: &'a [parser::Spanned<parser::Directive<'a>>],
     tag0: &'static str,
-) -> Option<(Date, Vec<&'a parser::Spanned<parser::Posting<'a>>>)> {
+) -> impl Iterator<Item = (Date, Vec<&'a parser::Spanned<parser::Posting<'a>>>, String)> {
     directives
         .iter()
-        .filter(|d| d.metadata().tags().any(|tag| tag.item().as_ref() == tag0))
+        .filter(move |d| d.metadata().tags().any(|tag| tag.item().as_ref() == tag0))
         .filter_map(|d| {
             if let parser::DirectiveVariant::Transaction(t) = d.variant() {
-                Some((*d.date().item(), t.postings().collect::<Vec<_>>()))
+                Some((
+                    *d.date().item(),
+                    t.postings().collect::<Vec<_>>(),
+                    d.to_string(),
+                ))
             } else {
                 None
             }
         })
-        .next()
 }
 
 pub(crate) const NO_OPTIONS: &str = "";

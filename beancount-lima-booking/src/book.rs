@@ -312,7 +312,7 @@ where
                         );
 
                         if matched_positions.is_empty() {
-                            Ok(Unbooked(annotated))
+                            Err(BookingError::Posting(annotated.idx, PostingBookingError::NoPositionMatches))
                         } else if matched_positions.len() == 1 {
                             let (i_matched, matched_pos) =
                                 matched_positions.into_iter().next().unwrap();
@@ -645,11 +645,9 @@ where
             || cost_spec
                 .currency()
                 .is_some_and(|cost_spec_currency| cost_spec_currency != cost.currency)
-            || cost_spec.label().is_some_and(|cost_spec_label| {
-                cost.label
-                    .as_ref()
-                    .is_some_and(|cost_label| *cost_label != cost_spec_label)
-            })
+            || cost_spec
+                .label()
+                .is_some_and(|cost_spec_label| cost.label != Some(cost_spec_label))
         // TODO merge
     )
 }
