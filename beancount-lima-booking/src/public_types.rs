@@ -406,7 +406,7 @@ pub enum Booking {
     Hifo,
 }
 
-#[derive(Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Positions<D, N, C, L>(Vec<Position<D, N, C, L>>)
 where
     D: Eq + Ord + Copy + Debug,
@@ -502,7 +502,7 @@ where
     }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct Inventory<A, D, N, C, L>
 where
     A: Eq + Hash + Clone + Display + Debug,

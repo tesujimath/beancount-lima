@@ -168,6 +168,8 @@ impl<'a> Tolerance for &parser::Options<'a> {
                 .inferred_tolerance_default(&cur)
                 .or(self.inferred_tolerance_default_fallback());
 
+            tracing::debug!("tolerance for {:?} {:?}", cur, &tolerance);
+
             if let Some(tolerance) = tolerance {
                 (abs_residual >= tolerance).then_some(residual)
             } else {

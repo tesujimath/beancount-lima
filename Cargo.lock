@@ -302,6 +302,7 @@ dependencies = [
  "strum_macros",
  "time",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
