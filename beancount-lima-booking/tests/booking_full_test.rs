@@ -1,4 +1,6 @@
-use beancount_lima_booking::{Booking, Bookings, Inventory, Tolerance};
+use beancount_lima_booking::{
+    Booking, BookingError, Bookings, Inventory, Tolerance, TransactionBookingError,
+};
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
 use std::io::stderr;
@@ -19,20 +21,95 @@ const PRINT_TAG: &str = "print";
 
 #[test]
 fn test_augment__from_empty__no_cost__pos() {
-    booking_test(
-        "
+    booking_test_ok(
+        r#"
 2015-10-01 * #apply
   Assets:Account           1 USD
 
 2015-10-01 * #ex #booked #reduced
   Assets:Account           1 USD
-",
+"#,
         UNBALANCED,
         Booking::Strict,
     );
 }
 
-fn booking_test(source: &str, options: &str, method: Booking) {
+#[test]
+fn test_augment__from_empty__no_cost__neg() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #apply
+  Assets:Account          -1 USD
+
+2015-10-01 * #ex #booked #reduced
+  Assets:Account           -1 USD
+"#,
+        UNBALANCED,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_augment__from_empty__at_cost__pos() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #apply
+  Assets:Account          1 HOOL {100.00 USD}
+
+2015-10-01 * #ex #booked
+  Assets:Account          1 HOOL {100.00 USD, 2015-10-01}
+
+2015-10-01 * #reduced
+  'S Assets:Account        1 HOOL {100.00 USD, 2015-10-01}
+"#,
+        UNBALANCED,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_augment__from_empty__at_cost__neg() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #apply
+  Assets:Account          -1 HOOL {100.00 USD}
+
+2015-10-01 * #ex #booked
+  Assets:Account          -1 HOOL {100.00 USD, 2015-10-01}
+
+2015-10-01 * #reduced
+  'S Assets:Account        -1 HOOL {100.00 USD, 2015-10-01}
+"#,
+        UNBALANCED,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_augment__from_empty__incomplete_cost__empty() {
+    booking_test_err(
+        r#"
+2015-10-01 * #apply
+  Assets:Account          1 HOOL {}
+
+2015-10-01 * #booked
+  error: "Failed to categorize posting"
+"#,
+        UNBALANCED,
+        Booking::Strict,
+        BookingError::Transaction(TransactionBookingError::AutoPostNoBuckets),
+    );
+}
+
+fn booking_test_ok(source: &str, options: &str, method: Booking) {
+    booking_test(source, options, method, None);
+}
+
+fn booking_test_err(source: &str, options: &str, method: Booking, err: BookingError) {
+    booking_test(source, options, method, Some(err));
+}
+
+fn booking_test(source: &str, options: &str, method: Booking, expected_err: Option<BookingError>) {
     init_tracing();
 
     let source_with_options = format!("{options}\n{source}");
@@ -73,17 +150,30 @@ fn booking_test(source: &str, options: &str, method: Booking) {
 
             let (date, postings) =
                 get_postings(&directives, APPLY_TAG).expect("missing apply tag in test data");
-            let Bookings {
-                updated_inventory: actual_inventory,
-                ..
-            } = beancount_lima_booking::book(
-                date,
-                &postings,
-                &tolerance,
-                |accname| ante_inventory.get(accname),
-                |_| method,
-            )
-            .unwrap();
+
+            let actual_inventory = match (
+                beancount_lima_booking::book(
+                    date,
+                    &postings,
+                    &tolerance,
+                    |accname| ante_inventory.get(accname),
+                    |_| method,
+                ),
+                expected_err,
+            ) {
+                (
+                    Ok(Bookings {
+                        updated_inventory, ..
+                    }),
+                    None,
+                ) => updated_inventory,
+                (Err(e), Some(expected_err)) => {
+                    assert_eq!(&e, &expected_err);
+                    return ();
+                }
+                (Ok(_), Some(_)) => panic!("unexpected success"),
+                (Err(e), None) => panic!("unexpected failure {e}"),
+            };
 
             let (date, postings) =
                 get_postings(&directives, EX_TAG).expect("missing ex tag in test data");
