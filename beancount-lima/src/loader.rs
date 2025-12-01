@@ -1,7 +1,7 @@
 // TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
 
-use beancount_lima_booking::{Bookings, Interpolated};
+use beancount_lima_booking::{Booking, Bookings, Interpolated};
 use beancount_parser_lima::{self as parser, Span, Spanned};
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
@@ -576,32 +576,18 @@ impl<'a, T> Loader<'a, T> {
                         .collect::<Vec<_>>(),
                 );
 
-                return Err(element
+                let err = Err(element
                     .error(reason)
                     .with_annotation(annotation.to_string()));
 
-                // TODO for new booking approach
                 // reset accumulated balance to what was asserted, to localise errors
-                // for (cur, units) in margin.into_iter() {
-                //     match account.inventory.entry(cur) {
-                //         hashbrown::hash_map::Entry::Occupied(mut entry) => {
-                //             let accumulated = entry.get_mut();
-                //             tracing::debug!(
-                //                 "adjusting inventory {cur}.{:?} for {:?} by {}",
-                //                 accumulated,
-                //                 balance,
-                //                 &units
-                //             );
-                //             accumulated.adjust_for_better_balance_violation_reporting(units);
-                //         }
-                //         hashbrown::hash_map::Entry::Vacant(entry) => {
-                //             tracing::debug!("adjusting empty inventory for balance to {}", &units);
-                //             entry
-                //                 .insert(CurrencyPositionsBuilder::default())
-                //                 .adjust_for_better_balance_violation_reporting(units);
-                //         }
-                //     };
-                // }
+                for (cur, units) in margin.into_iter() {
+                    account
+                        .positions
+                        .accumulate(units, cur, None, Booking::Strict);
+                }
+
+                return err;
             }
             (None, Some(pad)) => {}
             (None, None) => {}

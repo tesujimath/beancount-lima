@@ -123,6 +123,7 @@ where
         use Entry::*;
 
         let account = posting.account();
+        let account_method = method(account.clone());
 
         let previous_positions = match updated_inventory.entry(account.clone()) {
             Occupied(entry) => entry.into_mut(),
@@ -132,7 +133,12 @@ where
 
         match posting.cost() {
             None => {
-                previous_positions.accumulate(posting.units(), posting.currency(), None, method);
+                previous_positions.accumulate(
+                    posting.units(),
+                    posting.currency(),
+                    None,
+                    account_method,
+                );
             }
             Some(costs) => {
                 for (cur, adj) in costs.iter() {
@@ -140,7 +146,7 @@ where
                         adj.units,
                         posting.currency(),
                         Some((cur.clone(), adj.clone())),
-                        method,
+                        account_method,
                     );
                 }
             }
@@ -654,6 +660,7 @@ where
 
         let posting = &interpolated.posting;
         let account = posting.account();
+        let account_method = method(account.clone());
 
         let previous_positions = match updated_inventory.entry(account.clone()) {
             Occupied(entry) => entry.into_mut(),
@@ -673,7 +680,7 @@ where
                     interpolated.units,
                     interpolated.currency.clone(),
                     Some((currency.clone(), posting_cost.clone())),
-                    method,
+                    account_method,
                 );
             }
         } else {
@@ -686,7 +693,7 @@ where
                 interpolated.units,
                 interpolated.currency.clone(),
                 None,
-                method,
+                account_method,
             );
         }
     }
@@ -700,15 +707,13 @@ where
     N: Number + Debug,
     L: Eq + Ord + Clone + Debug,
 {
-    fn accumulate<A, M>(
+    pub fn accumulate(
         &mut self,
         units: N,
         currency: C,
         posting_cost: Option<(C, PostingCost<D, N, L>)>,
-        method: M,
-    ) where
-        M: Fn(A) -> Booking + Copy, // 'i for inventory
-    {
+        method: Booking,
+    ) {
         use Ordering::*;
 
         let posting_cost = posting_cost.map(|(posting_cost_currency, posting_cost)| {
