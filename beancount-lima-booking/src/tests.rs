@@ -4,7 +4,7 @@ use time::Date;
 use tracing_subscriber::EnvFilter;
 
 use super::{
-    book_with_residuals, Booking, BookingError, Bookings, Inventory, Tolerance,
+    book_with_residuals, Booking, BookingError, Bookings, Inventory, PostingBookingError,
     TransactionBookingError,
 };
 
@@ -61,7 +61,7 @@ fn test_augment__from_empty__at_cost__pos() {
   Assets:Account          1 HOOL {100.00 USD, 2015-10-01}
 
 2015-10-01 * #reduced
-  'S Assets:Account        1 HOOL {100.00 USD, 2015-10-01}
+  'S Assets:Account       1 HOOL {100.00 USD, 2015-10-01}
 "#,
         NO_OPTIONS,
         Booking::Strict,
@@ -79,7 +79,7 @@ fn test_augment__from_empty__at_cost__neg() {
   Assets:Account          -1 HOOL {100.00 USD, 2015-10-01}
 
 2015-10-01 * #reduced
-  'S Assets:Account        -1 HOOL {100.00 USD, 2015-10-01}
+  'S Assets:Account       -1 HOOL {100.00 USD, 2015-10-01}
 "#,
         NO_OPTIONS,
         Booking::Strict,
@@ -98,7 +98,66 @@ fn test_augment__from_empty__incomplete_cost__empty() {
 "#,
         NO_OPTIONS,
         Booking::Strict,
-        BookingError::Transaction(TransactionBookingError::CannotDetermineCurrencyForBalancing),
+        BookingError::Posting(0, PostingBookingError::CannotInferAnything),
+    );
+}
+
+#[test]
+fn test_augment__from_empty__incomplete_cost__with_currency() {
+    booking_test_err(
+        r#"
+2015-10-01 * #apply
+  Assets:Account          1 HOOL {USD}
+
+2015-10-01 * #booked
+  Assets:Account          1 HOOL {0 USD, 2015-10-01}
+
+2015-10-01 * #reduced
+  'S Assets:Account       1 HOOL {USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+        // ANOMALY: original test was different, but this seems correct to me
+        BookingError::Posting(0, PostingBookingError::CannotInferUnits),
+    );
+}
+
+#[test]
+fn test_reduce__no_cost() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #ante
+  Assets:Account          10 USD
+
+2015-10-01 * #apply #booked #reduced
+  Assets:Account          -5 USD
+
+2015-10-01 * #ex
+  Assets:Account           5 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_reduce__sign_change_simple() {
+    booking_test_ok(
+        r#"
+2016-01-01 * #ante
+  Assets:Account         10 HOOL {33.33 USD, 2016-01-01}
+
+2016-05-08 * #apply
+  Assets:Account        -13 HOOL {}
+
+2016-05-08 * #booked
+  error: "Not enough lots to reduce"
+
+2016-01-01 * #ex
+  Assets:Account         10 HOOL {33.33 USD, 2016-01-01}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
     );
 }
 

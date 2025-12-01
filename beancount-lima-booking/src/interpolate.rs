@@ -86,8 +86,8 @@ where
                                     &cost,
                                     a.cost_currency,
                                 );
-                                if let Some(cost_currency) = a.cost_currency {
-                                    Ok((
+                                match (a.cost_currency, cost_per_unit) {
+                                    (Some(cost_currency), Some(cost_per_unit)) =>Ok((
                                         Interpolated {
                                             posting: a.posting,
                                             idx: a.idx,
@@ -98,7 +98,7 @@ where
                                                 adjustments: vec![PostingCost {
                                                     date,
                                                     units,
-                                                    per_unit: (cost_per_unit.unwrap()), // can't fail, since we have cost
+                                                    per_unit: cost_per_unit,
                                                     label: cost.label(),
                                                     merge: cost.merge(),
                                                 }],
@@ -106,11 +106,11 @@ where
                                             price: None, // TODO price with cost
                                         },
                                         false,
-                                    ))    
-                                } else {
-                                    Err(BookingError::Transaction(TransactionBookingError::CannotDetermineCurrencyForBalancing))
+                                    )) ,
+                                    (None, Some(_)) =>  Err(BookingError::Posting(a.idx, PostingBookingError::CannotInferCurrency)),
+                                    (Some(_), None) => Err(BookingError::Posting(a.idx, PostingBookingError::CannotInferUnits)),
+                                    (None, None) => Err(BookingError::Posting(a.idx, PostingBookingError::CannotInferAnything)),
                                 }
-                                
                             }
                             (
                                 Some(UnitsAndCostPerUnit {
