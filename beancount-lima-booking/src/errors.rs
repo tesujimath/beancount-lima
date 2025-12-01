@@ -59,7 +59,7 @@ impl Error for TransactionBookingError {}
 pub enum PostingBookingError {
     CannotCategorize,
     AmbiguousAutoPost,
-    MultipleCostSpecMatches,
+    AmbiguousMatches,
     MultipleCostCurrenciesMatch,
     CannotInferUnits,
     CannotInferCurrency,
@@ -75,7 +75,7 @@ impl Display for PostingBookingError {
         match self {
             CannotCategorize => f.write_str("cannot categorize posting"),
             AmbiguousAutoPost => f.write_str("ambiguous auto-post"),
-            MultipleCostSpecMatches => f.write_str("multiple cost spec matches against inventory"),
+            AmbiguousMatches => f.write_str("ambiguous matches"),
             MultipleCostCurrenciesMatch => {
                 f.write_str("multiple currencies in cost spec matches against inventory")
             }

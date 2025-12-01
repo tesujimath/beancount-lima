@@ -451,7 +451,7 @@ where
                         } else {
                             Err(BookingError::Posting(
                                 annotated.idx,
-                                PostingBookingError::MultipleCostSpecMatches,
+                                PostingBookingError::AmbiguousMatches,
                             ))
                         }
                     } else {

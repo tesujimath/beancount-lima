@@ -22,18 +22,18 @@ pub(crate) fn booking_test_err(source: &str, options: &str, method: Booking, err
     booking_test(source, options, method, Some(err));
 }
 
-pub(crate) fn booking_test(
-    source: &str,
-    options: &str,
-    method: Booking,
-    expected_err: Option<BookingError>,
-) {
+fn booking_test(source: &str, options: &str, method: Booking, expected_err: Option<BookingError>) {
     init_tracing();
 
     let source_with_options = format!("{options}\n{source}");
     let sources = parser::BeancountSources::from(source_with_options);
     let parser = parser::BeancountParser::new(&sources);
     let error_w = &stderr();
+
+    // TODO support other booking methods
+    if method != Booking::Strict {
+        panic!("Failing for now because unsupported booking method Booking::{method}");
+    }
 
     match parser.parse() {
         Err(parser::ParseError { errors, .. }) => {

@@ -173,5 +173,59 @@ fn test_reduce__no_match() {
     );
 }
 
+#[test]
+fn test_reduce__unambiguous() {
+    booking_test_ok(
+        r#"
+2016-01-01 * #ante #ambi-matches
+  Assets:Account          10 HOOL {115.00 USD, 2016-04-15, "lot1"}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {}
+
+2016-05-02 * #booked #ambi-resolved #reduced
+  Assets:Account          -5 HOOL {115.00 USD, 2016-04-15, "lot1"}
+
+2016-01-01 * #ex
+  Assets:Account           5 HOOL {115.00 USD, 2016-04-15, "lot1"}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_reduce__ambiguous__strict() {
+    booking_test_err(
+        r#"
+2016-01-01 * #ante
+  Assets:Account          10 HOOL {115.00 USD, 2016-04-15, "lot1"}
+  Assets:Account          10 HOOL {115.00 USD, 2016-04-15, "lot2"}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {115.00 USD}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {USD}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {2016-04-15}
+
+2016-05-02 * #booked
+  error: "Ambiguous matches"
+
+2016-05-02 * #ex
+  Assets:Account          10 HOOL {115.00 USD, 2016-04-15, "lot1"}
+  Assets:Account          10 HOOL {115.00 USD, 2016-04-15, "lot2"}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+        BookingError::Posting(0, PostingBookingError::AmbiguousMatches),
+    );
+}
+
 mod helpers;
 use helpers::*;
