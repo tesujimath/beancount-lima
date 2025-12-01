@@ -142,7 +142,7 @@ fn test_reduce__no_cost() {
 
 #[test]
 fn test_reduce__sign_change_simple() {
-    booking_test_ok(
+    booking_test_err(
         r#"
 2016-01-01 * #ante
   Assets:Account         10 HOOL {33.33 USD, 2016-01-01}
@@ -158,6 +158,7 @@ fn test_reduce__sign_change_simple() {
 "#,
         NO_OPTIONS,
         Booking::Strict,
+        BookingError::Posting(0, PostingBookingError::NotEnoughLotsToReduce),
     );
 }
 

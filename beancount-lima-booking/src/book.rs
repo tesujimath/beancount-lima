@@ -140,6 +140,11 @@ where
         .map(|p| p.unwrap())
         .collect::<Vec<_>>();
 
+    tracing::debug!(
+        "book_with_residuals updated inventory {:?}",
+        &updated_inventory
+    );
+
     Ok((
         Bookings {
             interpolated_postings,
@@ -243,7 +248,6 @@ where
 
             match (
                 &annotated.currency,
-                &annotated.cost_currency,
                 annotated.posting.units(),
                 updated_inventory
                     .get(&account)
@@ -251,7 +255,6 @@ where
             ) {
                 (
                     Some(posting_currency),
-                    Some(posting_cost_currency),
                     Some(posting_units),
                     Some(previous_positions),
                 ) => {
@@ -267,9 +270,8 @@ where
                     //     ))
                     // } else
                     tracing::debug!(
-                        "{date} {bucket_currency} book_reductions 1 {:?} {:?} {:?} {:?}",
+                        "{date} {bucket_currency} book_reductions 1 {:?} {:?} {:?}",
                         posting_currency,
-                        posting_cost_currency,
                         posting_units,
                         previous_positions
                     );
@@ -284,7 +286,7 @@ where
                                     .is_some_and(|pos_sign| pos_sign != ann_sign)
                             })
                     {
-                        // we found a position with cost and sign opposite to ours, so we have a reduction
+                        // we found a position with cost and sign opposite to ours, so we may have a reduction
 
                         // find positions whose costs match what we have
                         let matched_positions = previous_positions
@@ -314,57 +316,62 @@ where
                         } else if matched_positions.len() == 1 {
                             let (i_matched, matched_pos) =
                                 matched_positions.into_iter().next().unwrap();
-                            // Book 'em, Danno!
-                            tracing::debug!(
-                                "cost-matched unique position at {}: {:?}",
-                                i_matched,
-                                &matched_pos
-                            );
                             let Position {
                                 currency: matched_currency,
                                 units: matched_units,
                                 cost: matched_cost,
                             } = matched_pos.clone();
-                            let matched_cost = matched_cost.unwrap();
 
-                            let updated_positions = Positions::new(
-                                previous_positions
-                                    .iter()
-                                    .enumerate()
-                                    .map(|(i, pos)| {
-                                        if i == i_matched {
-                                            pos.with_accumulated(posting_units)
-                                        } else {
-                                            pos.clone()
-                                        }
-                                    })
-                                    .collect::<Vec<_>>(),
-                            );
                             tracing::debug!(
-                                "updated positions for {:?}: {:?}",
-                                &account,
-                                &updated_positions
+                                "cost-matched unique position at {}: {:?}",
+                                i_matched,
+                                &matched_pos
                             );
-                            updated_inventory.insert(account.clone(), updated_positions);
 
-                            Ok(Booked(Interpolated {
-                                posting: annotated.posting,
-                                idx: annotated.idx,
-                                units: posting_units,
-                                currency: posting_currency.clone(),
-                                cost: Some(PostingCosts {
-                                    cost_currency: matched_currency.clone(),
-                                    adjustments: vec![PostingCost {
-                                        date: matched_cost.date,
-                                        units: posting_units,
-                                        per_unit: matched_cost.per_unit,
-                                        label: matched_cost.label,
-                                        merge: matched_cost.merge,
-                                    }],
-                                }),
-                                // TODO price
-                                price: None,
-                            }))
+                            if posting_units.abs() > matched_units.abs() {
+                                Err(BookingError::Posting(annotated.idx, PostingBookingError::NotEnoughLotsToReduce))
+                            } else {
+                                // Book 'em, Danno!
+                                let matched_cost = matched_cost.unwrap();
+                                let updated_positions = Positions::new(
+                                    previous_positions
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, pos)| {
+                                            if i == i_matched {
+                                                pos.with_accumulated(posting_units)
+                                            } else {
+                                                pos.clone()
+                                            }
+                                        })
+                                        .collect::<Vec<_>>(),
+                                );
+                                tracing::debug!(
+                                    "updated positions for {:?}: {:?}",
+                                    &account,
+                                    &updated_positions
+                                );
+                                updated_inventory.insert(account.clone(), updated_positions);
+
+                                Ok(Booked(Interpolated {
+                                    posting: annotated.posting,
+                                    idx: annotated.idx,
+                                    units: posting_units,
+                                    currency: posting_currency.clone(),
+                                    cost: Some(PostingCosts {
+                                        cost_currency: matched_currency.clone(),
+                                        adjustments: vec![PostingCost {
+                                            date: matched_cost.date,
+                                            units: posting_units,
+                                            per_unit: matched_cost.per_unit,
+                                            label: matched_cost.label,
+                                            merge: matched_cost.merge,
+                                        }],
+                                    }),
+                                    // TODO price
+                                    price: None,
+                                }))
+                            }
                         } else if tolerance
                             .residual(
                                 previous_positions
