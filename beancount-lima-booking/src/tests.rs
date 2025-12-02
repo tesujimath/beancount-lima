@@ -255,5 +255,61 @@ fn test_reduce__ambiguous__none() {
     );
 }
 
+#[test]
+fn test_reduce__ambiguous__none__from_mixed() {
+    booking_test_ok(
+        r#"
+2016-01-01 * #ante
+  Assets:Account           1 HOOL {115.00 USD}
+  Assets:Account          -2 HOOL {116.00 USD}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {117.00 USD}
+
+2016-05-02 * #booked
+  Assets:Account          -5 HOOL {117.00 USD, 2016-05-02}
+
+2016-05-02 * #reduced
+  'S Assets:Account        -5 HOOL {117.00 USD, 2016-05-02}
+
+2016-01-01 * #ex
+  Assets:Account           1 HOOL {115.00 USD, 2016-01-01}
+  Assets:Account          -2 HOOL {116.00 USD, 2016-01-01}
+  Assets:Account          -5 HOOL {117.00 USD, 2016-05-02}
+"#,
+        NO_OPTIONS,
+        Booking::None,
+    );
+}
+
+#[test]
+fn test_reduce__other_currency() {
+    booking_test_ok(
+        r#"
+2016-01-01 * #ante
+  Assets:Account           8 AAPL {115.00 USD, 2016-01-11}
+  Assets:Account           8 HOOL {115.00 USD, 2016-01-10}
+
+2016-01-01 * #ambi-matches
+  Assets:Account           8 HOOL {115.00 USD, 2016-01-10}
+
+2016-01-01 * #ambi-resolved
+  Assets:Account          -5 HOOL {115.00 USD, 2016-01-10}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {115.00 USD}
+
+2016-05-02 * #booked #reduced
+  Assets:Account          -5 HOOL {115.00 USD, 2016-01-10}
+
+2016-01-01 * #ex
+  Assets:Account           8 AAPL {115.00 USD, 2016-01-11}
+  Assets:Account           3 HOOL {115.00 USD, 2016-01-10}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
 mod helpers;
 use helpers::*;

@@ -108,6 +108,7 @@ where
             if is_potential_reduction(posting_units, posting_currency, previous_positions) {
                 // find positions whose costs match what we have
                 let matched_positions = match_positions(
+                    posting_currency,
                     annotated.posting.cost().as_ref(),
                     previous_positions,
                     method,
@@ -398,6 +399,7 @@ where
 }
 
 fn match_positions<'a, D, N, C, L, CS>(
+    posting_currency: &C,
     cost_spec: Option<&CS>,
     positions: &'a Positions<D, N, C, L>,
     method: Booking,
@@ -412,17 +414,23 @@ where
     positions
         .iter()
         .enumerate()
-        .filter_map(|(i, pos)| match (pos.cost.as_ref(), cost_spec) {
-            (Some(pos_cost), Some(cost_spec)) => {
-                tracing::debug!(
-                    "match_positions check {:?} {:?} {}",
-                    pos_cost,
-                    cost_spec,
-                    cost_matches_spec(pos_cost, cost_spec)
-                );
-                cost_matches_spec(pos_cost, cost_spec).then_some((i, pos))
+        .filter_map(|(i, pos)| {
+            if &pos.currency != posting_currency {
+                None
+            } else {
+                match (pos.cost.as_ref(), cost_spec) {
+                    (Some(pos_cost), Some(cost_spec)) => {
+                        tracing::debug!(
+                            "match_positions check {:?} {:?} {}",
+                            pos_cost,
+                            cost_spec,
+                            cost_matches_spec(pos_cost, cost_spec)
+                        );
+                        cost_matches_spec(pos_cost, cost_spec).then_some((i, pos))
+                    }
+                    _ => None,
+                }
             }
-            _ => None,
         })
         .collect::<Vec<_>>()
 }
