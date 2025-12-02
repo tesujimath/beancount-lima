@@ -95,19 +95,11 @@ where
         annotated.posting.units(),
         previous_positions,
     ) {
-        (Some(posting_currency), Some(posting_units), Some(previous_positions)) => {
-            // TODO booking methods other than strict
-            // we already warn about this, so we simply ignore it here
-            // if method != Booking::Strict {
-            //     Err(BookingError::Transaction(
-            //         TransactionBookingError::UnsupportedBookingMethod(
-            //             method,
-            //             account.to_string(),
-            //         ),
-            //     ))
-            // } else
+        (Some(posting_currency), Some(posting_units), Some(previous_positions))
+            if method != Booking::None =>
+        {
             tracing::debug!(
-                "{date} reduce 1 {:?} {:?} {:?}",
+                "{date} reduce 1 {method} {:?} {:?} {:?}",
                 posting_currency,
                 posting_units,
                 previous_positions
@@ -115,11 +107,14 @@ where
 
             if is_potential_reduction(posting_units, posting_currency, previous_positions) {
                 // find positions whose costs match what we have
-                let matched_positions =
-                    match_positions(annotated.posting.cost().as_ref(), previous_positions);
+                let matched_positions = match_positions(
+                    annotated.posting.cost().as_ref(),
+                    previous_positions,
+                    method,
+                );
 
                 tracing::debug!(
-                    "{date} reduce matched {:?} with {:?}",
+                    "{date} reduce {method} matched {:?} with {:?}",
                     &annotated,
                     &matched_positions
                 );
@@ -174,7 +169,7 @@ where
             }
         }
         x => {
-            tracing::debug!("{date} reduce x {:?}", x,);
+            tracing::debug!("{date} reduce x {method} {:?}", x,);
 
             Ok((Unbooked(annotated), None))
         }
@@ -405,6 +400,7 @@ where
 fn match_positions<'a, D, N, C, L, CS>(
     cost_spec: Option<&CS>,
     positions: &'a Positions<D, N, C, L>,
+    method: Booking,
 ) -> Vec<(usize, &'a Position<D, N, C, L>)>
 where
     D: Eq + Ord + Copy + Debug,

@@ -228,5 +228,32 @@ fn test_reduce__ambiguous__strict() {
     );
 }
 
+#[test]
+fn test_reduce__ambiguous__none() {
+    booking_test_ok(
+        r#"
+2016-01-01 * #ante
+  Assets:Account           1 HOOL {115.00 USD}
+  Assets:Account           2 HOOL {116.00 USD}
+
+2016-05-02 * #apply
+  Assets:Account          -5 HOOL {117.00 USD}
+
+2016-05-02 * #booked
+  Assets:Account          -5 HOOL {117.00 USD, 2016-05-02}
+
+2016-05-02 * #reduced
+  'S Assets:Account        -5 HOOL {117.00 USD, 2016-05-02}
+
+2016-01-01 * #ex
+  Assets:Account           1 HOOL {115.00 USD, 2016-01-01}
+  Assets:Account           2 HOOL {116.00 USD, 2016-01-01}
+  Assets:Account          -5 HOOL {117.00 USD, 2016-05-02}
+"#,
+        NO_OPTIONS,
+        Booking::None,
+    );
+}
+
 mod helpers;
 use helpers::*;

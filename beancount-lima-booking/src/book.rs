@@ -10,6 +10,10 @@ use super::{
     PostingCost, PostingSpec, Reductions, Tolerance, TransactionBookingError,
 };
 
+pub fn is_supported_method(method: Booking) -> bool {
+    method == Booking::Strict || method == Booking::None
+}
+
 pub fn book<'a, 'b, P, T, I, M>(
     date: P::Date,
     postings: &[P],

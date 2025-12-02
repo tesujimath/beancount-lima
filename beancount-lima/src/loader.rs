@@ -1,7 +1,7 @@
 // TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
 
-use beancount_lima_booking::{Booking, Bookings, Interpolated};
+use beancount_lima_booking::{is_supported_method, Booking, Bookings, Interpolated};
 use beancount_parser_lima::{self as parser, Span, Spanned};
 use color_eyre::eyre::Result;
 use rust_decimal::Decimal;
@@ -24,7 +24,7 @@ pub(crate) struct Loader<'a, T> {
     accounts: HashMap<&'a str, AccountBuilder<'a>>,
     currency_usage: hashbrown::HashMap<parser::Currency<'a>, i32>,
     config: LoaderConfig,
-    default_booking: parser::Booking,
+    default_booking: Booking,
     inferred_tolerance: InferredTolerance<'a>,
     tolerance: T,
     warnings: Vec<parser::AnnotatedWarning>,
@@ -42,7 +42,7 @@ pub(crate) struct LoadError {
 
 impl<'a, T> Loader<'a, T> {
     pub(crate) fn new(
-        default_booking: parser::Booking,
+        default_booking: Booking,
         inferred_tolerance: InferredTolerance<'a>,
         tolerance: T,
         config: LoaderConfig,
@@ -584,7 +584,7 @@ impl<'a, T> Loader<'a, T> {
                 for (cur, units) in margin.into_iter() {
                     account
                         .positions
-                        .accumulate(units, cur, None, Booking::Strict);
+                        .accumulate(units, cur, None, Booking::default()); // booking method doesn't matter if no cost
                 }
 
                 return err;
@@ -637,25 +637,34 @@ impl<'a, T> Loader<'a, T> {
                         )
                         .into());
                 } else {
+                    let mut booking = open
+                        .booking()
+                        .map(|booking| Into::<Booking>::into(*booking.item()))
+                        .unwrap_or(self.default_booking);
+
+                    if !is_supported_method(booking) {
+                        let default_booking = Booking::default();
+                        self.warnings.push(
+                            element .warning(format!( "booking method {booking} unsupported, falling back to default {default_booking}" )) .into(),
+                        );
+                        booking = default_booking;
+                    }
+
                     self.accounts.insert(
                         open.account().item().as_ref(),
-                        AccountBuilder::new(
-                            open.currencies().map(|c| *c.item()),
-                            open.booking()
-                                .map(|booking| *booking.item())
-                                .unwrap_or(self.default_booking),
-                            *span,
-                        ),
+                        AccountBuilder::new(open.currencies().map(|c| *c.item()), booking, *span),
                     );
                 }
             }
         }
 
         if let Some(booking) = open.booking() {
-            if *booking.item() != parser::Booking::Strict {
+            let booking = Into::<Booking>::into(*booking.item());
+            if is_supported_method(booking) {
+            } else {
                 self.warnings.push(
                     element
-                        .warning("booking methods other than strict are not yet supported")
+                        .warning("booking method {} unsupported, falling back to default")
                         .into(),
                 );
             }
@@ -730,15 +739,13 @@ struct AccountBuilder<'a> {
     allowed_currencies: HashSet<parser::Currency<'a>>,
     positions: Positions<'a>,
     opened: Span,
-    // TODO booking
-    //  booking: Symbol, // defaulted correctly from options if omitted from Open directive
     pad_idx: Option<usize>, // index in directives in Loader
     balance_diagnostics: Vec<BalanceDiagnostic<'a>>,
-    booking: parser::Booking,
+    booking: Booking,
 }
 
 impl<'a> AccountBuilder<'a> {
-    fn new<I>(allowed_currencies: I, booking: parser::Booking, opened: Span) -> Self
+    fn new<I>(allowed_currencies: I, booking: Booking, opened: Span) -> Self
     where
         I: Iterator<Item = parser::Currency<'a>>,
     {

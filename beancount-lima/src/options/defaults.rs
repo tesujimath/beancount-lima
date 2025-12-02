@@ -50,10 +50,6 @@ pub(crate) fn default_render_commas() -> bool {
     false
 }
 
-pub(crate) fn default_booking_method() -> parser::Booking {
-    parser::Booking::Strict
-}
-
 pub(crate) fn default_plugin_processing_mode() -> parser::PluginProcessingMode {
     parser::PluginProcessingMode::Default
 }

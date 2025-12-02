@@ -1,6 +1,6 @@
 mod book;
-pub use book::book;
 pub(crate) use book::book_with_residuals;
+pub use book::{book, is_supported_method};
 
 mod categorize;
 pub(crate) use categorize::categorize_by_currency;

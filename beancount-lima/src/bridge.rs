@@ -1,6 +1,7 @@
 // TODO remove dead code suppression
 #![allow(dead_code, unused_variables)]
 
+use beancount_lima_booking::{is_supported_method, Booking};
 use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess,
 };
@@ -11,7 +12,6 @@ use steel::{gc::Gc, rvals::IntoSteelVal, SteelVal};
 use crate::{
     config::LoaderConfig,
     loader::{InferredTolerance, LoadError, LoadSuccess, Loader},
-    options::defaults::default_booking_method,
     prism::Prism,
 };
 
@@ -30,22 +30,25 @@ where
             mut warnings,
         }) => {
             let inferred_tolerance = InferredTolerance::new(&options);
-            let default_booking_method = if let Some(booking_method) = options.booking_method() {
-                // TODO allow all supported booking methods
-                if *booking_method.item() != parser::Booking::Strict {
-                    warnings.push(
-                        booking_method
-                            .warning("Unsupported booking method, falling back to STRICT"),
-                    );
+
+            let default_booking = Booking::default();
+            let default_booking_option = if let Some(booking_method) = options.booking_method() {
+                let booking = Into::<Booking>::into(*booking_method.item());
+                if is_supported_method(booking) {
+                    booking
+                } else {
+                    warnings.push(booking_method.warning(format!(
+                        "Unsupported booking method, falling back to {default_booking}"
+                    )));
+                    default_booking
                 }
-                parser::Booking::Strict
             } else {
-                default_booking_method()
+                default_booking
             };
 
             sources.write_errors_or_warnings(error_w, warnings)?;
 
-            match Loader::new(default_booking_method, inferred_tolerance, &options, config)
+            match Loader::new(default_booking_option, inferred_tolerance, &options, config)
                 .collect(&directives)
             {
                 Ok(LoadSuccess {

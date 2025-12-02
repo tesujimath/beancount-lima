@@ -3,7 +3,7 @@ use std::io::stderr;
 use time::Date;
 use tracing_subscriber::EnvFilter;
 
-use crate::{book_with_residuals, Booking, BookingError, Bookings, Inventory};
+use crate::{book_with_residuals, is_supported_method, Booking, BookingError, Bookings, Inventory};
 
 const ANTE_TAG: &str = "ante";
 const EX_TAG: &str = "ex";
@@ -30,9 +30,8 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
     let parser = parser::BeancountParser::new(&sources);
     let error_w = &stderr();
 
-    // TODO support other booking methods
-    if method != Booking::Strict {
-        panic!("Failing for now because unsupported booking method Booking::{method}");
+    if !is_supported_method(method) {
+        panic!("Failing for now because Booking::{method} is unsupported");
     }
 
     match parser.parse() {
