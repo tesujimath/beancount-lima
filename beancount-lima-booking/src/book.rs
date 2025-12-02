@@ -20,7 +20,7 @@ pub fn is_supported_method(method: Booking) -> bool {
         Average => false,
         Fifo => true,
         Lifo => false,
-        Hifo => false,
+        Hifo => true,
     }
 }
 

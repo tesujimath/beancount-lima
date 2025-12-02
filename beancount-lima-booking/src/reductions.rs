@@ -345,8 +345,15 @@ where
             if method == Booking::Lifo {
                 matched.reverse();
             } else if method == Booking::Hifo {
-                // sort by units, greater first
-                matched.sort_by(|i, j| positions[*j].units.cmp(&positions[*i].units));
+                // sort by cost per-unit, greater first
+                matched.sort_by(|i, j| {
+                    positions[*j]
+                        .cost
+                        .as_ref()
+                        .unwrap()
+                        .per_unit
+                        .cmp(&positions[*i].cost.as_ref().unwrap().per_unit)
+                });
             }
 
             reduce_ordered_positions(
