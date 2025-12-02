@@ -46,7 +46,7 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
             ..
         }) => {
             let tolerance = &options;
-            let mut ante_inventory = Inventory::default();
+            let mut inventory = Inventory::default();
 
             if let Some((date, ante_postings, _)) = get_postings(&directives, ANTE_TAG).next() {
                 let (
@@ -54,27 +54,21 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                         updated_inventory, ..
                     },
                     _residuals,
-                ) = book_with_residuals(
-                    date,
-                    &ante_postings,
-                    &tolerance,
-                    |_| None,
-                    |_| Booking::Strict,
-                )
-                .unwrap();
+                ) = book_with_residuals(date, &ante_postings, &tolerance, |_| None, |_| method)
+                    .unwrap();
 
-                ante_inventory = updated_inventory;
+                inventory = updated_inventory;
             }
 
             for (i_apply, (date, postings, apply_string)) in
                 get_postings(&directives, APPLY_TAG).enumerate()
             {
-                let actual_inventory = match (
+                match (
                     book_with_residuals(
                         date,
                         &postings,
                         &tolerance,
-                        |accname| ante_inventory.get(accname),
+                        |accname| inventory.get(accname),
                         |_| method,
                     ),
                     expected_err.as_ref(),
@@ -87,7 +81,12 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                             _residuals,
                         )),
                         None,
-                    ) => updated_inventory,
+                    ) => {
+                        tracing::debug!("updating test inventory with {:?}", &updated_inventory);
+                        for (acc, positions) in updated_inventory {
+                            inventory.insert(acc, positions);
+                        }
+                    }
                     (Err(e), Some(expected_err)) => {
                         assert_eq!(&e, expected_err);
                         continue;
@@ -105,10 +104,9 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                         ..
                     },
                     _residuals,
-                ) = book_with_residuals(date, &postings, &tolerance, |_| None, |_| Booking::Strict)
-                    .unwrap();
+                ) = book_with_residuals(date, &postings, &tolerance, |_| None, |_| method).unwrap();
 
-                assert_eq!(&actual_inventory, &expected_inventory);
+                assert_eq!(&inventory, &expected_inventory);
 
                 // TODO check booked
             }

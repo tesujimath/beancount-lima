@@ -2,7 +2,7 @@
 #![allow(dead_code, unused_variables)]
 
 use hashbrown::{HashMap, HashSet};
-use std::{fmt::Debug, hash::Hash, iter::once};
+use std::{cmp::min, fmt::Debug, hash::Hash, iter::once};
 
 use super::{
     AnnotatedPosting, BookedOrUnbookedPosting, Booking, BookingError, Cost, CostSpec, Interpolated,
@@ -107,35 +107,27 @@ where
 
             if is_potential_reduction(posting_units, posting_currency, previous_positions) {
                 // find positions whose costs match what we have
-                let matched_positions = match_positions(
+                let matched = match_positions(
                     posting_currency,
                     annotated.posting.cost().as_ref(),
                     previous_positions,
-                    method,
                 );
 
-                tracing::debug!(
-                    "{date} reduce {method} matched {:?} with {:?}",
-                    &annotated,
-                    &matched_positions
-                );
+                tracing::debug!("{date} reduce {method} matched with {:?}", &matched);
 
-                if matched_positions.is_empty() {
+                if matched.is_empty() {
                     Err(BookingError::Posting(
                         annotated.idx,
                         PostingBookingError::NoPositionMatches,
                     ))
-                } else if matched_positions.len() == 1 {
-                    let (matched_position_idx, matched_position) =
-                        matched_positions.into_iter().next().unwrap();
+                } else if matched.len() == 1 {
                     reduce_matched_position(
                         posting_units,
                         posting_currency,
                         annotated.posting,
                         annotated.idx,
                         previous_positions,
-                        matched_position_idx,
-                        matched_position,
+                        matched[0],
                     )
                 } else if is_sell_all_at_cost(
                     posting_units,
@@ -143,21 +135,30 @@ where
                     previous_positions,
                     tolerance,
                 ) {
+                    tracing::debug!("{date} reduce_all_sold_at_cost {method}");
                     let (reducing_posting, updated_positions) = reduce_all_sold_at_cost(
                         posting_units,
                         posting_currency,
                         annotated.posting,
                         annotated.idx,
                         previous_positions,
-                        matched_positions,
+                        matched,
                     )?;
 
-                    Ok((reducing_posting, None))
+                    Ok((reducing_posting, Some(updated_positions)))
                 } else {
-                    Err(BookingError::Posting(
+                    tracing::debug!("{date} reduce_multiple_positions {method}");
+                    let (reducing_posting, updated_positions) = reduce_multiple_positions(
+                        posting_units,
+                        posting_currency,
+                        annotated.posting,
                         annotated.idx,
-                        PostingBookingError::AmbiguousMatches,
-                    ))
+                        previous_positions,
+                        matched,
+                        method,
+                    )?;
+
+                    Ok((reducing_posting, Some(updated_positions)))
                 }
             } else {
                 tracing::debug!(
@@ -212,7 +213,6 @@ fn reduce_matched_position<'a, P>(
     posting_idx: usize,
     previous_positions: &Positions<P::Date, P::Number, P::Currency, P::Label>,
     matched_position_idx: usize,
-    matched_position: &Position<P::Date, P::Number, P::Currency, P::Label>,
 ) -> Result<
     (
         BookedOrUnbookedPosting<P>,
@@ -229,12 +229,14 @@ where
         currency: matched_currency,
         units: matched_units,
         cost: matched_cost,
-    } = matched_position;
+    } = &previous_positions[matched_position_idx];
 
     tracing::debug!(
-        "reduce cost-matched unique position at {}: {:?}",
+        "reduce cost-matched unique position at {}: {:?} {:?} {:?}",
         matched_position_idx,
-        &matched_position
+        matched_currency,
+        matched_units,
+        matched_cost
     );
 
     if posting_units.abs() > matched_units.abs() {
@@ -316,13 +318,62 @@ where
         .is_none()
 }
 
-fn reduce_all_sold_at_cost<'a, P>(
+fn reduce_multiple_positions<'a, P>(
     posting_units: P::Number,
     posting_currency: &P::Currency,
     posting: P,
     posting_idx: usize,
-    previous_positions: &Positions<P::Date, P::Number, P::Currency, P::Label>,
-    matched_positions: Vec<(usize, &Position<P::Date, P::Number, P::Currency, P::Label>)>,
+    positions: &Positions<P::Date, P::Number, P::Currency, P::Label>,
+    mut matched: Vec<usize>,
+    method: Booking,
+) -> Result<
+    (
+        BookedOrUnbookedPosting<P>,
+        Positions<P::Date, P::Number, P::Currency, P::Label>,
+    ),
+    BookingError,
+>
+where
+    P: PostingSpec + Debug + 'a,
+{
+    match method {
+        Booking::Fifo | Booking::Lifo | Booking::Hifo => {
+            check_sufficient_matched_units(posting_units, posting_idx, positions, &matched)?;
+            let cost_currency = get_unique_cost_currency(posting_idx, positions, &matched)?;
+
+            // all that differs between the [FLH]ifo methods is the order in which we select matched postings for reduction
+            if method == Booking::Lifo {
+                matched.reverse();
+            } else if method == Booking::Hifo {
+                // sort by units, greater first
+                matched.sort_by(|i, j| positions[*j].units.cmp(&positions[*i].units));
+            }
+
+            reduce_ordered_positions(
+                posting_units,
+                posting_currency.clone(),
+                cost_currency,
+                posting,
+                posting_idx,
+                positions,
+                &matched,
+            )
+        }
+        _ => Err(BookingError::Posting(
+            posting_idx,
+            PostingBookingError::AmbiguousMatches,
+        )),
+    }
+}
+
+fn reduce_ordered_positions<'a, P>(
+    posting_units: P::Number,
+    posting_currency: P::Currency,
+    cost_currency: P::Currency,
+    posting: P,
+    posting_idx: usize,
+    positions: &Positions<P::Date, P::Number, P::Currency, P::Label>,
+    matched: &[usize],
 ) -> Result<
     (
         BookedOrUnbookedPosting<P>,
@@ -335,61 +386,188 @@ where
 {
     use BookedOrUnbookedPosting::*;
 
-    let cost_currencies = matched_positions
+    let mut remaining_units = posting_units;
+    let mut updated_position_units = positions.iter().map(|p| p.units).collect::<Vec<_>>();
+    let mut adjustments = Vec::default();
+
+    tracing::debug!(
+        "reduce_ordered_positions {:?} being {:?}",
+        &matched,
+        matched.iter().map(|i| &positions[*i]).collect::<Vec<_>>()
+    );
+
+    for i in matched {
+        let cost_i = positions[*i].cost.as_ref().unwrap();
+        let consumed = if remaining_units.abs() <= updated_position_units[*i].abs() {
+            remaining_units
+        } else {
+            -updated_position_units[*i]
+        };
+        updated_position_units[*i] += consumed;
+        remaining_units -= consumed;
+
+        adjustments.push(PostingCost {
+            date: cost_i.date,
+            units: consumed,
+            per_unit: cost_i.per_unit,
+            label: cost_i.label.as_ref().cloned(),
+            merge: cost_i.merge,
+        });
+
+        if remaining_units == P::Number::zero() {
+            break;
+        }
+    }
+
+    let updated_positions = Positions::new(
+        updated_position_units
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, units)| {
+                let position = &positions[i];
+                (units != P::Number::zero()).then_some(Position {
+                    currency: posting_currency.clone(),
+                    units,
+                    cost: position.cost.clone(),
+                })
+            })
+            .collect::<Vec<_>>(),
+    );
+
+    tracing::debug!(
+        "reduce_ordered_positions returning {:?} {:?}",
+        &adjustments,
+        &updated_positions
+    );
+
+    Ok((
+        Booked(Interpolated {
+            posting,
+            idx: posting_idx,
+            units: posting_units,
+            currency: posting_currency,
+            cost: Some(PostingCosts {
+                cost_currency,
+                adjustments,
+            }),
+            // TODO price
+            price: None,
+        }),
+        updated_positions,
+    ))
+}
+
+fn check_sufficient_matched_units<D, N, C, L>(
+    posting_units: N,
+    posting_idx: usize,
+    positions: &Positions<D, N, C, L>,
+    matched: &[usize],
+) -> Result<(), BookingError>
+where
+    D: Eq + Ord + Copy + Debug,
+    N: Number + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    L: Eq + Ord + Clone + Debug,
+{
+    let total_matched_units: N = matched.iter().map(|i| positions[*i].units).sum();
+
+    if posting_units <= total_matched_units {
+        Ok(())
+    } else {
+        Err(BookingError::Posting(
+            posting_idx,
+            PostingBookingError::NotEnoughLotsToReduce,
+        ))
+    }
+}
+
+fn reduce_all_sold_at_cost<'a, P>(
+    posting_units: P::Number,
+    posting_currency: &P::Currency,
+    posting: P,
+    posting_idx: usize,
+    positions: &Positions<P::Date, P::Number, P::Currency, P::Label>,
+    matched: Vec<usize>,
+) -> Result<
+    (
+        BookedOrUnbookedPosting<P>,
+        Positions<P::Date, P::Number, P::Currency, P::Label>,
+    ),
+    BookingError,
+>
+where
+    P: PostingSpec + Debug + 'a,
+{
+    use BookedOrUnbookedPosting::*;
+
+    let cost_currency = get_unique_cost_currency(posting_idx, positions, &matched)?;
+    let cost_units: P::Number = matched
         .iter()
-        .map(|(_i, pos)| pos.cost.as_ref().unwrap().currency.clone())
+        .map(|i| {
+            (positions[*i].cost.as_ref().unwrap().per_unit * posting_units)
+                .rescaled(posting_units.scale())
+        })
+        .sum();
+
+    let matched_set = matched.iter().copied().collect::<HashSet<_>>();
+
+    let updated_positions = Positions::new(
+        positions
+            .iter()
+            .enumerate()
+            .filter_map(|(i, pos)| matched_set.contains(&i).then_some(pos.clone()))
+            .collect::<Vec<_>>(),
+    );
+
+    Ok((
+        Booked(Interpolated {
+            posting,
+            idx: posting_idx,
+            units: posting_units,
+            currency: posting_currency.clone(),
+            cost: Some(PostingCosts {
+                cost_currency,
+                adjustments: matched
+                    .iter()
+                    .map(|i| {
+                        let matched_position = &positions[*i];
+                        let matched_cost = matched_position.cost.clone().unwrap();
+                        PostingCost {
+                            date: matched_cost.date,
+                            units: -matched_position.units,
+                            per_unit: matched_cost.per_unit,
+                            label: matched_cost.label,
+                            merge: matched_cost.merge,
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+            }),
+            // TODO price
+            price: None,
+        }),
+        updated_positions,
+    ))
+}
+
+fn get_unique_cost_currency<D, N, C, L>(
+    posting_idx: usize,
+    positions: &Positions<D, N, C, L>,
+    matched: &[usize],
+) -> Result<C, BookingError>
+where
+    D: Eq + Ord + Copy + Debug,
+    N: Number + Debug,
+    C: Eq + Hash + Ord + Clone + Debug,
+    L: Eq + Ord + Clone + Debug,
+{
+    let cost_currencies = matched
+        .iter()
+        .map(|i| positions[*i].cost.as_ref().unwrap().currency.clone())
         .collect::<HashSet<_>>();
 
     if cost_currencies.len() == 1 {
         let cost_currency = cost_currencies.into_iter().next().unwrap();
-        let cost_units: P::Number = matched_positions
-            .iter()
-            .map(|(_i, pos)| {
-                (pos.cost.as_ref().unwrap().per_unit * posting_units)
-                    .rescaled(posting_units.scale())
-            })
-            .sum();
-
-        let matched_position_indices = matched_positions
-            .iter()
-            .map(|(i, _)| *i)
-            .collect::<HashSet<_>>();
-
-        let updated_positions = Positions::new(
-            previous_positions
-                .iter()
-                .enumerate()
-                .filter_map(|(i, pos)| matched_position_indices.contains(&i).then_some(pos.clone()))
-                .collect::<Vec<_>>(),
-        );
-
-        Ok((
-            Booked(Interpolated {
-                posting,
-                idx: posting_idx,
-                units: posting_units,
-                currency: posting_currency.clone(),
-                cost: Some(PostingCosts {
-                    cost_currency,
-                    adjustments: matched_positions
-                        .into_iter()
-                        .map(|(idx, matched_pos)| {
-                            let matched_cost = matched_pos.cost.clone().unwrap();
-                            PostingCost {
-                                date: matched_cost.date,
-                                units: -matched_pos.units,
-                                per_unit: matched_cost.per_unit,
-                                label: matched_cost.label,
-                                merge: matched_cost.merge,
-                            }
-                        })
-                        .collect::<Vec<_>>(),
-                }),
-                // TODO price
-                price: None,
-            }),
-            updated_positions,
-        ))
+        Ok(cost_currency)
     } else {
         Err(BookingError::Posting(
             posting_idx,
@@ -398,12 +576,11 @@ where
     }
 }
 
-fn match_positions<'a, D, N, C, L, CS>(
+fn match_positions<D, N, C, L, CS>(
     posting_currency: &C,
     cost_spec: Option<&CS>,
-    positions: &'a Positions<D, N, C, L>,
-    method: Booking,
-) -> Vec<(usize, &'a Position<D, N, C, L>)>
+    positions: &Positions<D, N, C, L>,
+) -> Vec<usize>
 where
     D: Eq + Ord + Copy + Debug,
     N: Number + Debug,
@@ -426,7 +603,7 @@ where
                             cost_spec,
                             cost_matches_spec(pos_cost, cost_spec)
                         );
-                        cost_matches_spec(pos_cost, cost_spec).then_some((i, pos))
+                        cost_matches_spec(pos_cost, cost_spec).then_some(i)
                     }
                     _ => None,
                 }

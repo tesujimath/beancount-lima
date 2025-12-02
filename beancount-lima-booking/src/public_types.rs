@@ -3,7 +3,7 @@ use std::{
     fmt::{Debug, Display},
     hash::Hash,
     iter::{repeat, Sum},
-    ops::{Add, AddAssign, Deref, Div, Mul, Neg},
+    ops::{Add, AddAssign, Deref, Div, Mul, Neg, SubAssign},
 };
 use strum_macros::Display;
 
@@ -365,6 +365,7 @@ pub trait Number:
     Copy
     + Add<Output = Self>
     + AddAssign
+    + SubAssign
     + Neg<Output = Self>
     + Mul<Output = Self>
     + Div<Output = Self>

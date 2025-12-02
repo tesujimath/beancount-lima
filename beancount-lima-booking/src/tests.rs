@@ -311,5 +311,30 @@ fn test_reduce__other_currency() {
     );
 }
 
+#[test]
+fn test_reduce__multiple_reductions() {
+    booking_test_ok(
+        r#"
+2016-01-01 * #ante
+  Assets:Account           50 HOOL {115.00 USD, 2016-01-15}
+  Assets:Account           50 HOOL {116.00 USD, 2016-01-16}
+
+2016-05-02 * #apply
+  Assets:Account          -40 HOOL {}
+  Assets:Account          -35 HOOL {}
+
+2016-05-02 * #booked
+  Assets:Account          -40 HOOL {115.00 USD, 2016-01-15}
+  Assets:Account          -10 HOOL {115.00 USD, 2016-01-15}
+  Assets:Account          -25 HOOL {116.00 USD, 2016-01-16}
+
+2016-01-01 * #ex
+  Assets:Account           25 HOOL {116.00 USD, 2016-01-16}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
 mod helpers;
 use helpers::*;

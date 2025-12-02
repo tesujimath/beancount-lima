@@ -11,7 +11,17 @@ use super::{
 };
 
 pub fn is_supported_method(method: Booking) -> bool {
-    method == Booking::Strict || method == Booking::None
+    use Booking::*;
+
+    match method {
+        Strict => true,
+        StrictWithSize => false,
+        None => true,
+        Average => false,
+        Fifo => true,
+        Lifo => false,
+        Hifo => false,
+    }
 }
 
 pub fn book<'a, 'b, P, T, I, M>(
@@ -293,7 +303,7 @@ where
                 (None, Some(_)) => Less,
                 (Some(_), None) => Greater,
                 (Some((cost, units)), Some(position_cost)) => {
-                    cost.partial_cmp(position_cost).unwrap_or(Equal)
+                    position_cost.partial_cmp(cost).unwrap_or(Equal)
                 }
             });
         match (insertion_idx, posting_cost) {
