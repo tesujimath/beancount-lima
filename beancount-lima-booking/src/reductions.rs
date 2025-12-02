@@ -410,6 +410,16 @@ where
         } else {
             -updated_position_units[*i]
         };
+
+        tracing::debug!(
+            "with {} remaining, consuming {} of {} leaving {} with {} still to consume",
+            remaining_units,
+            consumed,
+            updated_position_units[*i],
+            updated_position_units[*i] + consumed,
+            remaining_units - consumed
+        );
+
         updated_position_units[*i] += consumed;
         remaining_units -= consumed;
 
@@ -424,6 +434,13 @@ where
         if remaining_units == P::Number::zero() {
             break;
         }
+    }
+
+    if remaining_units != P::Number::zero() {
+        return Err(BookingError::Posting(
+            posting_idx,
+            PostingBookingError::NotEnoughLotsToReduce,
+        ));
     }
 
     let updated_positions = Positions::new(

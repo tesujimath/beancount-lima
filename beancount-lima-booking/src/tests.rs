@@ -365,5 +365,46 @@ fn test_reduce__multiple_reductions_hifo() {
     );
 }
 
+#[test]
+fn test_reduce__multiple_reductions__competing__with_error() {
+    booking_test_err(
+        r#"
+2016-01-01 * #ante
+  Assets:Account            5 HOOL {115.00 USD, 2016-01-15}
+
+2016-05-02 * #apply
+  Assets:Account           -4 HOOL {115.00 USD}
+  Assets:Account           -4 HOOL {2016-01-15}
+
+2016-05-02 * #booked
+  error: "Not enough lots to reduce"
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+        BookingError::Posting(1, PostingBookingError::NotEnoughLotsToReduce),
+    );
+}
+
+#[test]
+fn test_reduce__multiple_reductions__overflowing__with_error() {
+    booking_test_err(
+        r#"
+2016-01-01 * #ante
+  Assets:Account           50 HOOL {115.00 USD, 2016-01-15}
+  Assets:Account           50 HOOL {116.00 USD, 2016-01-16}
+
+2016-05-02 * #apply
+  Assets:Account          -40 HOOL {}
+  Assets:Account          -65 HOOL {}
+
+2016-05-02 * #booked
+  error: "Not enough lots to reduce"
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+        BookingError::Posting(1, PostingBookingError::NotEnoughLotsToReduce),
+    );
+}
+
 mod helpers;
 use helpers::*;
