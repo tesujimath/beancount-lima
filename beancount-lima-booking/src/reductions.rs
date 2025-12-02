@@ -116,7 +116,7 @@ where
             if is_potential_reduction(posting_units, posting_currency, previous_positions) {
                 // find positions whose costs match what we have
                 let matched_positions =
-                    match_positions(date, annotated.posting.cost().as_ref(), previous_positions);
+                    match_positions(annotated.posting.cost().as_ref(), previous_positions);
 
                 tracing::debug!(
                     "{date} reduce matched {:?} with {:?}",
@@ -403,7 +403,6 @@ where
 }
 
 fn match_positions<'a, D, N, C, L, CS>(
-    date: D,
     cost_spec: Option<&CS>,
     positions: &'a Positions<D, N, C, L>,
 ) -> Vec<(usize, &'a Position<D, N, C, L>)>
@@ -420,10 +419,9 @@ where
         .filter_map(|(i, pos)| match (pos.cost.as_ref(), cost_spec) {
             (Some(pos_cost), Some(cost_spec)) => {
                 tracing::debug!(
-                    "match_positions check {:?} {:?} {:?} {}",
+                    "match_positions check {:?} {:?} {}",
                     pos_cost,
                     cost_spec,
-                    date,
                     cost_matches_spec(pos_cost, cost_spec)
                 );
                 cost_matches_spec(pos_cost, cost_spec).then_some((i, pos))
