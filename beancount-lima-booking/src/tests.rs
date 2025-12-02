@@ -1,4 +1,5 @@
-use super::{Booking, BookingError, PostingBookingError, TransactionBookingError};
+#![allow(non_snake_case)]
+use super::{Booking, BookingError, PostingBookingError};
 
 // a subset of the tests from
 // https://github.com/beancount/beancount/blob/master/beancount/parser/booking_full_test.py

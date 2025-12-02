@@ -727,9 +727,7 @@ impl<'a, T> Loader<'a, T> {
 
 #[derive(Debug)]
 struct AccountBuilder<'a> {
-    // TODO support cost in inventory
     allowed_currencies: HashSet<parser::Currency<'a>>,
-    // TODO replace all use of inventory with positions
     positions: Positions<'a>,
     opened: Span,
     // TODO booking

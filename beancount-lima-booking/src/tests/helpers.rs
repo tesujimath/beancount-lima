@@ -94,7 +94,7 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                         continue;
                     }
                     (Ok(_), Some(_)) => panic!("unexpected success at {i_apply}\n{apply_string}"),
-                    (Err(e), None) => panic!("unexpected failure at {i_apply}\n{apply_string}"),
+                    (Err(e), None) => panic!("unexpected failure {e} at {i_apply}\n{apply_string}"),
                 };
 
                 let (date, postings, _) = get_postings(&directives, EX_TAG)

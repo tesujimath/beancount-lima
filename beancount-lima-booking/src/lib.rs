@@ -2,6 +2,9 @@ mod book;
 pub use book::book;
 pub(crate) use book::book_with_residuals;
 
+mod categorize;
+pub(crate) use categorize::categorize_by_currency;
+
 mod errors;
 pub use errors::{BookingError, PostingBookingError, TransactionBookingError};
 
@@ -18,6 +21,9 @@ pub use public_types::{
     Booking, Bookings, Cost, CostSpec, Interpolated, Inventory, Number, Position, Positions,
     Posting, PostingCost, PostingCosts, PostingSpec, Price, PriceSpec, Sign, Tolerance,
 };
+
+mod reductions;
+pub(crate) use reductions::{book_reductions, Reductions};
 
 #[cfg(test)]
 mod tests;

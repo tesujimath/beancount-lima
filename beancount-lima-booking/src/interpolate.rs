@@ -4,8 +4,9 @@
 use std::fmt::Debug;
 
 use super::{
-    BookedOrUnbookedPosting, BookingError, CostSpec, Interpolated, Number, PostingBookingError,
-    PostingCost, PostingCosts, PostingSpec, PriceSpec, Tolerance, TransactionBookingError,
+    AnnotatedPosting, BookedOrUnbookedPosting, BookingError, CostSpec, Interpolated, Number,
+    PostingBookingError, PostingCost, PostingCosts, PostingSpec, PriceSpec, Tolerance,
+    TransactionBookingError,
 };
 
 #[derive(Debug)]
@@ -34,12 +35,14 @@ where
     let mut weights = costeds.iter().map(|c| c.weight()).collect::<Vec<_>>();
     let mut residual = tolerance.residual(weights.iter().filter_map(|w| *w), currency);
     tracing::debug!("{date} weights for {:?} {:?}", &currency, &weights);
+
     let unknown = weights
         .iter()
         .enumerate()
         .filter(|w| w.1.is_none())
         .collect::<Vec<_>>();
     tracing::debug!("{date} unknown values for {:?} {:?}", &currency, &unknown);
+
     if unknown.len() == 1 {
         let i_unknown = unknown[0].0;
         weights[i_unknown] = Some(-residual.unwrap_or_default());
@@ -53,111 +56,12 @@ where
     let booked_and_unbooked_postings = costeds
         .into_iter()
         .zip(weights)
-        .map(|(c, w)| {
-            match c {
-                BookedOrUnbookedPosting::Unbooked(a) => {
-                    let w = w.unwrap();
-
-                    if a.posting.cost().is_none() && a.posting.price().is_none() {
-                        // simple case with no cost or price
-                        Ok((
-                            Interpolated {
-                                posting: a.posting,
-                                idx: a.idx,
-                                units: w,
-                                currency: currency.clone(),
-                                cost: None,
-                                price: None,
-                            },
-                            false,
-                        ))
-                    } else {
-                        match (units(&a.posting, w), a.currency, a.posting.cost()) {
-                            (
-                                Some(UnitsAndCostPerUnit {
-                                    units,
-                                    cost_per_unit,
-                                }),
-                                Some(currency),
-                                Some(cost),
-                            ) => {
-                                tracing::debug!(
-                                    "{date} {currency} interpolate_from_costed {units} {:?} annotated cost currency {:?}",
-                                    &cost,
-                                    a.cost_currency,
-                                );
-                                match (a.cost_currency, cost_per_unit) {
-                                    (Some(cost_currency), Some(cost_per_unit)) =>Ok((
-                                        Interpolated {
-                                            posting: a.posting,
-                                            idx: a.idx,
-                                            units,
-                                            currency,
-                                            cost: Some(PostingCosts {
-                                                cost_currency ,
-                                                adjustments: vec![PostingCost {
-                                                    date: cost.date().unwrap_or(date),
-                                                    units,
-                                                    per_unit: cost_per_unit,
-                                                    label: cost.label(),
-                                                    merge: cost.merge(),
-                                                }],
-                                            }),
-                                            price: None, // TODO price with cost
-                                        },
-                                        false,
-                                    )) ,
-                                    (None, Some(_)) =>  Err(BookingError::Posting(a.idx, PostingBookingError::CannotInferCurrency)),
-                                    (Some(_), None) => Err(BookingError::Posting(a.idx, PostingBookingError::CannotInferUnits)),
-                                    (None, None) => Err(BookingError::Posting(a.idx, PostingBookingError::CannotInferAnything)),
-                                }
-                            }
-                            (
-                                Some(UnitsAndCostPerUnit {
-                                    units,
-                                    cost_per_unit: _,
-                                }),
-                                Some(currency),
-                                None,
-                            ) => {
-                                // TODO price without cost
-                                tracing::debug!(
-                                    "price without cost {} {} {} {:?}",
-                                    a.idx,
-                                    units,
-                                    currency,
-                                    a.posting.price()
-                                );
-                                Ok((
-                                    Interpolated {
-                                        posting: a.posting,
-                                        idx: a.idx,
-                                        units,
-                                        currency,
-                                        cost: None,
-                                        price: None,
-                                    },
-                                    false,
-                                ))
-                            }
-
-                            (None, Some(_), _) => Err(BookingError::Posting(
-                                a.idx,
-                                PostingBookingError::CannotInferUnits,
-                            )),
-                            (Some(_), None, _) => Err(BookingError::Posting(
-                                a.idx,
-                                PostingBookingError::CannotInferCurrency,
-                            )),
-                            (None, None, _) => Err(BookingError::Posting(
-                                a.idx,
-                                PostingBookingError::CannotInferAnything,
-                            )),
-                        }
-                    }
-                }
-                BookedOrUnbookedPosting::Booked(i) => Ok((i, true)),
+        .map(|(c, w)| match c {
+            BookedOrUnbookedPosting::Unbooked(annotated) => {
+                interpolate_from_annotated(date, currency, w.unwrap(), annotated)
             }
+
+            BookedOrUnbookedPosting::Booked(i) => Ok((i, true)),
         })
         .collect::<Result<Vec<_>, BookingError>>()?;
 
@@ -165,6 +69,134 @@ where
         booked_and_unbooked_postings,
         residual,
     })
+}
+pub(crate) fn interpolate_from_annotated<'i, 'b, P>(
+    date: P::Date,
+    currency: &P::Currency,
+    weight: P::Number,
+    annotated: AnnotatedPosting<P, P::Currency>,
+) -> Result<
+    (
+        Interpolated<P, P::Date, P::Number, P::Currency, P::Label>,
+        bool, // booked
+    ),
+    BookingError,
+>
+where
+    P: PostingSpec + Debug + 'i,
+{
+    match (
+        units(&annotated.posting, weight),
+        annotated.currency,
+        annotated.posting.cost(),
+        annotated.posting.price(),
+    ) {
+        (_, _, None, None) => {
+            // simple case with no cost or price
+            Ok((
+                Interpolated {
+                    posting: annotated.posting,
+                    idx: annotated.idx,
+                    units: weight,
+                    currency: currency.clone(),
+                    cost: None,
+                    price: None,
+                },
+                false,
+            ))
+        }
+        (
+            Some(UnitsAndCostPerUnit {
+                units,
+                cost_per_unit,
+            }),
+            Some(currency),
+            Some(cost),
+            _,
+        ) => {
+            tracing::debug!(
+                                    "{date} {currency} interpolate_from_costed {units} {:?} annotated cost currency {:?}",
+                                    &cost,
+                                    annotated.cost_currency,
+                                );
+            match (annotated.cost_currency, cost_per_unit) {
+                (Some(cost_currency), Some(cost_per_unit)) => Ok((
+                    Interpolated {
+                        posting: annotated.posting,
+                        idx: annotated.idx,
+                        units,
+                        currency,
+                        cost: Some(PostingCosts {
+                            cost_currency,
+                            adjustments: vec![PostingCost {
+                                date: cost.date().unwrap_or(date),
+                                units,
+                                per_unit: cost_per_unit,
+                                label: cost.label(),
+                                merge: cost.merge(),
+                            }],
+                        }),
+                        price: None, // TODO price with cost
+                    },
+                    false,
+                )),
+                (None, Some(_)) => Err(BookingError::Posting(
+                    annotated.idx,
+                    PostingBookingError::CannotInferCurrency,
+                )),
+                (Some(_), None) => Err(BookingError::Posting(
+                    annotated.idx,
+                    PostingBookingError::CannotInferUnits,
+                )),
+                (None, None) => Err(BookingError::Posting(
+                    annotated.idx,
+                    PostingBookingError::CannotInferAnything,
+                )),
+            }
+        }
+        (
+            Some(UnitsAndCostPerUnit {
+                units,
+                cost_per_unit: _,
+            }),
+            Some(currency),
+            None,
+            _,
+        ) => {
+            // TODO price without cost
+            tracing::debug!(
+                "price without cost {} {} {} {:?}",
+                annotated.idx,
+                units,
+                currency,
+                annotated.posting.price()
+            );
+            Ok((
+                Interpolated {
+                    posting: annotated.posting,
+                    idx: annotated.idx,
+                    units,
+                    currency,
+                    cost: None,
+                    price: None,
+                },
+                false,
+            ))
+        }
+
+        (None, Some(_), _, _) => Err(BookingError::Posting(
+            annotated.idx,
+            PostingBookingError::CannotInferUnits,
+        )),
+        (Some(_), None, _, _) => Err(BookingError::Posting(
+            annotated.idx,
+            PostingBookingError::CannotInferCurrency,
+        )),
+        (None, None, _, _) => Err(BookingError::Posting(
+            annotated.idx,
+            PostingBookingError::CannotInferAnything,
+        )),
+    }
 }
 
 struct UnitsAndCostPerUnit<N> {
@@ -179,50 +211,78 @@ where
 {
     // TODO review unit inference from cost and price and weight
     if let Some(cost_spec) = posting.cost() {
-        match (posting.units(), cost_spec.per_unit(), cost_spec.total()) {
-            (Some(units), Some(cost_per_unit), _) => Some(UnitsAndCostPerUnit {
-                units,
-                cost_per_unit: Some(cost_per_unit),
-            }),
-            (None, Some(cost_per_unit), _) => {
-                let units = (weight / cost_per_unit).rescaled(weight.scale());
-                Some(UnitsAndCostPerUnit {
-                    units,
-                    cost_per_unit: Some(cost_per_unit),
-                })
-            }
-            (Some(units), None, Some(cost_total)) => {
-                let cost_per_unit = cost_total / units;
-                Some(UnitsAndCostPerUnit {
-                    units,
-                    cost_per_unit: Some(cost_per_unit),
-                })
-            }
-            (Some(units), None, None) => Some(UnitsAndCostPerUnit {
-                units,
-                cost_per_unit: None,
-            }),
-            (None, None, _) => None, // TODO is this correct?
-        }
+        units_from_cost_spec(posting.units(), weight, &cost_spec)
     } else if let Some(price_spec) = posting.price() {
-        match (posting.units(), price_spec.per_unit(), price_spec.total()) {
-            (Some(units), _, _) => Some(UnitsAndCostPerUnit {
-                units,
-                cost_per_unit: None,
-            }),
-            (None, Some(price_per_unit), _) => {
-                let units = (weight / price_per_unit).rescaled(weight.scale());
-                Some(UnitsAndCostPerUnit {
-                    units,
-                    cost_per_unit: None,
-                })
-            }
-            (None, None, _) => None,
-        }
+        units_from_price_spec(posting.units(), weight, &price_spec)
     } else {
         posting.units().map(|units| UnitsAndCostPerUnit {
             units,
             cost_per_unit: None,
         })
+    }
+}
+
+fn units_from_cost_spec<D, N, C, L, CS>(
+    posting_units: Option<N>,
+    weight: N,
+    cost_spec: &CS,
+) -> Option<UnitsAndCostPerUnit<N>>
+where
+    D: Eq + Ord + Copy + Debug,
+    N: Number + Debug,
+    C: Eq + Ord + Clone + Debug,
+    L: Eq + Ord + Clone + Debug,
+    CS: CostSpec<Date = D, Number = N, Currency = C, Label = L> + Debug,
+{
+    match (posting_units, cost_spec.per_unit(), cost_spec.total()) {
+        (Some(units), Some(cost_per_unit), _) => Some(UnitsAndCostPerUnit {
+            units,
+            cost_per_unit: Some(cost_per_unit),
+        }),
+        (None, Some(cost_per_unit), _) => {
+            let units = (weight / cost_per_unit).rescaled(weight.scale());
+            Some(UnitsAndCostPerUnit {
+                units,
+                cost_per_unit: Some(cost_per_unit),
+            })
+        }
+        (Some(units), None, Some(cost_total)) => {
+            let cost_per_unit = cost_total / units;
+            Some(UnitsAndCostPerUnit {
+                units,
+                cost_per_unit: Some(cost_per_unit),
+            })
+        }
+        (Some(units), None, None) => Some(UnitsAndCostPerUnit {
+            units,
+            cost_per_unit: None,
+        }),
+        (None, None, _) => None, // TODO is this correct?
+    }
+}
+
+fn units_from_price_spec<N, C, PS>(
+    posting_units: Option<N>,
+    weight: N,
+    price_spec: &PS,
+) -> Option<UnitsAndCostPerUnit<N>>
+where
+    N: Number + Debug,
+    C: Eq + Ord + Clone + Debug,
+    PS: PriceSpec<Number = N, Currency = C> + Debug,
+{
+    match (posting_units, price_spec.per_unit(), price_spec.total()) {
+        (Some(units), _, _) => Some(UnitsAndCostPerUnit {
+            units,
+            cost_per_unit: None,
+        }),
+        (None, Some(price_per_unit), _) => {
+            let units = (weight / price_per_unit).rescaled(weight.scale());
+            Some(UnitsAndCostPerUnit {
+                units,
+                cost_per_unit: None,
+            })
+        }
+        (None, None, _) => None,
     }
 }
