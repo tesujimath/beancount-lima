@@ -23,8 +23,6 @@ pub(crate) fn booking_test_err(source: &str, options: &str, method: Booking, err
 }
 
 fn booking_test(source: &str, options: &str, method: Booking, expected_err: Option<BookingError>) {
-    init_tracing();
-
     let source_with_options = format!("{options}\n{source}");
     let sources = parser::BeancountSources::from(source_with_options);
     let parser = parser::BeancountParser::new(&sources);
@@ -63,7 +61,9 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
             for (i_apply, (date, postings, apply_string)) in
                 get_postings(&directives, APPLY_TAG).enumerate()
             {
-                tracing::debug!("TEST HELPER book_with_residuals {:?}", &postings);
+                init_tracing();
+
+                tracing::debug!("book_with_residuals {:?}", &postings);
                 match (
                     book_with_residuals(
                         date,

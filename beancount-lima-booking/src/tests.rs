@@ -435,5 +435,248 @@ fn test_reduce__multiple_reductions__no_error_because_total() {
     );
 }
 
+#[test]
+fn test_reduce__reduction_with_same_currency_not_at_cost() {
+    booking_test_err(
+        r#"
+2016-01-01 * #ante
+  Assets:Account   50 HOOL @ 14.33 USD
+
+2016-05-02 * #apply
+  Assets:Account  -40 HOOL {14.33 USD} @ 14.33 USD
+
+2016-05-02 * #booked
+  error: "No position matches"
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+        BookingError::Posting(0, PostingBookingError::NoPositionMatches),
+    );
+}
+
+#[test]
+fn test_reduce__missing_units_number() {
+    booking_test_ok(
+        r#"
+2016-01-01 * #ante
+
+2016-05-02 * #apply
+  Assets:Account              HOOL {115.00 USD}
+
+2016-01-01 * #booked
+
+; ANOMALY: added ex, units inferred as zero ???
+2016-01-01 * #ex
+  Assets:Account            0 HOOL {115.00 USD, 2016-05-02}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+// TODO self reductions tests:
+// test_has_self_reductions__simple
+// test_has_self_reductions__inverted_signs
+// test_has_self_reductions__multiple
+// test_has_self_reductions__reducing_without_cost
+// test_has_self_reductions__augmenting_without_cost
+// test_has_self_reductions__different_currency
+// test_has_self_reductions__different_account
+// test_has_self_reductions__total_replacement
+// test_has_self_reductions__booking_method_allowed
+
+// TODO more self reductions tests, also not handled by OG Beancount:
+// test_reduce__augment_and_reduce_with_empty_balance
+// test_reduce__augment_and_reduce_with_empty_balance__matching_pos
+// test_reduce__augment_and_reduce_with_empty_balance__matching_neg
+// test_reduce__augment_and_reduce_with_non_empty_balance
+
+#[test]
+fn test_ambiguous__NONE__matching_existing1() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+
+2015-06-01 * #apply
+  Assets:Account         -2 HOOL {100.00 USD, 2015-10-01}
+
+2015-01-01 * #ex
+  Assets:Account          3 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
+#[test]
+fn test_ambiguous__NONE__matching_existing2() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+
+2015-06-01 * #apply
+  Assets:Account         -2 HOOL {101.00 USD, 2015-10-01}
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          3 HOOL {101.00 USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
+#[test]
+fn test_ambiguous__NONE__notmatching_nonmixed1() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+
+2015-06-01 * #apply #booked
+  Assets:Account         -2 HOOL {102.00 USD, 2015-06-01}
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+  Assets:Account         -2 HOOL {102.00 USD, 2015-06-01}
+"#,
+        NO_OPTIONS,
+        Booking::None,
+    );
+}
+
+#[test]
+fn test_ambiguous__NONE__notmatching_mixed1() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
+
+2015-06-01 * #apply #booked
+  Assets:Account         -2 HOOL {102.00 USD, 2015-06-01}
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
+  Assets:Account         -2 HOOL {102.00 USD, 2015-06-01}
+"#,
+        NO_OPTIONS,
+        Booking::None,
+    );
+}
+
+#[test]
+fn test_ambiguous__NONE__notmatching_mixed2() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
+
+2015-06-01 * #apply #booked
+  Assets:Account          2 HOOL {102.00 USD, 2015-06-01}
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
+  Assets:Account          2 HOOL {102.00 USD, 2015-06-01}
+"#,
+        NO_OPTIONS,
+        Booking::None,
+    );
+}
+
+#[test]
+fn test_ambiguous__STRICT_1() {
+    booking_test_err(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+
+2015-06-01 * #apply
+  Assets:Account         -2 HOOL {102.00 USD, 2015-06-01}
+
+2015-06-01 * #apply
+  Assets:Account         -2 HOOL {102.00 USD}
+
+2015-06-01 * #apply
+  Assets:Account         -2 HOOL {2015-06-01}
+
+2015-06-01 * #booked
+  error: "No position matches"
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+        BookingError::Posting(0, PostingBookingError::NoPositionMatches),
+    );
+}
+
+#[test]
+fn test_ambiguous__STRICT_2() {
+    booking_test_err(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+
+2015-06-01 * #apply
+  Assets:Account         -6 HOOL {100.00 USD, 2015-10-01}
+
+2015-06-01 * #booked
+  error: "Not enough lots to reduce"
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+        BookingError::Posting(0, PostingBookingError::NotEnoughLotsToReduce),
+    );
+}
+
+#[test]
+fn test_ambiguous__STRICT__mixed() {
+    booking_test_err(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
+
+2015-06-01 * #apply
+  Assets:Account         -2 HOOL {102.00 USD, 2015-06-01}
+
+2015-06-01 * #apply
+  Assets:Account         -2 HOOL {102.00 USD}
+
+2015-06-01 * #apply
+  Assets:Account         -2 HOOL {2015-06-01}
+
+2015-06-01 * #booked
+  error: "No position matches"
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+        BookingError::Posting(0, PostingBookingError::NoPositionMatches),
+    );
+}
+
 mod helpers;
 use helpers::*;

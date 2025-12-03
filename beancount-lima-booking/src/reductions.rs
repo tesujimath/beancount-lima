@@ -105,7 +105,9 @@ where
                 previous_positions
             );
 
-            if is_potential_reduction(posting_units, posting_currency, previous_positions) {
+            if annotated.posting.cost().is_some()
+                && is_potential_reduction(posting_units, posting_currency, previous_positions)
+            {
                 // find positions whose costs match what we have
                 let matched = match_positions(
                     posting_currency,
@@ -179,7 +181,7 @@ where
     }
 }
 
-// do we found a position with cost and sign opposite to ours?
+// do any positions in this currency have a sign opposite to ours?
 fn is_potential_reduction<D, N, C, L>(
     posting_units: N,
     posting_currency: &C,
@@ -194,7 +196,7 @@ where
     if let Some(ann_sign) = posting_units.sign()
         && previous_positions
             .iter()
-            .filter(|pos| &pos.currency == posting_currency && pos.cost.is_some())
+            .filter(|pos| &pos.currency == posting_currency)
             .any(|pos| {
                 pos.units
                     .sign()
