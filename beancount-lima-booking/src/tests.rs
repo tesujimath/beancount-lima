@@ -1073,5 +1073,134 @@ fn test_ambiguous__LIFO__test_matching_more_than_is_available() {
     );
 }
 
+// TODO crossing is not supported in OG Beancount:
+// test_ambiguous__FIFO__no_match_against_any_lots
+
+// TODO Booking::Average is not supported
+// test_ambiguous__AVERAGE__trivial1
+// test_ambiguous__AVERAGE__trivial2
+// test_ambiguous__AVERAGE__simple_merge2_match1
+// test_ambiguous__AVERAGE__simple_merge2_match2
+// test_ambiguous__AVERAGE__simple_merge2_match2_b
+// test_ambiguous__AVERAGE__simple_merge3_match1
+// test_ambiguous__AVERAGE__simple_merge2_insufficient
+// test_ambiguous__AVERAGE__simple_merge2_insufficient_b
+// test_ambiguous__AVERAGE__mixed_currencies__ambi
+// test_ambiguous__AVERAGE__mixed_currencies__unambi_currency
+// test_ambiguous__AVERAGE__mixed_currencies__unambi_currency__merging
+// test_ambiguous__AVERAGE__mixed_currencies__unambi_cost_ccy__merging
+// test_ambiguous__AVERAGE__mixed_currencies__unambi_cost__merging
+// test_ambiguous__AVERAGE__mixed_currencies__unambi_date
+// test_ambiguous__AVERAGE__mixed_currencies__unambi_with_merge
+
+#[test]
+fn test_augment__at_cost__same_date() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #ante
+  Assets:Account          1 HOOL {100.00 USD}
+
+2015-10-01 * #apply
+  Assets:Account          2 HOOL {100.00 USD}
+
+2015-10-02 * #apply
+  Assets:Account          2 HOOL {100.00 USD, 2015-10-01}
+
+2015-11-01 * #ex
+  Assets:Account          3 HOOL {100.00 USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_augment__at_cost__different_date() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #ante
+  Assets:Account          1 HOOL {100.00 USD}
+
+2015-10-02 * #apply
+  Assets:Account          2 HOOL {100.00 USD}
+
+2015-10-01 * #apply
+  Assets:Account          2 HOOL {100.00 USD, 2015-10-02}
+
+2015-11-01 * #ex
+  Assets:Account          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          2 HOOL {100.00 USD, 2015-10-02}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_augment__at_cost__different_cost() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #ante
+  Assets:Account          1 HOOL {100.00 USD}
+
+2015-10-01 * #apply
+  Assets:Account          2 HOOL {101.00 USD}
+
+2015-10-01 * #booked
+  Assets:Account          2 HOOL {101.00 USD, 2015-10-01}
+
+2015-11-01 * #ex
+  Assets:Account          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          2 HOOL {101.00 USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_strict_with_size_single() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #ante
+  Assets:Account          1 HOOL {101.00 USD}
+  Assets:Account          2 HOOL {102.00 USD}
+
+2015-10-02 * #apply
+  Assets:Account         -1 HOOL {}
+
+2015-10-02 * #booked
+  Assets:Account         -1 HOOL {101.00 USD, 2015-10-01}
+
+2015-11-04 * #ex
+  Assets:Account          2 HOOL {102.00 USD, 2015-10-01}
+"#,
+        NO_OPTIONS,
+        Booking::StrictWithSize,
+    );
+}
+
+#[test]
+fn test_strict_with_size_multiple() {
+    booking_test_ok(
+        r#"
+2015-10-01 * #ante
+  Assets:Account          2 HOOL {101.00 USD, 2014-06-02}
+  Assets:Account          2 HOOL {102.00 USD, 2014-06-01}
+
+2015-10-02 * #apply
+  Assets:Account         -2 HOOL {}
+
+2015-10-02 * #booked
+  Assets:Account         -2 HOOL {102.00 USD, 2014-06-01}
+
+2015-11-04 * #ex
+  Assets:Account          2 HOOL {101.00 USD, 2014-06-02}
+"#,
+        NO_OPTIONS,
+        Booking::StrictWithSize,
+    );
+}
+
 mod helpers;
 use helpers::*;

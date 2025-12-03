@@ -15,7 +15,7 @@ pub fn is_supported_method(method: Booking) -> bool {
 
     match method {
         Strict => true,
-        StrictWithSize => false,
+        StrictWithSize => true,
         None => true,
         Average => false,
         Fifo => true,

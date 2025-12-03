@@ -74,7 +74,7 @@ fn reduce<'a, P, T>(
     date: P::Date,
     tolerance: &T,
     method: Booking,
-    previous_positions: Option<&Positions<P::Date, P::Number, P::Currency, P::Label>>,
+    positions: Option<&Positions<P::Date, P::Number, P::Currency, P::Label>>,
 ) -> Result<
     (
         BookedOrUnbookedPosting<P>,
@@ -90,29 +90,25 @@ where
 
     let account = annotated.posting.account();
 
-    match (
-        &annotated.currency,
-        annotated.posting.units(),
-        previous_positions,
-    ) {
-        (Some(posting_currency), Some(posting_units), Some(previous_positions))
+    match (&annotated.currency, annotated.posting.units(), positions) {
+        (Some(posting_currency), Some(posting_units), Some(positions))
             if method != Booking::None =>
         {
             tracing::debug!(
                 "{date} reduce 1 {method} {:?} {:?} {:?}",
                 posting_currency,
                 posting_units,
-                previous_positions
+                positions
             );
 
             if annotated.posting.cost().is_some()
-                && is_potential_reduction(posting_units, posting_currency, previous_positions)
+                && is_potential_reduction(posting_units, posting_currency, positions)
             {
                 // find positions whose costs match what we have
                 let matched = match_positions(
                     posting_currency,
                     annotated.posting.cost().as_ref(),
-                    previous_positions,
+                    positions,
                 );
 
                 tracing::debug!("{date} reduce {method} matched with {:?}", &matched);
@@ -123,18 +119,20 @@ where
                         PostingBookingError::NoPositionMatches,
                     ))
                 } else if matched.len() == 1 {
-                    reduce_matched_position(
+                    let (reducing_posting, updated_positions) = reduce_matched_position(
                         posting_units,
                         posting_currency,
                         annotated.posting,
                         annotated.idx,
-                        previous_positions,
+                        positions,
                         matched[0],
-                    )
+                    )?;
+
+                    Ok((reducing_posting, Some(updated_positions)))
                 } else if is_sell_all_at_cost(
                     posting_units,
                     posting_currency,
-                    previous_positions,
+                    positions,
                     &matched,
                     tolerance,
                 ) {
@@ -144,7 +142,7 @@ where
                         posting_currency,
                         annotated.posting,
                         annotated.idx,
-                        previous_positions,
+                        positions,
                         matched,
                     )?;
 
@@ -156,7 +154,7 @@ where
                         posting_currency,
                         annotated.posting,
                         annotated.idx,
-                        previous_positions,
+                        positions,
                         matched,
                         method,
                     )?;
@@ -167,7 +165,7 @@ where
                 tracing::debug!(
                     "{date} reduce failed with {:?} {:?}",
                     posting_units.sign(),
-                    previous_positions
+                    positions
                 );
 
                 Ok((Unbooked(annotated), None))
@@ -219,7 +217,7 @@ fn reduce_matched_position<'a, P>(
 ) -> Result<
     (
         BookedOrUnbookedPosting<P>,
-        Option<Positions<P::Date, P::Number, P::Currency, P::Label>>,
+        Positions<P::Date, P::Number, P::Currency, P::Label>,
     ),
     BookingError,
 >
@@ -254,11 +252,12 @@ where
             previous_positions
                 .iter()
                 .enumerate()
-                .map(|(i, pos)| {
+                .filter_map(|(i, pos)| {
                     if i == matched_position_idx {
-                        pos.with_accumulated(posting_units)
+                        let updated_pos = pos.with_accumulated(posting_units);
+                        (updated_pos.units != Number::zero()).then_some(updated_pos)
                     } else {
-                        pos.clone()
+                        Some(pos.clone())
                     }
                 })
                 .collect::<Vec<_>>(),
@@ -290,7 +289,7 @@ where
                 // TODO price
                 price: None,
             }),
-            Some(updated_positions),
+            updated_positions,
         ))
     }
 }
@@ -376,6 +375,39 @@ where
                 &matched,
             )
         }
+
+        Booking::StrictWithSize => {
+            // not only do we filter to positions which match the posting units, but we take the oldest by cost date
+            let mut matched_with_size = matched
+                .into_iter()
+                .filter(|i| positions[*i].units == -posting_units)
+                .collect::<Vec<_>>();
+            matched_with_size.sort_by(|i, j| {
+                positions[*i]
+                    .cost
+                    .as_ref()
+                    .unwrap()
+                    .date
+                    .cmp(&positions[*j].cost.as_ref().unwrap().date)
+            });
+
+            if !matched_with_size.is_empty() {
+                reduce_matched_position(
+                    posting_units,
+                    posting_currency,
+                    posting,
+                    posting_idx,
+                    positions,
+                    matched_with_size[0],
+                )
+            } else {
+                Err(BookingError::Posting(
+                    posting_idx,
+                    PostingBookingError::AmbiguousMatches,
+                ))
+            }
+        }
+
         _ => Err(BookingError::Posting(
             posting_idx,
             PostingBookingError::AmbiguousMatches,
