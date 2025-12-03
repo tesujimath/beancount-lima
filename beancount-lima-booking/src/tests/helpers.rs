@@ -1,4 +1,5 @@
 use beancount_parser_lima as parser;
+use hashbrown::HashMap;
 use std::io::stderr;
 use time::Date;
 use tracing_subscriber::EnvFilter;
@@ -44,7 +45,7 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
             ..
         }) => {
             let tolerance = &options;
-            let mut inventory = Inventory::default();
+            let mut ante_inventory = Inventory::default();
 
             if let Some((date, ante_postings, _)) = get_postings(&directives, ANTE_TAG).next() {
                 let (
@@ -55,13 +56,16 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                 ) = book_with_residuals(date, &ante_postings, &tolerance, |_| None, |_| method)
                     .unwrap();
 
-                inventory = updated_inventory;
+                ante_inventory = updated_inventory;
             }
 
+            init_tracing();
+
+            // run a separate test for each posting tagged with apply
             for (i_apply, (date, postings, apply_string)) in
                 get_postings(&directives, APPLY_TAG).enumerate()
             {
-                init_tracing();
+                let mut actual_inventory = ante_inventory.clone();
 
                 tracing::debug!("book_with_residuals {:?}", &postings);
                 match (
@@ -69,7 +73,7 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                         date,
                         &postings,
                         &tolerance,
-                        |accname| inventory.get(accname),
+                        |accname| actual_inventory.get(accname),
                         |_| method,
                     ),
                     expected_err.as_ref(),
@@ -85,7 +89,7 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                     ) => {
                         tracing::debug!("updating test inventory with {:?}", &updated_inventory);
                         for (acc, positions) in updated_inventory {
-                            inventory.insert(acc, positions);
+                            actual_inventory.insert(acc, positions);
                         }
                     }
                     (Err(e), Some(expected_err)) => {
@@ -107,7 +111,17 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
                     _residuals,
                 ) = book_with_residuals(date, &postings, &tolerance, |_| None, |_| method).unwrap();
 
-                assert_eq!(&inventory, &expected_inventory);
+                // since we can't build an expected inventory with an empty account, we remove all such from the result before comparison
+                let actual_inventory = Into::<Inventory<_, _, _, _, _>>::into(
+                    actual_inventory
+                        .into_iter()
+                        .filter_map(|(account, positions)| {
+                            (!positions.is_empty()).then_some((account, positions))
+                        })
+                        .collect::<HashMap<_, _>>(),
+                );
+
+                assert_eq!(&actual_inventory, &expected_inventory);
 
                 // TODO check booked
             }

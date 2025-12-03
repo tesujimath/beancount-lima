@@ -678,5 +678,181 @@ fn test_ambiguous__STRICT__mixed() {
     );
 }
 
+#[test]
+fn test_ambiguous__FIFO__no_match_against_any_lots() {
+    booking_test_err(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+
+2015-02-22 * #apply
+  Assets:Account          0 HOOL {}
+
+2015-02-22 * #reduced
+  'S Assets:Account          0 HOOL {USD, 2015-02-22}
+
+2015-02-22 * #booked
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+        // ANOMALY: error
+        BookingError::Posting(0, PostingBookingError::CannotInferAnything),
+    );
+}
+
+#[test]
+fn test_ambiguous__FIFO__test_match_against_partial_first_lot() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+
+2015-02-22 * #apply
+  Assets:Account         -2 HOOL {}
+
+2015-02-22 * #booked
+  Assets:Account         -2 HOOL {100.00 USD, 2015-10-01}
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          2 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
+#[test]
+fn test_ambiguous__FIFO__test_match_against_complete_first_lot() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+
+2015-02-22 * #apply
+  Assets:Account         -4 HOOL {}
+
+2015-02-22 * #booked
+  Assets:Account         -4 HOOL {100.00 USD, 2015-10-01}
+
+2015-01-01 * #ex
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
+#[test]
+fn test_ambiguous__FIFO__test_partial_match_against_first_two_lots() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+
+2015-02-22 * #apply
+  Assets:Account         -7 HOOL {}
+
+2015-02-22 * #booked
+  Assets:Account         -4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -3 HOOL {111.11 USD, 2015-10-02}
+
+2015-01-01 * #ex
+  Assets:Account          2 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
+#[test]
+fn test_ambiguous__FIFO__test_complete_match_against_first_two_lots() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+
+2015-02-22 * #apply
+  Assets:Account         -9 HOOL {}
+
+2015-02-22 * #booked
+  Assets:Account         -4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {111.11 USD, 2015-10-02}
+
+2015-01-01 * #ex
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
+#[test]
+fn test_ambiguous__FIFO__test_partial_match_against_first_three_lots() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+
+2015-02-22 * #apply
+  Assets:Account        -12 HOOL {}
+
+2015-02-22 * #booked
+  Assets:Account         -4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account         -3 HOOL {122.22 USD, 2015-10-03}
+
+2015-01-01 * #ex
+  Assets:Account          3 HOOL {122.22 USD, 2015-10-03}
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
+#[test]
+fn test_ambiguous__FIFO__test_complete_match_against_first_three_lots() {
+    booking_test_ok(
+        r#"
+2015-01-01 * #ante
+  Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
+
+2015-02-22 * #apply
+  Assets:Account        -15 HOOL {}
+
+2015-02-22 * #booked
+  Assets:Account         -4 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account         -5 HOOL {111.11 USD, 2015-10-02}
+  Assets:Account         -6 HOOL {122.22 USD, 2015-10-03}
+
+2015-01-01 * #ex
+"#,
+        NO_OPTIONS,
+        Booking::Fifo,
+    );
+}
+
 mod helpers;
 use helpers::*;
