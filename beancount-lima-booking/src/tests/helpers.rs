@@ -6,7 +6,8 @@ use time::Date;
 use tracing_subscriber::EnvFilter;
 
 use crate::{
-    book_with_residuals, is_supported_method, Booking, BookingError, Bookings, Inventory, Tolerance,
+    book_with_residuals, is_supported_method, Booking, BookingError, Bookings, Interpolated,
+    Inventory, Tolerance,
 };
 
 const ANTE_TAG: &str = "ante";
@@ -73,7 +74,9 @@ fn booking_test(source: &str, method: Booking, expected_err: Option<BookingError
                 tracing::debug!("book_with_residuals {:?}", &postings);
                 let location = format!("{} {}", ordinal(i_apply), APPLY_TAG);
                 if let Some(Bookings {
-                    updated_inventory, ..
+                    interpolated_postings,
+                    updated_inventory,
+                    ..
                 }) = book_and_check_error(
                     date,
                     &postings,
@@ -91,7 +94,7 @@ fn booking_test(source: &str, method: Booking, expected_err: Option<BookingError
 
                     check_inventory_as_expected(actual_inventory, &directives, &tolerance);
 
-                    // TODO check booked
+                    check_postings_as_expected(interpolated_postings, &directives);
                 }
             }
 
@@ -106,7 +109,9 @@ fn booking_test(source: &str, method: Booking, expected_err: Option<BookingError
                     tracing::debug!("book_with_residuals {:?}", &postings);
                     let location = format!("{} {}", ordinal(i_apply), APPLY_TAG);
                     if let Some(Bookings {
-                        updated_inventory, ..
+                        interpolated_postings,
+                        updated_inventory,
+                        ..
                     }) = book_and_check_error(
                         date,
                         &postings,
@@ -211,6 +216,64 @@ fn check_inventory_as_expected<'a, 'b, T>(
     );
 
     assert_eq!(&actual_inventory, &expected_inventory);
+}
+
+fn check_postings_as_expected<'a>(
+    actual_postings: Vec<
+        Interpolated<
+            &'a parser::Spanned<parser::Posting<'a>>,
+            time::Date,
+            Decimal,
+            parser::Currency<'a>,
+            &'a str,
+        >,
+    >,
+    directives: &'a [parser::Spanned<parser::Directive<'a>>],
+) {
+    if let Some((_date, expected_postings, _)) = get_postings(directives, BOOKED_TAG).next() {
+        // TODO cost and price comparison
+        let actual = actual_postings
+            .into_iter()
+            .flat_map(|actual_posting| {
+                let Interpolated {
+                    units: actual_units,
+                    currency: actual_currency,
+                    cost: actual_cost,
+                    price: actual_price,
+                    ..
+                } = actual_posting;
+                if let Some(actual_cost) = actual_cost {
+                    actual_cost
+                        .into_currency_costs()
+                        .filter_map(|(cur, posting_cost)| {
+                            // we filter out zero postings, since they're generally not included in the expected
+                            (actual_units != Decimal::ZERO)
+                                .then_some((actual_units, actual_currency))
+                        })
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![(actual_units, actual_currency)]
+                }
+                // pub units: N,
+                // pub currency: C,
+                // pub cost: Option<PostingCosts<D, N, C, L>>,
+                // pub price: Option<Price<N, C>>,
+            })
+            .collect::<Vec<_>>();
+
+        let expected = expected_postings
+            .into_iter()
+            .map(|spanned| {
+                let posting = spanned.item();
+                (
+                    posting.amount().unwrap().item().value(),
+                    *posting.currency().unwrap().item(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(actual, expected);
+    }
 }
 
 fn get_postings<'a>(
