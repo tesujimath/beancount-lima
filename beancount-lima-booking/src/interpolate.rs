@@ -22,14 +22,14 @@ where
     pub(crate) residual: Option<P::Number>,
 }
 
-pub(crate) fn interpolate_from_costed<'i, 'b, P, T>(
+pub(crate) fn interpolate_from_costed<'a, 'b, P, T>(
     date: P::Date,
     currency: &P::Currency,
     costeds: Vec<BookedOrUnbookedPosting<P>>,
     tolerance: &T,
 ) -> Result<Interpolation<P>, BookingError>
 where
-    P: PostingSpec + Debug + 'i,
+    P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
 {
     let mut weights = costeds.iter().map(|c| c.weight()).collect::<Vec<_>>();
@@ -70,7 +70,8 @@ where
         residual,
     })
 }
-pub(crate) fn interpolate_from_annotated<'i, 'b, P>(
+
+pub(crate) fn interpolate_from_annotated<'a, 'b, P>(
     date: P::Date,
     currency: &P::Currency,
     weight: P::Number,
@@ -83,7 +84,7 @@ pub(crate) fn interpolate_from_annotated<'i, 'b, P>(
     BookingError,
 >
 where
-    P: PostingSpec + Debug + 'i,
+    P: PostingSpec + Debug + 'a,
 {
     match (
         units(&annotated.posting, weight),
@@ -115,7 +116,7 @@ where
             _,
         ) => {
             tracing::debug!(
-                                    "{date} {currency} interpolate_from_costed {units} {:?} annotated cost currency {:?}",
+                                    "{date} {currency} interpolate_from_annotated {units} {:?} annotated cost currency {:?}",
                                     &cost,
                                     annotated.cost_currency,
                                 );

@@ -34,8 +34,8 @@ pub fn book<'a, 'b, P, T, I, M>(
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'b Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
-    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'b Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy,
+    M: Fn(P::Account) -> Booking + Copy,
     'a: 'b,
 {
     let (bookings, residuals) = book_with_residuals(date, postings, tolerance, inventory, method)?;
@@ -69,8 +69,8 @@ pub(crate) fn book_with_residuals<'a, 'b, P, T, I, M>(
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'b Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
-    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'b Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy,
+    M: Fn(P::Account) -> Booking + Copy,
     'a: 'b,
 {
     let mut interpolated_postings = repeat_n(None, postings.len()).collect::<Vec<_>>();
@@ -170,8 +170,8 @@ pub fn accumulate<'a, P, I, M>(
 ) -> Result<Inventory<P::Account, P::Date, P::Number, P::Currency, P::Label>, BookingError>
 where
     P: Posting + Debug + 'a,
-    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
-    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy,
+    M: Fn(P::Account) -> Booking + Copy,
 {
     let mut updated_inventory = HashMap::default();
 
@@ -222,8 +222,8 @@ fn book_augmentations<'a, 'b, P, T, I, M>(
 where
     P: PostingSpec + Debug + 'a,
     T: Tolerance<Currency = P::Currency, Number = P::Number>,
-    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy, // 'i for inventory
-    M: Fn(P::Account) -> Booking + Copy, // 'i for inventory
+    I: Fn(P::Account) -> Option<&'a Positions<P::Date, P::Number, P::Currency, P::Label>> + Copy,
+    M: Fn(P::Account) -> Booking + Copy,
     'a: 'b,
 {
     let mut updated_inventory = HashMap::default();

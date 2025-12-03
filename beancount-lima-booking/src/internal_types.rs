@@ -121,6 +121,7 @@ where
 
 impl<P, C> AnnotatedPosting<P, C>
 where
+    P: PostingSpec,
     C: Clone,
 {
     // the bucket is the currency used for balancing weights during inference, not the currency booked to
@@ -132,7 +133,14 @@ where
             .as_ref()
             .cloned()
             .or(self.price_currency.as_ref().cloned())
-            .or(self.currency.as_ref().cloned())
+            .or_else(|| {
+                // use the posting currency as the bucket only if there's neither cost nor price
+                if self.posting.cost().is_none() && self.posting.price().is_none() {
+                    self.currency.as_ref().cloned()
+                } else {
+                    None
+                }
+            })
     }
 }
 

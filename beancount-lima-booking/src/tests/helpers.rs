@@ -63,6 +63,7 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
             for (i_apply, (date, postings, apply_string)) in
                 get_postings(&directives, APPLY_TAG).enumerate()
             {
+                tracing::debug!("TEST HELPER book_with_residuals {:?}", &postings);
                 match (
                     book_with_residuals(
                         date,

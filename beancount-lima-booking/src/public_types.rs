@@ -169,8 +169,38 @@ where
     }
 }
 
-// costs with all the same non-numeric fields are equal if the per-unit is
-// equal, otherwise incomparable
+impl<D, N, C, L> Ord for Cost<D, N, C, L>
+where
+    D: Ord + Copy,
+    N: Ord + Copy,
+    C: Ord + Clone,
+    L: Ord + Clone,
+{
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.date.cmp(&other.date) {
+            core::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        match self.currency.cmp(&other.currency) {
+            core::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        match self.per_unit.cmp(&other.per_unit) {
+            core::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        match self.label.cmp(&other.label) {
+            core::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+
+        self.merge.cmp(&other.merge)
+    }
+}
+
 impl<D, N, C, L> PartialOrd for Cost<D, N, C, L>
 where
     D: Ord + Copy,
@@ -179,27 +209,7 @@ where
     L: Ord + Clone,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match self.date.partial_cmp(&other.date) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.currency.partial_cmp(&other.currency) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.label.partial_cmp(&other.label) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        match self.merge.partial_cmp(&other.merge) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-
-        match self.per_unit.partial_cmp(&other.per_unit) {
-            equal @ Some(core::cmp::Ordering::Equal) => equal,
-            _ord => None,
-        }
+        Some(self.cmp(other))
     }
 }
 

@@ -406,5 +406,34 @@ fn test_reduce__multiple_reductions__overflowing__with_error() {
     );
 }
 
+#[test]
+fn test_reduce__multiple_reductions__no_error_because_total() {
+    booking_test_ok(
+        r#"
+2016-01-01 * #ante
+  Assets:Account            7 HOOL {115.00 USD, 2016-01-15}
+  Assets:Account            4 HOOL {115.00 USD, 2016-01-16}
+  Assets:Account            3 HOOL {117.00 USD, 2016-01-15}
+
+2016-05-02 * #apply
+  Assets:Account          -11 HOOL {115.00 USD}
+
+2016-01-01 * #ambi-matches
+  Assets:Account            7 HOOL {115.00 USD, 2016-01-15}
+  Assets:Account            4 HOOL {115.00 USD, 2016-01-16}
+
+2016-01-01 * #ambi-resolved #booked
+  Assets:Account           -7 HOOL {115.00 USD, 2016-01-15}
+  Assets:Account           -4 HOOL {115.00 USD, 2016-01-16}
+
+; ANOMALY: added ex
+2016-01-01 * #ex
+  Assets:Account            3 HOOL {117.00 USD, 2016-01-15}
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
 mod helpers;
 use helpers::*;

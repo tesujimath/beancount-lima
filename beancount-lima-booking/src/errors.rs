@@ -57,7 +57,6 @@ impl Error for TransactionBookingError {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum PostingBookingError {
-    CannotCategorize,
     AmbiguousAutoPost,
     AmbiguousMatches,
     MultipleCostCurrenciesMatch,
@@ -73,7 +72,6 @@ impl Display for PostingBookingError {
         use PostingBookingError::*;
 
         match self {
-            CannotCategorize => f.write_str("cannot categorize posting"),
             AmbiguousAutoPost => f.write_str("ambiguous auto-post"),
             AmbiguousMatches => f.write_str("ambiguous matches"),
             MultipleCostCurrenciesMatch => {

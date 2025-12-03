@@ -133,6 +133,7 @@ where
                     posting_units,
                     posting_currency,
                     previous_positions,
+                    &matched,
                     tolerance,
                 ) {
                     tracing::debug!("{date} reduce_all_sold_at_cost {method}");
@@ -292,12 +293,13 @@ where
     }
 }
 
-// is this "sell everything"?
-// that is, existing positions at cost together with this one sum to zero-ish updated_inventory
+// is this "sell everything that matches"?
+// that is, matched positions together with this one sum to zero-ish updated_inventory
 fn is_sell_all_at_cost<D, N, C, L, T>(
     posting_units: N,
     posting_currency: &C,
-    previous_positions: &Positions<D, N, C, L>,
+    positions: &Positions<D, N, C, L>,
+    matched: &[usize],
     tolerance: &T,
 ) -> bool
 where
@@ -307,15 +309,21 @@ where
     L: Eq + Ord + Clone + Debug,
     T: Tolerance<Currency = C, Number = N>,
 {
-    tolerance
-        .residual(
-            previous_positions
-                .iter()
-                .filter_map(|pos| pos.cost.is_some().then_some(pos.units))
-                .chain(once(posting_units)),
-            posting_currency,
-        )
-        .is_none()
+    let tol = tolerance.residual(
+        matched
+            .iter()
+            .map(|i| positions[*i].units)
+            .chain(once(posting_units)),
+        posting_currency,
+    );
+    tracing::debug!(
+        "is_sell_all_at_cost {:?} with {:?} matched {:?} tol is {:?}",
+        posting_units,
+        positions,
+        matched,
+        &tol
+    );
+    tol.is_none()
 }
 
 fn reduce_multiple_positions<'a, P>(
@@ -539,9 +547,23 @@ where
         positions
             .iter()
             .enumerate()
-            .filter_map(|(i, pos)| matched_set.contains(&i).then_some(pos.clone()))
+            .filter_map(|(i, pos)| (!matched_set.contains(&i)).then_some(pos.clone()))
             .collect::<Vec<_>>(),
     );
+    let adjustments = matched
+        .iter()
+        .map(|i| {
+            let matched_position = &positions[*i];
+            let matched_cost = matched_position.cost.clone().unwrap();
+            PostingCost {
+                date: matched_cost.date,
+                units: -matched_position.units,
+                per_unit: matched_cost.per_unit,
+                label: matched_cost.label,
+                merge: matched_cost.merge,
+            }
+        })
+        .collect::<Vec<_>>();
 
     Ok((
         Booked(Interpolated {
@@ -551,20 +573,7 @@ where
             currency: posting_currency.clone(),
             cost: Some(PostingCosts {
                 cost_currency,
-                adjustments: matched
-                    .iter()
-                    .map(|i| {
-                        let matched_position = &positions[*i];
-                        let matched_cost = matched_position.cost.clone().unwrap();
-                        PostingCost {
-                            date: matched_cost.date,
-                            units: -matched_position.units,
-                            per_unit: matched_cost.per_unit,
-                            label: matched_cost.label,
-                            merge: matched_cost.merge,
-                        }
-                    })
-                    .collect::<Vec<_>>(),
+                adjustments,
             }),
             // TODO price
             price: None,
