@@ -1,4 +1,5 @@
 mod book;
+#[cfg(test)]
 pub(crate) use book::book_with_residuals;
 pub use book::{book, is_supported_method};
 

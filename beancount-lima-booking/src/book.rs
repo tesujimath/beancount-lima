@@ -55,7 +55,7 @@ where
     Ok(bookings)
 }
 
-type Residuals<C, N> = HashMap<C, N>;
+pub(crate) type Residuals<C, N> = HashMap<C, N>;
 
 // this exists so we can test the booking algorithm with unbalanced transactions
 // as per OG Beancount booking_full_test.py

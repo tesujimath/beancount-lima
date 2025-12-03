@@ -196,7 +196,6 @@ impl<'a, T> Loader<'a, T> {
                     .get(accname)
                     .map(|acc| acc.booking)
                     .unwrap_or(self.default_booking)
-                    .into()
             },
         ) {
             Ok(Bookings {

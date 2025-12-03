@@ -1,14 +1,18 @@
 use beancount_parser_lima as parser;
 use hashbrown::HashMap;
+use rust_decimal::Decimal;
 use std::io::stderr;
 use time::Date;
 use tracing_subscriber::EnvFilter;
 
-use crate::{book_with_residuals, is_supported_method, Booking, BookingError, Bookings, Inventory};
+use crate::{
+    book_with_residuals, is_supported_method, Booking, BookingError, Bookings, Inventory, Tolerance,
+};
 
 const ANTE_TAG: &str = "ante";
 const EX_TAG: &str = "ex";
 const APPLY_TAG: &str = "apply";
+const APPLY_COMBINED_TAG: &str = "apply-combined";
 const BOOKED_TAG: &str = "booked";
 const AMBI_MATCHES_TAG: &str = "ambi-matches";
 const AMBI_RESOLVED_TAG: &str = "ambi-resolved";
@@ -65,68 +69,151 @@ fn booking_test(source: &str, options: &str, method: Booking, expected_err: Opti
             for (i_apply, (date, postings, apply_string)) in
                 get_postings(&directives, APPLY_TAG).enumerate()
             {
-                let mut actual_inventory = ante_inventory.clone();
+                let mut actual_inventory = ante_inventory.clone().into();
 
                 tracing::debug!("book_with_residuals {:?}", &postings);
-                match (
-                    book_with_residuals(
+                let location = format!("{} {}", ordinal(i_apply), APPLY_TAG);
+                if let Some(Bookings {
+                    updated_inventory, ..
+                }) = book_and_check_error(
+                    date,
+                    &postings,
+                    &mut actual_inventory,
+                    &tolerance,
+                    method,
+                    expected_err.as_ref(),
+                    &location,
+                    &apply_string,
+                ) {
+                    tracing::debug!("updating test inventory with {:?}", &updated_inventory);
+                    for (acc, positions) in updated_inventory {
+                        actual_inventory.insert(acc, positions);
+                    }
+
+                    check_inventory_as_expected(actual_inventory, &directives, &tolerance);
+
+                    // TODO check booked
+                }
+            }
+
+            // run a single tests for all combined, if any
+            let apply_combined = get_postings(&directives, APPLY_COMBINED_TAG)
+                .enumerate()
+                .collect::<Vec<_>>();
+            if !apply_combined.is_empty() {
+                let mut actual_inventory = ante_inventory.clone().into();
+
+                for (i_apply, (date, postings, apply_string)) in apply_combined {
+                    tracing::debug!("book_with_residuals {:?}", &postings);
+                    let location = format!("{} {}", ordinal(i_apply), APPLY_TAG);
+                    if let Some(Bookings {
+                        updated_inventory, ..
+                    }) = book_and_check_error(
                         date,
                         &postings,
+                        &mut actual_inventory,
                         &tolerance,
-                        |accname| actual_inventory.get(accname),
-                        |_| method,
-                    ),
-                    expected_err.as_ref(),
-                ) {
-                    (
-                        Ok((
-                            Bookings {
-                                updated_inventory, ..
-                            },
-                            _residuals,
-                        )),
-                        None,
-                    ) => {
+                        method,
+                        expected_err.as_ref(),
+                        &location,
+                        &apply_string,
+                    ) {
                         tracing::debug!("updating test inventory with {:?}", &updated_inventory);
                         for (acc, positions) in updated_inventory {
                             actual_inventory.insert(acc, positions);
                         }
                     }
-                    (Err(e), Some(expected_err)) => {
-                        assert_eq!(&e, expected_err);
-                        continue;
-                    }
-                    (Ok(_), Some(_)) => panic!("unexpected success at {i_apply}\n{apply_string}"),
-                    (Err(e), None) => panic!("unexpected failure {e} at {i_apply}\n{apply_string}"),
-                };
+                }
 
-                let (date, postings, _) = get_postings(&directives, EX_TAG)
-                    .next()
-                    .expect("missing ex tag in test data");
-                let (
-                    Bookings {
-                        updated_inventory: expected_inventory,
-                        ..
-                    },
-                    _residuals,
-                ) = book_with_residuals(date, &postings, &tolerance, |_| None, |_| method).unwrap();
-
-                // since we can't build an expected inventory with an empty account, we remove all such from the result before comparison
-                let actual_inventory = Into::<Inventory<_, _, _, _, _>>::into(
-                    actual_inventory
-                        .into_iter()
-                        .filter_map(|(account, positions)| {
-                            (!positions.is_empty()).then_some((account, positions))
-                        })
-                        .collect::<HashMap<_, _>>(),
-                );
-
-                assert_eq!(&actual_inventory, &expected_inventory);
+                check_inventory_as_expected(actual_inventory, &directives, &tolerance);
 
                 // TODO check booked
             }
         }
     }
+}
+
+fn ordinal(i: usize) -> String {
+    format!(
+        "{}{}",
+        i,
+        match i {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th",
+        }
+    )
+}
+
+fn book_and_check_error<'a, 'b, T>(
+    date: Date,
+    postings: &[&'a parser::Spanned<parser::Posting<'a>>],
+    inventory: &mut Inventory<&'a str, time::Date, Decimal, parser::Currency<'a>, &'a str>,
+    tolerance: &'b T,
+    method: Booking,
+    expected_err: Option<&BookingError>,
+    location_in_case_of_error: &str,
+    source_in_case_of_error: &str,
+) -> Option<Bookings<&'a parser::Spanned<parser::Posting<'a>>>>
+where
+    T: Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
+{
+    match (
+        book_with_residuals(
+            date,
+            &postings,
+            tolerance,
+            |accname| inventory.get(accname),
+            |_| method,
+        ),
+        expected_err,
+    ) {
+        (Ok((bookings, _residuals)), None) => Some(bookings),
+        (Err(e), Some(expected_err)) => {
+            assert_eq!(&e, expected_err);
+            None
+        }
+        (Ok(_), Some(_)) => panic!(
+            "unexpected success at {}\n{}",
+            location_in_case_of_error, source_in_case_of_error
+        ),
+        (Err(e), None) => panic!(
+            "unexpected failure {e} at {}\n{}",
+            location_in_case_of_error, source_in_case_of_error
+        ),
+    }
+}
+
+fn check_inventory_as_expected<'a, 'b, T>(
+    actual_inventory: Inventory<&'a str, time::Date, Decimal, parser::Currency<'a>, &'a str>,
+    directives: &'a [parser::Spanned<parser::Directive<'a>>],
+    tolerance: &'b T,
+) where
+    T: Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
+{
+    let (date, postings, _) = get_postings(&directives, EX_TAG)
+        .next()
+        .expect("missing ex tag in test data");
+    let (
+        Bookings {
+            updated_inventory: expected_inventory,
+            ..
+        },
+        _residuals,
+    ) = book_with_residuals(date, &postings, tolerance, |_| None, |_| Booking::Strict).unwrap();
+
+    // since we can't build an expected inventory with an empty account, we remove all such from the result before comparison
+    let actual_inventory = Into::<Inventory<_, _, _, _, _>>::into(
+        actual_inventory
+            .into_iter()
+            .filter_map(|(account, positions)| {
+                (!positions.is_empty()).then_some((account, positions))
+            })
+            .collect::<HashMap<_, _>>(),
+    );
+
+    assert_eq!(&actual_inventory, &expected_inventory);
 }
 
 fn get_postings<'a>(

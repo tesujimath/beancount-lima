@@ -2,7 +2,7 @@
 #![allow(dead_code, unused_variables)]
 
 use hashbrown::{HashMap, HashSet};
-use std::{cmp::min, fmt::Debug, hash::Hash, iter::once};
+use std::{fmt::Debug, hash::Hash, iter::once};
 
 use super::{
     AnnotatedPosting, BookedOrUnbookedPosting, Booking, BookingError, Cost, CostSpec, Interpolated,

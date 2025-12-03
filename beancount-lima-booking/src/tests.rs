@@ -1,8 +1,17 @@
 #![allow(non_snake_case)]
 use super::{Booking, BookingError, PostingBookingError};
 
-// a subset of the tests from
+// These tests were lifted from:
 // https://github.com/beancount/beancount/blob/master/beancount/parser/booking_full_test.py
+//
+// The meaning of the tags is similar to what was used there, but not identical.
+//
+// #ante is used for setting up previous positions
+// #apply may occur on more than one transaction;  each one is an independent test with these common previous positions
+// #ex is used to build an expected inventory, with each of possible multiple apply's being expected to result in the same
+// #booked is currently ignored, but could be added
+// #reduced is ignored because the Lima booking API does not expose this
+// #apply-combined is a new tag;  all transactions tagged as such are combined into a single test
 
 #[test]
 fn test_augment__from_empty__no_cost__pos() {
@@ -1199,6 +1208,241 @@ fn test_strict_with_size_multiple() {
 "#,
         NO_OPTIONS,
         Booking::StrictWithSize,
+    );
+}
+
+#[test]
+fn test_combined_augment__at_cost__different_cost() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          1 HOOL {100.00 USD}
+  Assets:Other          -100.00 USD
+
+2015-10-01 * "Held-at-cost, positive, different cost" #apply-combined
+  Assets:Account1          2 HOOL {101.00 USD}
+  Assets:Other          -204.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account1          2 HOOL {101.00 USD, 2015-10-01}
+  Assets:Other          -304.00 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_augment__at_cost__different_currency() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          1 HOOL {100.00 USD}
+  Assets:Other          -100.00 USD
+
+2015-10-01 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1          2 HOOL {100.00 CAD}
+  Assets:Other          -200.00 CAD
+
+2015-10-01 * #ex
+  Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account1          2 HOOL {100.00 CAD, 2015-10-01}
+  Assets:Other          -300.00 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_augment__at_cost__different_label() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          1 HOOL {100.00 USD}
+  Assets:Other          -100.00 USD
+
+2015-10-01 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1          2 HOOL {100.00 USD, "lot1"}
+  Assets:Other          -200.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Account1          2 HOOL {100.00 USD, 2015-10-01, "lot1"}
+  Assets:Other          -300.00 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_reduce__no_cost() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          10 USD
+  Assets:Other1           -10 USD
+
+2015-10-01 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1         -1 USD
+  Assets:Other2            1 USD
+
+2015-10-01 * #ex
+  Assets:Account1          9 USD
+  Assets:Other1          -10 USD
+  Assets:Other2            1 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_reduce__same_cost() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          3 HOOL {100.00 USD}
+  Assets:Other       -300.00 USD
+
+2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1         -1 HOOL {100.00 USD}
+  Assets:Other        100.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -200 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_reduce__any_spec() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          3 HOOL {100.00 USD}
+  Assets:Other       -300.00 USD
+
+2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1         -1 HOOL {}
+  Assets:Other        100.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -200 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_reduce__same_cost__per() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          3 HOOL {100.00 USD}
+  Assets:Other       -300.00 USD
+
+2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1         -1 HOOL {100.00}
+  Assets:Other        100.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -200 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_reduce__same_cost__total() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          3 HOOL {100.00 USD}
+  Assets:Other       -300.00 USD
+
+2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1         -2 HOOL {# 100.00 USD}
+  Assets:Other        200.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -100 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_reduce__same_cost__currency() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          3 HOOL {100.00 USD}
+  Assets:Other       -300.00 USD
+
+2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1         -1 HOOL {USD}
+  Assets:Other        100.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -200 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_reduce__same_cost__date() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          3 HOOL {100.00 USD}
+  Assets:Other       -300.00 USD
+
+2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1         -1 HOOL {2015-10-01}
+  Assets:Other        100.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -200 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
+    );
+}
+
+#[test]
+fn test_combined_reduce__same_cost__label() {
+    booking_test_ok(
+        r#"
+2015-10-01 * "Held-at-cost, positive" #apply-combined
+  Assets:Account1          3 HOOL {100.00 USD, "6e425dd7b820"}
+  Assets:Other       -300.00 USD
+
+2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
+  Assets:Account1         -1 HOOL {"6e425dd7b820"}
+  Assets:Other        100.00 USD
+
+2015-10-01 * #ex
+  Assets:Account1          2 HOOL {100.00 USD, 2015-10-01, "6e425dd7b820"}
+  Assets:Other          -200 USD
+"#,
+        NO_OPTIONS,
+        Booking::Strict,
     );
 }
 
