@@ -23,7 +23,6 @@ fn test_augment__from_empty__no_cost__pos() {
 2015-10-01 * #ex #booked #reduced
   Assets:Account           1 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -38,7 +37,6 @@ fn test_augment__from_empty__no_cost__neg() {
 2015-10-01 * #ex #booked #reduced
   Assets:Account           -1 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -56,7 +54,6 @@ fn test_augment__from_empty__at_cost__pos() {
 2015-10-01 * #reduced
   'S Assets:Account       1 HOOL {100.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -74,7 +71,6 @@ fn test_augment__from_empty__at_cost__neg() {
 2015-10-01 * #reduced
   'S Assets:Account       -1 HOOL {100.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -89,7 +85,6 @@ fn test_augment__from_empty__incomplete_cost__empty() {
 2015-10-01 * #booked
   error: "Failed to categorize posting"
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         BookingError::Posting(0, PostingBookingError::CannotInferAnything),
     );
@@ -108,7 +103,6 @@ fn test_augment__from_empty__incomplete_cost__with_currency() {
 2015-10-01 * #reduced
   'S Assets:Account       1 HOOL {USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         // ANOMALY: original test was different, but this seems correct to me
         BookingError::Posting(0, PostingBookingError::CannotInferUnits),
@@ -128,7 +122,6 @@ fn test_reduce__no_cost() {
 2015-10-01 * #ex
   Assets:Account           5 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -149,7 +142,6 @@ fn test_reduce__sign_change_simple() {
 2016-01-01 * #ex
   Assets:Account         10 HOOL {33.33 USD, 2016-01-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         BookingError::Posting(0, PostingBookingError::NotEnoughLotsToReduce),
     );
@@ -177,7 +169,6 @@ fn test_reduce__no_match() {
 2016-05-02 * #booked
   error: "No position matches"
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         BookingError::Posting(0, PostingBookingError::NoPositionMatches),
     );
@@ -199,7 +190,6 @@ fn test_reduce__unambiguous() {
 2016-01-01 * #ex
   Assets:Account           5 HOOL {115.00 USD, 2016-04-15, "lot1"}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -231,7 +221,6 @@ fn test_reduce__ambiguous__strict() {
   Assets:Account          10 HOOL {115.00 USD, 2016-04-15, "lot1"}
   Assets:Account          10 HOOL {115.00 USD, 2016-04-15, "lot2"}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         BookingError::Posting(0, PostingBookingError::AmbiguousMatches),
     );
@@ -259,7 +248,6 @@ fn test_reduce__ambiguous__none() {
   Assets:Account           2 HOOL {116.00 USD, 2016-01-01}
   Assets:Account          -5 HOOL {117.00 USD, 2016-05-02}
 "#,
-        NO_OPTIONS,
         Booking::None,
     );
 }
@@ -286,7 +274,6 @@ fn test_reduce__ambiguous__none__from_mixed() {
   Assets:Account          -2 HOOL {116.00 USD, 2016-01-01}
   Assets:Account          -5 HOOL {117.00 USD, 2016-05-02}
 "#,
-        NO_OPTIONS,
         Booking::None,
     );
 }
@@ -315,7 +302,6 @@ fn test_reduce__other_currency() {
   Assets:Account           8 AAPL {115.00 USD, 2016-01-11}
   Assets:Account           3 HOOL {115.00 USD, 2016-01-10}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -340,7 +326,6 @@ fn test_reduce__multiple_reductions() {
 2016-01-01 * #ex
   Assets:Account           25 HOOL {116.00 USD, 2016-01-16}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -369,7 +354,6 @@ fn test_reduce__multiple_reductions_hifo() {
 2016-01-01 * #ex
   Assets:Account           45 HOOL {114.00 USD, 2016-01-17}
 "#,
-        NO_OPTIONS,
         Booking::Hifo,
     );
 }
@@ -388,7 +372,6 @@ fn test_reduce__multiple_reductions__competing__with_error() {
 2016-05-02 * #booked
   error: "Not enough lots to reduce"
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         BookingError::Posting(1, PostingBookingError::NotEnoughLotsToReduce),
     );
@@ -409,7 +392,6 @@ fn test_reduce__multiple_reductions__overflowing__with_error() {
 2016-05-02 * #booked
   error: "Not enough lots to reduce"
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
         BookingError::Posting(1, PostingBookingError::NotEnoughLotsToReduce),
     );
@@ -439,7 +421,6 @@ fn test_reduce__multiple_reductions__no_error_because_total() {
 2016-01-01 * #ex
   Assets:Account            3 HOOL {117.00 USD, 2016-01-15}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -457,7 +438,6 @@ fn test_reduce__reduction_with_same_currency_not_at_cost() {
 2016-05-02 * #booked
   error: "No position matches"
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
         BookingError::Posting(0, PostingBookingError::NoPositionMatches),
     );
@@ -478,7 +458,6 @@ fn test_reduce__missing_units_number() {
 2016-01-01 * #ex
   Assets:Account            0 HOOL {115.00 USD, 2016-05-02}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -515,7 +494,6 @@ fn test_ambiguous__NONE__matching_existing1() {
   Assets:Account          3 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -535,7 +513,6 @@ fn test_ambiguous__NONE__matching_existing2() {
   Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          3 HOOL {101.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -556,7 +533,6 @@ fn test_ambiguous__NONE__notmatching_nonmixed1() {
   Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
   Assets:Account         -2 HOOL {102.00 USD, 2015-06-01}
 "#,
-        NO_OPTIONS,
         Booking::None,
     );
 }
@@ -577,7 +553,6 @@ fn test_ambiguous__NONE__notmatching_mixed1() {
   Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
   Assets:Account         -2 HOOL {102.00 USD, 2015-06-01}
 "#,
-        NO_OPTIONS,
         Booking::None,
     );
 }
@@ -598,7 +573,6 @@ fn test_ambiguous__NONE__notmatching_mixed2() {
   Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
   Assets:Account          2 HOOL {102.00 USD, 2015-06-01}
 "#,
-        NO_OPTIONS,
         Booking::None,
     );
 }
@@ -627,7 +601,6 @@ fn test_ambiguous__STRICT_1() {
   Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         BookingError::Posting(0, PostingBookingError::NoPositionMatches),
     );
@@ -651,7 +624,6 @@ fn test_ambiguous__STRICT_2() {
   Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          5 HOOL {101.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         BookingError::Posting(0, PostingBookingError::NotEnoughLotsToReduce),
     );
@@ -681,7 +653,6 @@ fn test_ambiguous__STRICT__mixed() {
   Assets:Account          5 HOOL {100.00 USD, 2015-10-01}
   Assets:Account         -5 HOOL {101.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
         BookingError::Posting(0, PostingBookingError::NoPositionMatches),
     );
@@ -709,7 +680,6 @@ fn test_ambiguous__FIFO__no_match_against_any_lots() {
   Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
         // ANOMALY: error
         BookingError::Posting(0, PostingBookingError::CannotInferAnything),
@@ -736,7 +706,6 @@ fn test_ambiguous__FIFO__test_match_against_partial_first_lot() {
   Assets:Account          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -760,7 +729,6 @@ fn test_ambiguous__FIFO__test_match_against_complete_first_lot() {
   Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
   Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -785,7 +753,6 @@ fn test_ambiguous__FIFO__test_partial_match_against_first_two_lots() {
   Assets:Account          2 HOOL {111.11 USD, 2015-10-02}
   Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -809,7 +776,6 @@ fn test_ambiguous__FIFO__test_complete_match_against_first_two_lots() {
 2015-01-01 * #ex
   Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -834,7 +800,6 @@ fn test_ambiguous__FIFO__test_partial_match_against_first_three_lots() {
 2015-01-01 * #ex
   Assets:Account          3 HOOL {122.22 USD, 2015-10-03}
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -858,7 +823,6 @@ fn test_ambiguous__FIFO__test_complete_match_against_first_three_lots() {
 
 2015-01-01 * #ex
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
     );
 }
@@ -878,7 +842,6 @@ fn test_ambiguous__FIFO__test_matching_more_than_is_available() {
 2015-02-22 * #booked
   error: "Not enough lots to reduce"
 "#,
-        NO_OPTIONS,
         Booking::Fifo,
         BookingError::Posting(0, PostingBookingError::NotEnoughLotsToReduce),
     );
@@ -906,7 +869,6 @@ fn test_ambiguous__LIFO__no_match_against_any_lots() {
   Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          6 HOOL {122.22 USD, 2015-10-03}
 "#,
-        NO_OPTIONS,
         Booking::Lifo,
         // ANOMALY: error
         BookingError::Posting(0, PostingBookingError::CannotInferAnything),
@@ -933,7 +895,6 @@ fn test_ambiguous__LIFO__test_match_against_partial_first_lot() {
   Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          4 HOOL {122.22 USD, 2015-10-03}
 "#,
-        NO_OPTIONS,
         Booking::Lifo,
     );
 }
@@ -957,7 +918,6 @@ fn test_ambiguous__LIFO__test_match_against_complete_first_lot() {
   Assets:Account          5 HOOL {111.11 USD, 2015-10-02}
   Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Lifo,
     );
 }
@@ -982,7 +942,6 @@ fn test_ambiguous__LIFO__test_partial_match_against_first_two_lots() {
   Assets:Account          4 HOOL {111.11 USD, 2015-10-02}
   Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Lifo,
     );
 }
@@ -1006,7 +965,6 @@ fn test_ambiguous__LIFO__test_complete_match_against_first_two_lots() {
 2015-01-01 * #ex
   Assets:Account          4 HOOL {100.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Lifo,
     );
 }
@@ -1031,7 +989,6 @@ fn test_ambiguous__LIFO__test_partial_match_against_first_three_lots() {
 2015-01-01 * #ex
   Assets:Account          3 HOOL {100.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Lifo,
     );
 }
@@ -1055,7 +1012,6 @@ fn test_ambiguous__LIFO__test_complete_match_against_first_three_lots() {
 
 2015-01-01 * #ex
 "#,
-        NO_OPTIONS,
         Booking::Lifo,
     );
 }
@@ -1075,7 +1031,6 @@ fn test_ambiguous__LIFO__test_matching_more_than_is_available() {
 2015-02-22 * #booked
   error: "Not enough lots to reduce"
 "#,
-        NO_OPTIONS,
         Booking::Lifo,
         // ANOMALY: error
         BookingError::Posting(0, PostingBookingError::NotEnoughLotsToReduce),
@@ -1118,7 +1073,6 @@ fn test_augment__at_cost__same_date() {
 2015-11-01 * #ex
   Assets:Account          3 HOOL {100.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1140,7 +1094,6 @@ fn test_augment__at_cost__different_date() {
   Assets:Account          1 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          2 HOOL {100.00 USD, 2015-10-02}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1162,7 +1115,6 @@ fn test_augment__at_cost__different_cost() {
   Assets:Account          1 HOOL {100.00 USD, 2015-10-01}
   Assets:Account          2 HOOL {101.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1184,7 +1136,6 @@ fn test_strict_with_size_single() {
 2015-11-04 * #ex
   Assets:Account          2 HOOL {102.00 USD, 2015-10-01}
 "#,
-        NO_OPTIONS,
         Booking::StrictWithSize,
     );
 }
@@ -1206,7 +1157,6 @@ fn test_strict_with_size_multiple() {
 2015-11-04 * #ex
   Assets:Account          2 HOOL {101.00 USD, 2014-06-02}
 "#,
-        NO_OPTIONS,
         Booking::StrictWithSize,
     );
 }
@@ -1228,7 +1178,6 @@ fn test_combined_augment__at_cost__different_cost() {
   Assets:Account1          2 HOOL {101.00 USD, 2015-10-01}
   Assets:Other          -304.00 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1250,7 +1199,6 @@ fn test_combined_augment__at_cost__different_currency() {
   Assets:Account1          2 HOOL {100.00 CAD, 2015-10-01}
   Assets:Other          -300.00 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1272,7 +1220,6 @@ fn test_combined_augment__at_cost__different_label() {
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01, "lot1"}
   Assets:Other          -300.00 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1294,7 +1241,6 @@ fn test_combined_reduce__no_cost() {
   Assets:Other1          -10 USD
   Assets:Other2            1 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1315,7 +1261,6 @@ fn test_combined_reduce__same_cost() {
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1336,7 +1281,6 @@ fn test_combined_reduce__any_spec() {
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1357,7 +1301,6 @@ fn test_combined_reduce__same_cost__per() {
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1378,7 +1321,6 @@ fn test_combined_reduce__same_cost__total() {
   Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -100 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1399,7 +1341,6 @@ fn test_combined_reduce__same_cost__currency() {
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1420,7 +1361,6 @@ fn test_combined_reduce__same_cost__date() {
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }
@@ -1441,7 +1381,6 @@ fn test_combined_reduce__same_cost__label() {
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01, "6e425dd7b820"}
   Assets:Other          -200 USD
 "#,
-        NO_OPTIONS,
         Booking::Strict,
     );
 }

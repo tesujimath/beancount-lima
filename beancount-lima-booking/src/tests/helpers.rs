@@ -19,17 +19,16 @@ const AMBI_RESOLVED_TAG: &str = "ambi-resolved";
 const REDUCED_TAG: &str = "reduced";
 const PRINT_TAG: &str = "print";
 
-pub(crate) fn booking_test_ok(source: &str, options: &str, method: Booking) {
-    booking_test(source, options, method, None);
+pub(crate) fn booking_test_ok(source: &str, method: Booking) {
+    booking_test(source, method, None);
 }
 
-pub(crate) fn booking_test_err(source: &str, options: &str, method: Booking, err: BookingError) {
-    booking_test(source, options, method, Some(err));
+pub(crate) fn booking_test_err(source: &str, method: Booking, err: BookingError) {
+    booking_test(source, method, Some(err));
 }
 
-fn booking_test(source: &str, options: &str, method: Booking, expected_err: Option<BookingError>) {
-    let source_with_options = format!("{options}\n{source}");
-    let sources = parser::BeancountSources::from(source_with_options);
+fn booking_test(source: &str, method: Booking, expected_err: Option<BookingError>) {
+    let sources = parser::BeancountSources::from(source);
     let parser = parser::BeancountParser::new(&sources);
     let error_w = &stderr();
 
@@ -162,7 +161,7 @@ where
     match (
         book_with_residuals(
             date,
-            &postings,
+            postings,
             tolerance,
             |accname| inventory.get(accname),
             |_| method,
@@ -174,13 +173,11 @@ where
             assert_eq!(&e, expected_err);
             None
         }
-        (Ok(_), Some(_)) => panic!(
-            "unexpected success at {}\n{}",
-            location_in_case_of_error, source_in_case_of_error
-        ),
+        (Ok(_), Some(_)) => {
+            panic!("unexpected success at {location_in_case_of_error}\n{source_in_case_of_error}")
+        }
         (Err(e), None) => panic!(
-            "unexpected failure {e} at {}\n{}",
-            location_in_case_of_error, source_in_case_of_error
+            "unexpected failure {e} at {location_in_case_of_error}\n{source_in_case_of_error}"
         ),
     }
 }
@@ -192,7 +189,7 @@ fn check_inventory_as_expected<'a, 'b, T>(
 ) where
     T: Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
 {
-    let (date, postings, _) = get_postings(&directives, EX_TAG)
+    let (date, postings, _) = get_postings(directives, EX_TAG)
         .next()
         .expect("missing ex tag in test data");
     let (
@@ -235,8 +232,6 @@ fn get_postings<'a>(
             }
         })
 }
-
-pub(crate) const NO_OPTIONS: &str = "";
 
 fn init_tracing() {
     static INIT: std::sync::Once = std::sync::Once::new();
