@@ -1173,6 +1173,12 @@ fn test_combined_augment__at_cost__different_cost() {
   Assets:Account1          2 HOOL {101.00 USD}
   Assets:Other          -204.00 USD
 
+2015-10-01 * #booked
+  Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -100.00 USD
+  Assets:Account1          2 HOOL {101.00 USD, 2015-10-01}
+  Assets:Other          -204.00 USD
+
 2015-10-01 * #ex
   Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
   Assets:Account1          2 HOOL {101.00 USD, 2015-10-01}
@@ -1192,6 +1198,12 @@ fn test_combined_augment__at_cost__different_currency() {
 
 2015-10-01 * "Held-at-cost, positive, same cost" #apply-combined
   Assets:Account1          2 HOOL {100.00 CAD}
+  Assets:Other          -200.00 CAD
+
+2015-10-01 * #booked
+  Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -100.00 USD
+  Assets:Account1          2 HOOL {100.00 CAD, 2015-10-01}
   Assets:Other          -200.00 CAD
 
 2015-10-01 * #ex
@@ -1215,6 +1227,12 @@ fn test_combined_augment__at_cost__different_label() {
   Assets:Account1          2 HOOL {100.00 USD, "lot1"}
   Assets:Other          -200.00 USD
 
+2015-10-01 * #booked
+  Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -100.00 USD
+  Assets:Account1          2 HOOL {100.00 USD, 2015-10-01, "lot1"}
+  Assets:Other          -200.00 USD
+
 2015-10-01 * #ex
   Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01, "lot1"}
@@ -1235,6 +1253,12 @@ fn test_combined_reduce__no_cost() {
 2015-10-01 * "Held-at-cost, positive, same cost" #apply-combined
   Assets:Account1         -1 USD
   Assets:Other2            1 USD
+
+2015-10-01 * #booked
+  Assets:Account1          10 USD
+  Assets:Other1           -10 USD
+  Assets:Account1          -1 USD
+  Assets:Other2             1 USD
 
 2015-10-01 * #ex
   Assets:Account1          9 USD
@@ -1257,6 +1281,12 @@ fn test_combined_reduce__same_cost() {
   Assets:Account1         -1 HOOL {100.00 USD}
   Assets:Other        100.00 USD
 
+2015-10-01 * #booked
+  Assets:Account1          3 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -300.00 USD
+  Assets:Account1         -1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other           100.00 USD
+
 2015-10-01 * #ex
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
@@ -1276,6 +1306,12 @@ fn test_combined_reduce__any_spec() {
 2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
   Assets:Account1         -1 HOOL {}
   Assets:Other        100.00 USD
+
+2015-10-01 * #booked
+  Assets:Account1          3 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -300.00 USD
+  Assets:Account1         -1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other           100.00 USD
 
 2015-10-01 * #ex
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
@@ -1297,6 +1333,12 @@ fn test_combined_reduce__same_cost__per() {
   Assets:Account1         -1 HOOL {100.00}
   Assets:Other        100.00 USD
 
+2015-10-01 * #booked
+  Assets:Account1          3 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -300.00 USD
+  Assets:Account1         -1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other           100.00 USD
+
 2015-10-01 * #ex
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
@@ -1317,6 +1359,12 @@ fn test_combined_reduce__same_cost__total() {
   Assets:Account1         -2 HOOL {# 100.00 USD}
   Assets:Other        200.00 USD
 
+2015-10-01 * #booked
+  Assets:Account1          3 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -300.00 USD
+  Assets:Account1         -2 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other           200.00 USD
+
 2015-10-01 * #ex
   Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -100 USD
@@ -1326,7 +1374,7 @@ fn test_combined_reduce__same_cost__total() {
 }
 
 #[test]
-fn test_combined_reduce__same_cost__currency() {
+fn test_combined_reduce__same_currency() {
     booking_test_ok(
         r#"
 2015-10-01 * "Held-at-cost, positive" #apply-combined
@@ -1337,6 +1385,12 @@ fn test_combined_reduce__same_cost__currency() {
   Assets:Account1         -1 HOOL {USD}
   Assets:Other        100.00 USD
 
+2015-10-01 * #booked
+  Assets:Account1          3 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -300.00 USD
+  Assets:Account1         -1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other           100.00 USD
+
 2015-10-01 * #ex
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
@@ -1346,7 +1400,7 @@ fn test_combined_reduce__same_cost__currency() {
 }
 
 #[test]
-fn test_combined_reduce__same_cost__date() {
+fn test_combined_reduce__same_date() {
     booking_test_ok(
         r#"
 2015-10-01 * "Held-at-cost, positive" #apply-combined
@@ -1357,6 +1411,12 @@ fn test_combined_reduce__same_cost__date() {
   Assets:Account1         -1 HOOL {2015-10-01}
   Assets:Other        100.00 USD
 
+2015-10-01 * #booked
+  Assets:Account1          3 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other          -300.00 USD
+  Assets:Account1         -1 HOOL {100.00 USD, 2015-10-01}
+  Assets:Other           100.00 USD
+
 2015-10-01 * #ex
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01}
   Assets:Other          -200 USD
@@ -1366,7 +1426,7 @@ fn test_combined_reduce__same_cost__date() {
 }
 
 #[test]
-fn test_combined_reduce__same_cost__label() {
+fn test_combined_reduce__same_label() {
     booking_test_ok(
         r#"
 2015-10-01 * "Held-at-cost, positive" #apply-combined
@@ -1376,6 +1436,12 @@ fn test_combined_reduce__same_cost__label() {
 2015-10-02 * "Held-at-cost, positive, same cost" #apply-combined
   Assets:Account1         -1 HOOL {"6e425dd7b820"}
   Assets:Other        100.00 USD
+
+2015-10-01 * #booked
+  Assets:Account1          3 HOOL {100.00 USD, 2015-10-01, "6e425dd7b820"}
+  Assets:Other          -300.00 USD
+  Assets:Account1         -1 HOOL {100.00 USD, 2015-10-01, "6e425dd7b820"}
+  Assets:Other           100.00 USD
 
 2015-10-01 * #ex
   Assets:Account1          2 HOOL {100.00 USD, 2015-10-01, "6e425dd7b820"}

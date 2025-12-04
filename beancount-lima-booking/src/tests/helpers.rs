@@ -105,6 +105,7 @@ fn booking_test(source: &str, method: Booking, expected_err: Option<BookingError
                 .collect::<Vec<_>>();
             if !apply_combined.is_empty() {
                 let mut actual_inventory = ante_inventory.clone().into();
+                let mut actual_postings = Vec::default();
 
                 for (i_apply, (date, postings, apply_string)) in apply_combined {
                     tracing::debug!("book_with_residuals {:?}", &postings);
@@ -127,12 +128,14 @@ fn booking_test(source: &str, method: Booking, expected_err: Option<BookingError
                         for (acc, positions) in updated_inventory {
                             actual_inventory.insert(acc, positions);
                         }
+
+                        actual_postings.extend(interpolated_postings);
                     }
                 }
 
                 check_inventory_as_expected(actual_inventory, &directives, &tolerance);
 
-                // TODO check booked
+                check_postings_as_expected(actual_postings, &directives);
             }
         }
     }
@@ -236,18 +239,21 @@ fn check_postings_as_expected<'a>(
             .into_iter()
             .flat_map(|actual_posting| {
                 let Interpolated {
+                    posting: actual_posting,
                     units: actual_units,
                     currency: actual_currency,
                     cost: actual_cost,
                     price: _actual_price, // TODO price comparison
                     ..
                 } = actual_posting;
+                let actual_account = actual_posting.account().item().as_ref();
                 if let Some(actual_cost) = actual_cost {
                     actual_cost
                         .into_currency_costs()
                         .filter_map(|(cur, pc)| {
                             // we filter out zero postings, since they're generally not included in the expected
                             (pc.units != Decimal::ZERO).then_some((
+                                actual_account,
                                 pc.units,
                                 actual_currency,
                                 Some(pc.per_unit),
@@ -259,8 +265,17 @@ fn check_postings_as_expected<'a>(
                         })
                         .collect::<HashSet<_>>()
                 } else if actual_units != Decimal::ZERO {
-                    once((actual_units, actual_currency, None, None, None, None, false))
-                        .collect::<HashSet<_>>()
+                    once((
+                        actual_account,
+                        actual_units,
+                        actual_currency,
+                        None,
+                        None,
+                        None,
+                        None,
+                        false,
+                    ))
+                    .collect::<HashSet<_>>()
                 } else {
                     HashSet::default()
                 }
@@ -271,6 +286,7 @@ fn check_postings_as_expected<'a>(
             .into_iter()
             .map(|spanned| {
                 let posting = spanned.item();
+                let expected_account = posting.account().item().as_ref();
                 if let Some(cost) = posting.cost_spec() {
                     let per_unit = cost.per_unit().map(|x| x.item().value());
                     let currency = cost.currency().map(|x| x.item());
@@ -278,6 +294,7 @@ fn check_postings_as_expected<'a>(
                     let label = cost.label().map(|x| *x.item());
                     let merge = cost.merge();
                     (
+                        expected_account,
                         posting.amount().unwrap().item().value(),
                         *posting.currency().unwrap().item(),
                         per_unit,
@@ -288,6 +305,7 @@ fn check_postings_as_expected<'a>(
                     )
                 } else {
                     (
+                        expected_account,
                         posting.amount().unwrap().item().value(),
                         *posting.currency().unwrap().item(),
                         None,
