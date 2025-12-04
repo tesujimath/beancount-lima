@@ -166,24 +166,14 @@ impl<'a, T> Loader<'a, T> {
             .map(|postings| DirectiveVariant::Transaction(Transaction { postings }))
     }
 
-    fn book<P>(
+    fn book(
         &mut self,
         element: &parser::Spanned<Element>,
         date: Date,
-        postings: &[P],
+        postings: &[&'a parser::Spanned<parser::Posting<'a>>],
         description: &'a str,
     ) -> Result<Vec<Posting<'a>>, parser::AnnotatedError>
     where
-        P: beancount_lima_booking::PostingSpec<
-                Date = time::Date,
-                Account = &'a str,
-                Currency = parser::Currency<'a>,
-                Number = Decimal,
-                CostSpec = &'a parser::CostSpec<'a>,
-                PriceSpec = &'a parser::PriceSpec<'a>,
-                Label = &'a str,
-            > + Debug
-            + 'a,
         T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
         match beancount_lima_booking::book(
@@ -215,6 +205,8 @@ impl<'a, T> Loader<'a, T> {
                     .into_iter()
                     .zip(postings)
                     .flat_map(|(interpolated, posting)| {
+                        let account = posting.account().item().as_ref();
+                        let flag = posting.flag().map(|flag| *flag.item());
                         let Interpolated {
                             units,
                             currency,
@@ -226,8 +218,8 @@ impl<'a, T> Loader<'a, T> {
                             costs
                                 .into_currency_costs()
                                 .map(|(cur, cost)| Posting {
-                                    flag: None, // TODO pass through posting flag
-                                    account: posting.account(),
+                                    flag,
+                                    account,
                                     units: cost.units,
                                     currency,
                                     cost: Some(cur_posting_cost_to_cost(cur, cost)),
@@ -236,8 +228,8 @@ impl<'a, T> Loader<'a, T> {
                                 .collect::<Vec<_>>()
                         } else {
                             vec![Posting {
-                                flag: None, // TODO pass through posting flag
-                                account: posting.account(),
+                                flag,
+                                account,
                                 units,
                                 currency,
                                 cost: None,
@@ -422,8 +414,16 @@ impl<'a, T> Loader<'a, T> {
         T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
         let account_name = balance.account().item().as_ref();
+        let balance_currency = *balance.atol().amount().currency().item();
+        let balance_units = balance.atol().amount().number().value();
+        let balance_tolerance = balance
+            .atol()
+            .tolerance()
+            .map(|x| *x.item())
+            .unwrap_or(Decimal::ZERO);
         let account_rollup = self.rollup_units(account_name);
-        let account = self.validate_account(&element, account_name)?;
+        let account =
+            self.validate_account_and_currency(&element, account_name, balance_currency)?;
 
         let (margin, pad_idx) = {
             // what's the gap between what we have and what the balance says we should have?
@@ -431,42 +431,22 @@ impl<'a, T> Loader<'a, T> {
             let mut margin = account_rollup
                 .into_iter()
                 .map(|(cur, number)| {
-                    if *balance.atol().amount().currency().item() == cur {
+                    if balance_currency == cur {
                         inventory_has_balance_currency = true;
-                        (
-                            cur,
-                            balance.atol().amount().number().item().value()
-                                - Into::<Decimal>::into(number),
-                        )
+                        (cur, balance_units - Into::<Decimal>::into(number))
                     } else {
                         (cur, -(Into::<Decimal>::into(number)))
                     }
                 })
                 .filter_map(|(cur, number)| {
                     // discard anything below the tolerance
-                    (number.abs()
-                        > balance
-                            .atol()
-                            .tolerance()
-                            .map(|x| *x.item())
-                            .unwrap_or(Decimal::ZERO))
-                    .then_some((cur, number))
+                    (number.abs() > balance_tolerance).then_some((cur, number))
                 })
                 .collect::<HashMap<_, _>>();
 
             // cope with the case of balance currency wasn't in inventory
-            if !inventory_has_balance_currency
-                && (balance.atol().amount().number().item().value().abs()
-                    > balance
-                        .atol()
-                        .tolerance()
-                        .map(|x| *x.item())
-                        .unwrap_or(Decimal::ZERO))
-            {
-                margin.insert(
-                    *balance.atol().amount().currency().item(),
-                    balance.atol().amount().number().item().value(),
-                );
+            if !inventory_has_balance_currency && (balance_units.abs() > balance_tolerance) {
+                margin.insert(balance_currency, balance_units);
             }
 
             // pad can't last beyond balance
@@ -520,7 +500,19 @@ impl<'a, T> Loader<'a, T> {
                         })
                         .collect::<Vec<_>>();
 
-                    self.book(&element, date, &pad_postings, "pad")?;
+                    for Posting {
+                        account,
+                        units,
+                        currency,
+                        ..
+                    } in &pad_postings
+                    {
+                        let account =
+                            self.validate_account_and_currency(&pad_element, account, *currency)?;
+                        account
+                            .positions
+                            .accumulate(*units, *currency, None, Booking::default());
+                    }
 
                     if let DirectiveVariant::Pad(pad) = &mut self.directives[pad_idx].loaded {
                         pad.postings = pad_postings;
@@ -595,11 +587,8 @@ impl<'a, T> Loader<'a, T> {
 
         let account = self.accounts.get_mut(&account_name).unwrap();
         account.balance_diagnostics.clear();
-        let balance_amount = balance.atol().amount().item();
-        let balance_units = balance_amount.number().item().value();
-        let balance_cur = *balance_amount.currency().item();
         let mut positions = Positions::default();
-        positions.accumulate(balance_units, balance_cur, None, Booking::default());
+        positions.accumulate(balance_units, balance_currency, None, Booking::default());
         account.balance_diagnostics.push(BalanceDiagnostic {
             date,
             description: None,

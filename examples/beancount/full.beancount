@@ -23,6 +23,8 @@ plugin "a_mythical_plugin_with_config" "the config"
 
 1972-05-28 open Assets:US:TD:Checking USD
 
+1972-05-28 open Equity:Opening-Balances
+
 2016-03-01 open Assets:Bank:Unspecified
 
 2016-03-01 open Assets:Bank:Current NZD #money ^www.bank.com
