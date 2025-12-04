@@ -5,3 +5,6 @@ use booking::*;
 
 mod helpers;
 use helpers::*;
+
+mod positions;
+use positions::*;

@@ -6,7 +6,9 @@ members = ["beancount-lima", "beancount-lima-booking"]
 beancount-parser-lima = "0.14.1"
 # beancount-parser-lima = { version = "0.14.1", path = "../beancount-parser-lima" }
 hashbrown = "0.15.4"
+rstest = "0.26.1"
 rust_decimal = "1.37.2"
+rust_decimal_macros = "1.37.2"
 strum_macros = "0.27.2"
 time = "0.3.41"
 tracing = "0.1.41"

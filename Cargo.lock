@@ -298,7 +298,9 @@ version = "0.1.0"
 dependencies = [
  "beancount-parser-lima",
  "hashbrown 0.15.4",
+ "rstest",
  "rust_decimal",
+ "rust_decimal_macros",
  "strum_macros",
  "time",
  "tracing",

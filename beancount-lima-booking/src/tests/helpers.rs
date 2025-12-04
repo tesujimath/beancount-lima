@@ -1,4 +1,4 @@
-use beancount_parser_lima as parser;
+use beancount_parser_lima::{self as parser, DirectiveVariant};
 use hashbrown::HashMap;
 use rust_decimal::Decimal;
 use std::{collections::HashSet, io::stderr, iter::once};
@@ -6,8 +6,8 @@ use time::Date;
 use tracing_subscriber::EnvFilter;
 
 use crate::{
-    book_with_residuals, is_supported_method, Booking, BookingError, Bookings, Interpolated,
-    Inventory, Tolerance,
+    book_with_residuals, is_supported_method, Booking, BookingError, Bookings, Cost, Interpolated,
+    Inventory, Position, Positions, Tolerance,
 };
 
 const ANTE_TAG: &str = "ante";
@@ -341,6 +341,116 @@ fn get_postings<'a>(
                 None
             }
         })
+}
+
+pub(crate) fn positions_test(
+    source: &str,
+    method: Booking,
+    expected_positions: &[(
+        &str,
+        Decimal,
+        Option<(time::Date, Decimal, &str, Option<&str>, bool)>,
+    )],
+) {
+    let sources = parser::BeancountSources::from(source);
+    let parser = parser::BeancountParser::new(&sources);
+    let error_w = &stderr();
+
+    if !is_supported_method(method) {
+        panic!("Failing for now because Booking::{method} is unsupported");
+    }
+
+    match parser.parse() {
+        Err(parser::ParseError { errors, .. }) => {
+            sources.write_errors_or_warnings(error_w, errors).unwrap();
+            panic!("unexpected parse failure in test data");
+        }
+
+        Ok(parser::ParseSuccess { directives, .. }) => {
+            if directives.len() != 1 {
+                panic!("test requires precisely 1 directive");
+            }
+            let directive = directives[0].item();
+
+            if let DirectiveVariant::Transaction(txn) = directive.variant() {
+                let positions = txn
+                    .postings()
+                    .map(|p| {
+                        let amount = p.amount().expect("posting amount is required");
+                        let units = amount.value();
+                        let currency = p.currency().expect("posting currency is required").item();
+
+                        if let Some(cost_spec) = p.cost_spec().as_ref().map(|cs| cs.item()) {
+                            let cost_per_unit = cost_spec
+                                .per_unit()
+                                .expect("cost per-unit is required")
+                                .value();
+                            let cost_currency = cost_spec
+                                .currency()
+                                .expect("cost currency is required")
+                                .item();
+                            let cost_date =
+                                *cost_spec.date().expect("cost date is required").item();
+                            let cost_label = cost_spec.label().map(|label| *label.item());
+                            let merge = cost_spec.merge();
+                            let cost = Cost {
+                                date: cost_date,
+                                per_unit: cost_per_unit,
+                                currency: cost_currency,
+                                label: cost_label,
+                                merge,
+                            };
+
+                            Position {
+                                currency,
+                                units,
+                                cost: Some(cost),
+                            }
+                        } else {
+                            Position {
+                                currency,
+                                units,
+                                cost: None,
+                            }
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                init_tracing();
+
+                let mut actual_positions =
+                    Positions::<Date, Decimal, &parser::Currency, &str>::default();
+                for Position {
+                    currency,
+                    units,
+                    cost,
+                } in positions
+                {
+                    actual_positions.accumulate(units, currency, cost, method);
+                }
+
+                let actual_positions = actual_positions
+                    .iter()
+                    .map(|p| {
+                        (
+                            p.currency.as_ref(),
+                            p.units,
+                            p.cost.as_ref().map(|cost| {
+                                (
+                                    cost.date,
+                                    cost.per_unit,
+                                    cost.currency.as_ref(),
+                                    cost.label.as_ref().map(|label| *label),
+                                    cost.merge,
+                                )
+                            }),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(&actual_positions, expected_positions);
+            }
+        }
+    }
 }
 
 fn init_tracing() {
