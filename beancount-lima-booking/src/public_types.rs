@@ -1,5 +1,6 @@
 use hashbrown::HashMap;
 use std::{
+    cmp::Ordering,
     fmt::{Debug, Display},
     hash::Hash,
     iter::{repeat, Sum},
@@ -442,18 +443,6 @@ where
     }
 }
 
-impl<D, N, C, L> From<Position<D, N, C, L>> for Positions<D, N, C, L>
-where
-    D: Eq + Ord + Copy + Debug,
-    N: Number + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
-    L: Eq + Ord + Clone + Debug,
-{
-    fn from(value: Position<D, N, C, L>) -> Self {
-        Self(vec![value])
-    }
-}
-
 impl<D, N, C, L> Positions<D, N, C, L>
 where
     D: Eq + Ord + Copy + Debug,
@@ -461,7 +450,8 @@ where
     C: Eq + Hash + Ord + Clone + Debug,
     L: Eq + Ord + Clone + Debug,
 {
-    pub(crate) fn new(positions: Vec<Position<D, N, C, L>>) -> Self {
+    // Requires that `positions` satisfy our invariants, so can't be public.
+    pub(crate) fn from_previous(positions: Vec<Position<D, N, C, L>>) -> Self {
         Self(positions)
     }
 
@@ -486,6 +476,90 @@ where
             }
         }
         units_by_currency
+    }
+
+    pub fn accumulate(
+        &mut self,
+        units: N,
+        currency: C,
+        cost: Option<Cost<D, N, C, L>>,
+        method: Booking,
+    ) {
+        use Ordering::*;
+
+        tracing::debug!(
+            "accumulate {method} {:?} {:?} {:?}",
+            &units,
+            &currency,
+            &cost
+        );
+
+        let insertion_idx = match method {
+            Booking::Strict
+            | Booking::StrictWithSize
+            | Booking::Fifo
+            | Booking::Lifo
+            | Booking::Hifo => {
+                self.binary_search_by(|existing| match &existing.currency.cmp(&currency) {
+                    ordering @ (Less | Greater) => *ordering,
+                    Equal => match (&existing.cost, &cost) {
+                        (None, None) => Equal,
+                        (Some(_), None) => Greater,
+                        (None, Some(_)) => Less,
+                        (Some(existing_cost), Some(cost)) => {
+                            existing_cost.partial_cmp(cost).unwrap_or(Equal)
+                        }
+                    },
+                })
+            }
+            Booking::None => {
+                self.binary_search_by(|existing| match &existing.currency.cmp(&currency) {
+                    ordering @ (Less | Greater) => *ordering,
+                    Equal => match (&existing.cost, &cost) {
+                        (None, None) => Equal,
+                        (Some(_), None) => Greater,
+                        (_, Some(_)) => Less,
+                    },
+                })
+            }
+            Booking::Average => todo!("average booking method is not yet implemented"),
+        };
+
+        match (insertion_idx, cost) {
+            (Ok(i), None) => {
+                let position = self.get_mut(i).unwrap();
+                tracing::debug!("augmenting position {:?} with {:?}", &position, units,);
+                position.units += units;
+            }
+            (Ok(i), Some(cost)) => {
+                let position = self.get_mut(i).unwrap();
+                tracing::debug!(
+                    "augmenting position {:?} with {:?} {:?}",
+                    &position,
+                    units,
+                    &cost
+                );
+                position.units += units;
+            }
+            (Err(i), None) => {
+                let position = Position {
+                    units,
+                    currency,
+                    cost: None,
+                };
+                tracing::debug!("inserting new position {:?} at {i}", &position);
+                self.insert(i, position)
+            }
+            (Err(i), Some(cost)) => {
+                let position = Position {
+                    units,
+                    currency,
+                    cost: Some(cost),
+                };
+                tracing::debug!("inserting new position {:?} at {i}", &position);
+                self.insert(i, position)
+            }
+        }
     }
 }
 

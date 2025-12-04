@@ -2,7 +2,7 @@
 #![allow(dead_code, unused_variables)]
 
 use hashbrown::HashMap;
-use std::{cmp::Ordering, fmt::Debug, hash::Hash, iter::repeat_n};
+use std::{fmt::Debug, iter::repeat_n};
 
 use super::{
     book_reductions, categorize_by_currency, interpolate_from_costed, Booking, BookingError,
@@ -204,7 +204,7 @@ where
                     previous_positions.accumulate(
                         adj.units,
                         posting.currency(),
-                        Some((cur.clone(), adj.clone())),
+                        Some((cur.clone(), adj.clone()).into()),
                         account_method,
                     );
                 }
@@ -255,7 +255,7 @@ where
                 previous_positions.accumulate(
                     interpolated.units,
                     interpolated.currency.clone(),
-                    Some((currency.clone(), posting_cost.clone())),
+                    Some((currency.clone(), posting_cost.clone()).into()),
                     account_method,
                 );
             }
@@ -274,75 +274,4 @@ where
         }
     }
     Ok(updated_inventory.into())
-}
-
-impl<D, N, C, L> Positions<D, N, C, L>
-where
-    D: Eq + Ord + Copy + Debug,
-    C: Eq + Hash + Ord + Clone + Debug,
-    N: Number + Debug,
-    L: Eq + Ord + Clone + Debug,
-{
-    pub fn accumulate(
-        &mut self,
-        units: N,
-        currency: C,
-        posting_cost: Option<(C, PostingCost<D, N, L>)>,
-        method: Booking,
-    ) {
-        use Ordering::*;
-
-        let posting_cost = posting_cost.map(|(posting_cost_currency, posting_cost)| {
-            let units = posting_cost.units;
-            (
-                Into::<Cost<D, N, C, L>>::into((posting_cost_currency.clone(), posting_cost)),
-                units,
-            )
-        });
-
-        let insertion_idx =
-            self.binary_search_by(|position| match (&posting_cost, &position.cost) {
-                (None, None) => Equal,
-                (None, Some(_)) => Less,
-                (Some(_), None) => Greater,
-                (Some((cost, units)), Some(position_cost)) => {
-                    position_cost.partial_cmp(cost).unwrap_or(Equal)
-                }
-            });
-        match (insertion_idx, posting_cost) {
-            (Ok(i), None) => {
-                let position = self.get_mut(i).unwrap();
-                tracing::debug!("augmenting position {:?} with {:?}", &position, units,);
-                position.units += units;
-            }
-            (Ok(i), Some((cost, units))) => {
-                let position = self.get_mut(i).unwrap();
-                tracing::debug!(
-                    "augmenting position {:?} with {:?} {:?}",
-                    &position,
-                    units,
-                    &cost
-                );
-                position.units += units;
-            }
-            (Err(i), None) => {
-                let position = Position {
-                    units,
-                    currency,
-                    cost: None,
-                };
-                tracing::debug!("inserting new position {:?} at {i}", &position);
-                self.insert(i, position)
-            }
-            (Err(i), Some((cost, units))) => {
-                let position = Position {
-                    units,
-                    currency,
-                    cost: Some(cost),
-                };
-                tracing::debug!("inserting new position {:?} at {i}", &position);
-                self.insert(i, position)
-            }
-        }
-    }
 }

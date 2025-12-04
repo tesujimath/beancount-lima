@@ -93,7 +93,7 @@ fn booking_test(source: &str, method: Booking, expected_err: Option<BookingError
                         actual_inventory.insert(acc, positions);
                     }
 
-                    check_inventory_as_expected(actual_inventory, &directives, &tolerance);
+                    check_inventory_as_expected(actual_inventory, &directives, &tolerance, method);
 
                     check_postings_as_expected(interpolated_postings, &directives);
                 }
@@ -133,7 +133,7 @@ fn booking_test(source: &str, method: Booking, expected_err: Option<BookingError
                     }
                 }
 
-                check_inventory_as_expected(actual_inventory, &directives, &tolerance);
+                check_inventory_as_expected(actual_inventory, &directives, &tolerance, method);
 
                 check_postings_as_expected(actual_postings, &directives);
             }
@@ -195,6 +195,7 @@ fn check_inventory_as_expected<'a, 'b, T>(
     actual_inventory: Inventory<&'a str, time::Date, Decimal, parser::Currency<'a>, &'a str>,
     directives: &'a [parser::Spanned<parser::Directive<'a>>],
     tolerance: &'b T,
+    method: Booking,
 ) where
     T: Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
 {
@@ -207,7 +208,7 @@ fn check_inventory_as_expected<'a, 'b, T>(
             ..
         },
         _residuals,
-    ) = book_with_residuals(date, &postings, tolerance, |_| None, |_| Booking::Strict).unwrap();
+    ) = book_with_residuals(date, &postings, tolerance, |_| None, |_| method).unwrap();
 
     // since we can't build an expected inventory with an empty account, we remove all such from the result before comparison
     let actual_inventory = Into::<Inventory<_, _, _, _, _>>::into(

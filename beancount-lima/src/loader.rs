@@ -583,7 +583,8 @@ impl<'a, T> Loader<'a, T> {
                 for (cur, units) in margin.into_iter() {
                     account
                         .positions
-                        .accumulate(units, cur, None, Booking::default()); // booking method doesn't matter if no cost
+                        .accumulate(units, cur, None, Booking::default());
+                    // booking method doesn't matter if no cost
                 }
 
                 return err;
@@ -597,11 +598,13 @@ impl<'a, T> Loader<'a, T> {
         let balance_amount = balance.atol().amount().item();
         let balance_units = balance_amount.number().item().value();
         let balance_cur = *balance_amount.currency().item();
+        let mut positions = Positions::default();
+        positions.accumulate(balance_units, balance_cur, None, Booking::default());
         account.balance_diagnostics.push(BalanceDiagnostic {
             date,
             description: None,
             amount: None,
-            positions: Some(Into::<Position<'_>>::into((balance_units, balance_cur)).into()),
+            positions: Some(positions),
         });
 
         Ok(DirectiveVariant::NA)

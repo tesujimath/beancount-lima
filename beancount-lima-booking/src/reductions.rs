@@ -248,7 +248,7 @@ where
     } else {
         // Book 'em, Danno!
         let matched_cost = matched_cost.as_ref().unwrap();
-        let updated_positions = Positions::new(
+        let updated_positions = Positions::from_previous(
             previous_positions
                 .iter()
                 .enumerate()
@@ -486,7 +486,7 @@ where
         ));
     }
 
-    let updated_positions = Positions::new(
+    let updated_positions = Positions::from_previous(
         updated_position_units
             .into_iter()
             .enumerate()
@@ -578,7 +578,7 @@ where
 
     let matched_set = matched.iter().copied().collect::<HashSet<_>>();
 
-    let updated_positions = Positions::new(
+    let updated_positions = Positions::from_previous(
         positions
             .iter()
             .enumerate()

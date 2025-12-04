@@ -1209,7 +1209,8 @@ fn test_combined_augment__at_cost__different_currency() {
 2015-10-01 * #ex
   Assets:Account1          1 HOOL {100.00 USD, 2015-10-01}
   Assets:Account1          2 HOOL {100.00 CAD, 2015-10-01}
-  Assets:Other          -300.00 USD
+  Assets:Other          -100.00 USD
+  Assets:Other          -200.00 CAD
 "#,
         Booking::Strict,
     );
