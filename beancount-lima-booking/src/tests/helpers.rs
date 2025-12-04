@@ -1,7 +1,7 @@
 use beancount_parser_lima as parser;
 use hashbrown::HashMap;
 use rust_decimal::Decimal;
-use std::io::stderr;
+use std::{collections::HashSet, io::stderr, iter::once};
 use time::Date;
 use tracing_subscriber::EnvFilter;
 
@@ -15,10 +15,11 @@ const EX_TAG: &str = "ex";
 const APPLY_TAG: &str = "apply";
 const APPLY_COMBINED_TAG: &str = "apply-combined";
 const BOOKED_TAG: &str = "booked";
-const AMBI_MATCHES_TAG: &str = "ambi-matches";
-const AMBI_RESOLVED_TAG: &str = "ambi-resolved";
-const REDUCED_TAG: &str = "reduced";
-const PRINT_TAG: &str = "print";
+// unused:
+// const AMBI_MATCHES_TAG: &str = "ambi-matches";
+// const AMBI_RESOLVED_TAG: &str = "ambi-resolved";
+// const REDUCED_TAG: &str = "reduced";
+// const PRINT_TAG: &str = "print";
 
 pub(crate) fn booking_test_ok(source: &str, method: Booking) {
     booking_test(source, method, None);
@@ -231,7 +232,6 @@ fn check_postings_as_expected<'a>(
     directives: &'a [parser::Spanned<parser::Directive<'a>>],
 ) {
     if let Some((_date, expected_postings, _)) = get_postings(directives, BOOKED_TAG).next() {
-        // TODO cost and price comparison
         let actual = actual_postings
             .into_iter()
             .flat_map(|actual_posting| {
@@ -239,38 +239,66 @@ fn check_postings_as_expected<'a>(
                     units: actual_units,
                     currency: actual_currency,
                     cost: actual_cost,
-                    price: actual_price,
+                    price: _actual_price, // TODO price comparison
                     ..
                 } = actual_posting;
                 if let Some(actual_cost) = actual_cost {
                     actual_cost
                         .into_currency_costs()
-                        .filter_map(|(cur, posting_cost)| {
+                        .filter_map(|(cur, pc)| {
                             // we filter out zero postings, since they're generally not included in the expected
-                            (actual_units != Decimal::ZERO)
-                                .then_some((actual_units, actual_currency))
+                            (pc.units != Decimal::ZERO).then_some((
+                                pc.units,
+                                actual_currency,
+                                Some(pc.per_unit),
+                                Some(cur),
+                                Some(pc.date),
+                                pc.label,
+                                pc.merge,
+                            ))
                         })
-                        .collect::<Vec<_>>()
+                        .collect::<HashSet<_>>()
+                } else if actual_units != Decimal::ZERO {
+                    once((actual_units, actual_currency, None, None, None, None, false))
+                        .collect::<HashSet<_>>()
                 } else {
-                    vec![(actual_units, actual_currency)]
+                    HashSet::default()
                 }
-                // pub units: N,
-                // pub currency: C,
-                // pub cost: Option<PostingCosts<D, N, C, L>>,
-                // pub price: Option<Price<N, C>>,
             })
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
 
         let expected = expected_postings
             .into_iter()
             .map(|spanned| {
                 let posting = spanned.item();
-                (
-                    posting.amount().unwrap().item().value(),
-                    *posting.currency().unwrap().item(),
-                )
+                if let Some(cost) = posting.cost_spec() {
+                    let per_unit = cost.per_unit().map(|x| x.item().value());
+                    let currency = cost.currency().map(|x| x.item());
+                    let date = cost.date().map(|x| x.item());
+                    let label = cost.label().map(|x| *x.item());
+                    let merge = cost.merge();
+                    (
+                        posting.amount().unwrap().item().value(),
+                        *posting.currency().unwrap().item(),
+                        per_unit,
+                        currency.copied(),
+                        date.copied(),
+                        label,
+                        merge,
+                    )
+                } else {
+                    (
+                        posting.amount().unwrap().item().value(),
+                        *posting.currency().unwrap().item(),
+                        None,
+                        None,
+                        None,
+                        None,
+                        false,
+                    )
+                }
             })
-            .collect::<Vec<_>>();
+            .collect::<HashSet<_>>();
 
         assert_eq!(actual, expected);
     }

@@ -267,6 +267,7 @@ where
         let date = matched_cost.date;
         let units = posting_units;
         let per_unit = matched_cost.per_unit;
+        let cost_currency = matched_cost.currency.clone();
         let label = matched_cost.label.as_ref().cloned();
         let merge = matched_cost.merge;
 
@@ -277,7 +278,7 @@ where
                 units: posting_units,
                 currency: posting_currency.clone(),
                 cost: Some(PostingCosts {
-                    cost_currency: matched_currency.clone(),
+                    cost_currency,
                     adjustments: vec![PostingCost {
                         date,
                         units: posting_units,
