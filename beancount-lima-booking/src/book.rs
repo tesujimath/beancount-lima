@@ -24,6 +24,9 @@ pub fn is_supported_method(method: Booking) -> bool {
     }
 }
 
+/// Book the postings for the given date, returning updated inventory and interpolated postings.
+/// The interpolated postings are aligned with the original postings, in that they may be zipped together and
+/// will always correspond.
 pub fn book<'a, 'b, P, T, I, M>(
     date: P::Date,
     postings: &[P],

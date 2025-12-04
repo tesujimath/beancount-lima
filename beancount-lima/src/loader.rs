@@ -213,9 +213,9 @@ impl<'a, T> Loader<'a, T> {
                 // each with a simple cost, so we don't have to deal with composite costs for a posting elsewhere
                 let booked_postings = interpolated_postings
                     .into_iter()
-                    .flat_map(|interpolated| {
+                    .zip(postings)
+                    .flat_map(|(interpolated, posting)| {
                         let Interpolated {
-                            posting,
                             units,
                             currency,
                             cost,

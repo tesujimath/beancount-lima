@@ -320,7 +320,7 @@ where
     C: Clone,
     L: Clone,
 {
-    pub posting: P,
+    pub(crate) posting: P,
     pub(crate) idx: usize,
     pub units: N,
     pub currency: C,
