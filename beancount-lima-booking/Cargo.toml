@@ -2,6 +2,11 @@
 name = "beancount-lima-booking"
 version = "0.6.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Beancount booking algorithms for Lima"
+homepage = "https://github.com/tesujimath/beancount-lima"
+repository = "https://github.com/tesujimath/beancount-lima"
+readme = "../README.md"
 
 [dependencies]
 beancount-parser-lima = { workspace = true, optional = true }

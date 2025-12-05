@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "Beancount frontend using Steel Scheme and Lima parser"
 homepage = "https://github.com/tesujimath/beancount-lima"
 repository = "https://github.com/tesujimath/beancount-lima"
-readme = "README.md"
+readme = "../README.md"
 
 [[bin]]
 name = "lima"
