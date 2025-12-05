@@ -12,18 +12,18 @@ use std::{
 use tabulator::{Align, Cell};
 use time::Date;
 
-use crate::config::LoaderConfig;
 use crate::format::GUTTER_MEDIUM;
+use crate::plugins::InternalPlugins;
 
 #[derive(Debug)]
-pub(crate) struct Loader<'a, T> {
+pub(crate) struct Loader<'a, 'b, T> {
     directives: Vec<Directive<'a>>,
     // hashbrown HashMaps are used here for their Entry API, which is still unstable in std::collections::HashMap
     open_accounts: hashbrown::HashMap<&'a str, Span>,
     closed_accounts: hashbrown::HashMap<&'a str, Span>,
     accounts: HashMap<&'a str, AccountBuilder<'a>>,
     currency_usage: hashbrown::HashMap<parser::Currency<'a>, i32>,
-    config: LoaderConfig,
+    internal_plugins: &'b InternalPlugins,
     default_booking: Booking,
     inferred_tolerance: InferredTolerance<'a>,
     tolerance: T,
@@ -40,12 +40,12 @@ pub(crate) struct LoadError {
     pub(crate) warnings: Vec<parser::AnnotatedWarning>,
 }
 
-impl<'a, T> Loader<'a, T> {
+impl<'a, 'b, T> Loader<'a, 'b, T> {
     pub(crate) fn new(
         default_booking: Booking,
         inferred_tolerance: InferredTolerance<'a>,
         tolerance: T,
-        config: LoaderConfig,
+        internal_plugins: &'b InternalPlugins,
     ) -> Self {
         Self {
             directives: Vec::default(),
@@ -53,7 +53,7 @@ impl<'a, T> Loader<'a, T> {
             closed_accounts: hashbrown::HashMap::default(),
             accounts: HashMap::default(),
             currency_usage: hashbrown::HashMap::default(),
-            config,
+            internal_plugins,
             default_booking,
             tolerance,
             inferred_tolerance,
@@ -385,7 +385,7 @@ impl<'a, T> Loader<'a, T> {
         &self,
         base_account_name: &str,
     ) -> hashbrown::HashMap<parser::Currency<'a>, Decimal> {
-        if self.config.balance_rollup {
+        if self.internal_plugins.balance_rollup {
             let mut rollup_units = hashbrown::HashMap::<parser::Currency<'a>, Decimal>::default();
             self.accounts
                 .keys()

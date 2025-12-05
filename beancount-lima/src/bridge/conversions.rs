@@ -1,10 +1,12 @@
 use crate::loader::{self as loader, into_spanned_element};
+use crate::plugins::InternalPlugins;
 use crate::prism::{self as prism};
 use beancount_lima_booking as booking;
 use rust_decimal::Decimal;
 
 pub(crate) fn convert_directives(
     loaded_directives: Vec<loader::Directive>,
+    internal_plugins: &InternalPlugins,
 ) -> Vec<prism::Directive> {
     use beancount_parser_lima::DirectiveVariant as PDV;
     use loader::DirectiveVariant as LDV;
@@ -35,18 +37,19 @@ pub(crate) fn convert_directives(
                         }),
                     });
 
-                    // TODO make this conditional on whether the beancount.plugins.implicit_prices plugin is active
-                    let mut prices = loaded.prices.into_iter().collect::<Vec<_>>();
-                    prices.sort();
-                    for (currency, price_currency, price_per_unit) in prices {
-                        directives.push(prism::Directive {
-                            date,
-                            element: element.clone(),
-                            variant: prism::DirectiveVariant::Price(prism::Price {
-                                currency: currency.to_string(),
-                                amount: (price_per_unit, price_currency).into(),
-                            }),
-                        });
+                    if internal_plugins.implicit_prices {
+                        let mut prices = loaded.prices.into_iter().collect::<Vec<_>>();
+                        prices.sort();
+                        for (currency, price_currency, price_per_unit) in prices {
+                            directives.push(prism::Directive {
+                                date,
+                                element: element.clone(),
+                                variant: prism::DirectiveVariant::Price(prism::Price {
+                                    currency: currency.to_string(),
+                                    amount: (price_per_unit, price_currency).into(),
+                                }),
+                            });
+                        }
                     }
                 } else {
                     panic!(

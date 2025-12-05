@@ -78,12 +78,30 @@ $ lima import kiwibank/*250807.ofx >>my-existing.beancount
 ## Balance assertions
 
 A point of difference from classic Beancount is that balance assertions may be configured to assert the total for an account an all its subaccounts, using
-the lima config item `balance-rollup`.  For example, if a bank account holds multiple logical amounts, they may be tracked as subaccounts, without violating
+the internal plugin `lima.balance_rollup`.  For example, if a bank account holds multiple logical amounts, they may be tracked as subaccounts, without violating
 balance assertions.
 
 Padding is only ever performed on the actual account asserted in the balance directive, never on its subaccounts.
 
-The default behaviour is not to do this.
+Unless the plugin is enabled, the default behaviour is not to do this.
+
+## Plugins
+
+Lima does not support externally provided plugins.  The intention is that all desired behaviour may be implemented by the end user in Steel Scheme.
+
+That said, there are a handful of internal plugins, as follows.
+
+### Implicit Prices
+
+The existing plugin `beancount.plugins.implicit_prices` is built in.
+
+### Auto Accounts
+
+The existing plugin `beancount.plugins.auto_accounts` is not yet supported, but will be implemented as a built-in plugin.
+
+### Balance Rollup
+
+As described above, the plugin `lima.balance_rollup` modifies the behaviour of the `balance` directive.
 
 ## Contributions
 

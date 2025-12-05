@@ -6,7 +6,6 @@ use std::path::PathBuf;
 
 use crate::{
     bridge::load_from, create_engine, register_args, report_test_failures, tests::init_tracing,
-    LoaderConfig,
 };
 
 use super::load_cog_path;
@@ -20,11 +19,7 @@ fn beancount_tests(#[files("tests/beancount/**/*.beancount")] beancount_relpath:
     let cog_relpath = beancount_reldir
         .join(Path::new(beancount_relpath.file_stem().unwrap()).with_extension("scm"));
 
-    match load_from(
-        &beancount_relpath,
-        LoaderConfig::default(),
-        &std::io::stderr(),
-    ) {
+    match load_from(&beancount_relpath, &std::io::stderr()) {
         Err(report) => {
             panic!("Failed loading {:?}: {}", &beancount_relpath, &report);
         }

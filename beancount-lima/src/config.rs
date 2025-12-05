@@ -39,15 +39,3 @@ pub(crate) fn get_config_val(steel_engine: &mut Engine, path: &[&str]) -> Result
     )
     .map(|result| result.into_iter().next())
 }
-
-#[derive(Default, Debug)]
-pub(crate) struct LoaderConfig {
-    pub(crate) balance_rollup: bool,
-}
-
-impl LoaderConfig {
-    pub(crate) fn get(steel_engine: &mut Engine) -> Result<Self> {
-        let balance_rollup = get_config_bool(steel_engine, &["balance-rollup"])?.unwrap_or(false);
-        Ok(Self { balance_rollup })
-    }
-}

@@ -1,6 +1,3 @@
-// TODO remove dead code suppression
-#![allow(dead_code, unused_variables)]
-
 use beancount_lima_booking::{is_supported_method, Booking};
 use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess,
@@ -10,12 +7,12 @@ use std::{io::Write, iter::once, path::Path};
 use steel::{gc::Gc, rvals::IntoSteelVal, SteelVal};
 
 use crate::{
-    config::LoaderConfig,
     loader::{InferredTolerance, LoadError, LoadSuccess, Loader},
+    plugins::InternalPlugins,
     prism::Prism,
 };
 
-pub(crate) fn load_from<W>(path: &Path, config: LoaderConfig, error_w: W) -> Result<Prism>
+pub(crate) fn load_from<W>(path: &Path, error_w: W) -> Result<Prism>
 where
     W: Write + Copy,
 {
@@ -26,9 +23,10 @@ where
         Ok(ParseSuccess {
             directives,
             options,
-            plugins: _,
+            plugins,
             mut warnings,
         }) => {
+            let internal_plugins = plugins.iter().collect::<InternalPlugins>();
             let inferred_tolerance = InferredTolerance::new(&options);
 
             let default_booking = Booking::default();
@@ -48,8 +46,13 @@ where
 
             sources.write_errors_or_warnings(error_w, warnings)?;
 
-            match Loader::new(default_booking_option, inferred_tolerance, &options, config)
-                .collect(&directives)
+            match Loader::new(
+                default_booking_option,
+                inferred_tolerance,
+                &options,
+                &internal_plugins,
+            )
+            .collect(&directives)
             {
                 Ok(LoadSuccess {
                     directives,
@@ -59,7 +62,8 @@ where
                         sources.write_errors_or_warnings(error_w, warnings)?;
                     }
 
-                    let prism_directives = conversions::convert_directives(directives);
+                    let prism_directives =
+                        conversions::convert_directives(directives, &internal_plugins);
 
                     let options = convert_parser_options(&options)
                         .map(|(k, v)| (SteelVal::SymbolV(k.to_string().into()), v))

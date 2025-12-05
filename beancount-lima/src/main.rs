@@ -1,6 +1,6 @@
 use crate::{
     bridge::load_from,
-    config::{get_config_string, LoaderConfig},
+    config::get_config_string,
     import::{Context, Import},
     prism::{register_args, Prism},
 };
@@ -146,7 +146,7 @@ fn main() -> Result<()> {
         .ledger
         .or(get_config_string(&mut steel_engine, &["ledger"])?.map(PathBuf::from));
     let prism = if let Some(ledger_path) = ledger_path.as_ref() {
-        load_from(ledger_path, LoaderConfig::get(&mut steel_engine)?, error_w)?
+        load_from(ledger_path, error_w)?
     } else {
         Prism::empty()
     };
@@ -196,7 +196,7 @@ fn main() -> Result<()> {
 
         Some(Command::Test { scheme_files }) => {
             if let Some(ledger_path) = ledger_path.as_ref() {
-                let prism = load_from(ledger_path, LoaderConfig::get(&mut steel_engine)?, error_w)?;
+                let prism = load_from(ledger_path, error_w)?;
                 prism.register(&mut steel_engine);
             };
 
@@ -304,6 +304,7 @@ pub(crate) mod format;
 pub(crate) mod import;
 pub(crate) mod loader;
 pub(crate) mod options;
+pub(crate) mod plugins;
 pub(crate) mod prism;
 
 #[cfg(test)]
