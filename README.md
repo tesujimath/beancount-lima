@@ -1,11 +1,10 @@
 # beancount-lima
 
-This is an early stage work-in-progress Beancount frontend using Steel Scheme and the [Lima parser](https://github.com/tesujimath/beancount-parser-lima).
+This is new implementation of Beancount using [Steel Scheme](https://github.com/mattwparas/steel) and the [Lima parser](https://github.com/tesujimath/beancount-parser-lima).
 
 The observation is that Rust is at the same time both wonderful and uncomfortable for end-users.  The idea is to use Steel Scheme for interactive Beancounting.
-
 Instead of [Beancount Query Language](https://beancount.github.io/docs/beancount_query_language.html), Steel Scheme is used.
-
+(There is currently no intention to reimplement the existing query language.)
 
 A number of useful queries are provided out-of-the-box.
 
@@ -105,7 +104,7 @@ As described above, the plugin `lima.balance_rollup` modifies the behaviour of t
 
 ## Contributions
 
-While issues are welcome, and I am particularly interested in more example files for import, given the current pace of development I am unlikely to be able to accept PRs for now.
+While issues are welcome and I am particularly interested in making this generally useful to others, given the current pace of development I am unlikely to be able to accept PRs for now.
 
 ## License
 
