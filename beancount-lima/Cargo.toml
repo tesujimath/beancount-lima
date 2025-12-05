@@ -1,6 +1,6 @@
 [package]
 name = "beancount-lima"
-version = "0.6.0"
+version.workspace = true
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Beancount frontend using Steel Scheme and Lima parser"
@@ -13,7 +13,7 @@ name = "lima"
 path = "src/main.rs"
 
 [dependencies]
-beancount-lima-booking = { path = "../beancount-lima-booking", features = [
+beancount-lima-booking = { workspace = true, features = [
   "lima-parser-types",
   "rust-decimal",
 ] }
