@@ -197,8 +197,7 @@ impl From<loader::Posting<'_>> for prism::Posting {
             value.account,
             (value.units, value.currency.to_string()).into(),
             value.flag,
-            // TODO Cost
-            None, // value.cost.map(Into::<prism::Cost>::into),
+            value.cost.map(Into::<prism::Cost>::into),
         )
     }
 }
