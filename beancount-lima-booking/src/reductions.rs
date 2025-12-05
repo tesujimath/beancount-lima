@@ -287,8 +287,7 @@ where
                         merge,
                     }],
                 }),
-                // TODO price
-                price: None,
+                price: None, // ignored in favour of cost
             }),
             updated_positions,
         ))
@@ -517,8 +516,7 @@ where
                 cost_currency,
                 adjustments,
             }),
-            // TODO price
-            price: None,
+            price: None, // ignored in favour of cost
         }),
         updated_positions,
     ))
@@ -610,8 +608,7 @@ where
                 cost_currency,
                 adjustments,
             }),
-            // TODO price
-            price: None,
+            price: None, // ignored in favour of cost
         }),
         updated_positions,
     ))

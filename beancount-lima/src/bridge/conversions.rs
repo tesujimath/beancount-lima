@@ -12,13 +12,14 @@ pub(crate) fn convert_directives(
 
     for directive in loaded_directives {
         let date = *directive.parsed.date().item();
-        let element = into_spanned_element(directive.parsed).into();
+        let element =
+            Into::<prism::WrappedSpannedElement>::into(into_spanned_element(directive.parsed));
         match directive.parsed.variant() {
             PDV::Transaction(parsed_transaction) => {
                 if let LDV::Transaction(loaded) = directive.loaded {
                     directives.push(prism::Directive {
                         date,
-                        element,
+                        element: element.clone(),
                         variant: prism::DirectiveVariant::Transaction(prism::Transaction {
                             postings: loaded
                                 .postings
@@ -33,6 +34,20 @@ pub(crate) fn convert_directives(
                                 .map(|narration| narration.to_string()),
                         }),
                     });
+
+                    // TODO make this conditional on whether the beancount.plugins.implicit_prices plugin is active
+                    let mut prices = loaded.prices.into_iter().collect::<Vec<_>>();
+                    prices.sort();
+                    for (currency, price_currency, price_per_unit) in prices {
+                        directives.push(prism::Directive {
+                            date,
+                            element: element.clone(),
+                            variant: prism::DirectiveVariant::Price(prism::Price {
+                                currency: currency.to_string(),
+                                amount: (price_per_unit, price_currency).into(),
+                            }),
+                        });
+                    }
                 } else {
                     panic!(
                         "mismatch between variants parsed transaction {:?}, loaded {:?}",

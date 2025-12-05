@@ -162,8 +162,12 @@ impl<'a, T> Loader<'a, T> {
         );
 
         let postings = transaction.postings().collect::<Vec<_>>();
-        self.book(&element, date, &postings, description)
-            .map(|postings| DirectiveVariant::Transaction(Transaction { postings }))
+        let (postings, prices) = self.book(&element, date, &postings, description)?;
+
+        Ok(DirectiveVariant::Transaction(Transaction {
+            postings,
+            prices,
+        }))
     }
 
     fn book(
@@ -172,7 +176,13 @@ impl<'a, T> Loader<'a, T> {
         date: Date,
         postings: &[&'a parser::Spanned<parser::Posting<'a>>],
         description: &'a str,
-    ) -> Result<Vec<Posting<'a>>, parser::AnnotatedError>
+    ) -> Result<
+        (
+            Vec<Posting<'a>>,
+            HashSet<(parser::Currency<'a>, parser::Currency<'a>, Decimal)>,
+        ),
+        parser::AnnotatedError,
+    >
     where
         T: beancount_lima_booking::Tolerance<Currency = parser::Currency<'a>, Number = Decimal>,
     {
@@ -199,6 +209,9 @@ impl<'a, T> Loader<'a, T> {
                     element
                 );
 
+                let mut prices: HashSet<(parser::Currency, parser::Currency, Decimal)> =
+                    HashSet::default();
+
                 // an interpolated posting arising from a reduction with multiple costs is mapped here to several postings,
                 // each with a simple cost, so we don't have to deal with composite costs for a posting elsewhere
                 let booked_postings = interpolated_postings
@@ -217,23 +230,29 @@ impl<'a, T> Loader<'a, T> {
                         if let Some(costs) = cost {
                             costs
                                 .into_currency_costs()
-                                .map(|(cur, cost)| Posting {
-                                    flag,
-                                    account,
-                                    units: cost.units,
-                                    currency,
-                                    cost: Some(cur_posting_cost_to_cost(cur, cost)),
-                                    price: price.as_ref().cloned(),
+                                .map(|(cost_cur, cost)| {
+                                    prices.insert((currency, cost_cur, cost.per_unit));
+
+                                    Posting {
+                                        flag,
+                                        account,
+                                        units: cost.units,
+                                        currency,
+                                        cost: Some(cur_posting_cost_to_cost(cost_cur, cost)),
+                                    }
                                 })
                                 .collect::<Vec<_>>()
                         } else {
+                            if let Some(price) = &price {
+                                prices.insert((currency, price.currency, price.per_unit));
+                            }
+
                             vec![Posting {
                                 flag,
                                 account,
                                 units,
                                 currency,
                                 cost: None,
-                                price,
                             }]
                         }
                     })
@@ -292,7 +311,7 @@ impl<'a, T> Loader<'a, T> {
                     }
                 }
 
-                Ok(booked_postings)
+                Ok((booked_postings, prices))
             }
             Err(e) => {
                 tracing::error!("booking error {}", &e);
@@ -486,7 +505,6 @@ impl<'a, T> Loader<'a, T> {
                                     units: *number,
                                     currency: *cur,
                                     cost: None,
-                                    price: None,
                                 },
                                 Posting {
                                     flag: Some(pad_flag()),
@@ -494,7 +512,6 @@ impl<'a, T> Loader<'a, T> {
                                     units: -*number,
                                     currency: *cur,
                                     cost: None,
-                                    price: None,
                                 },
                             ]
                         })

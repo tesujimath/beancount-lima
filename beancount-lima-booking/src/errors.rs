@@ -63,6 +63,9 @@ pub enum PostingBookingError {
     CannotInferUnits,
     CannotInferCurrency,
     CannotInferAnything,
+    CannotInferPricePerUnit,
+    CannotInferPriceCurrency,
+    CannotInferPrice,
     NotEnoughLotsToReduce,
     NoPositionMatches,
 }
@@ -80,6 +83,9 @@ impl Display for PostingBookingError {
             CannotInferUnits => f.write_str("cannot infer units"),
             CannotInferCurrency => f.write_str("cannot infer currency"),
             CannotInferAnything => f.write_str("cannot infer anything"),
+            CannotInferPricePerUnit => f.write_str("cannot infer price per-unit"),
+            CannotInferPriceCurrency => f.write_str("cannot infer price currency"),
+            CannotInferPrice => f.write_str("cannot infer price"),
             NotEnoughLotsToReduce => f.write_str("not enough lots to reduce"),
             NoPositionMatches => f.write_str("no position matches"),
         }

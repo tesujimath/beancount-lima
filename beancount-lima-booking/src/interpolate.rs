@@ -5,7 +5,7 @@ use std::fmt::Debug;
 
 use super::{
     AnnotatedPosting, BookedOrUnbookedPosting, BookingError, CostSpec, Interpolated, Number,
-    PostingBookingError, PostingCost, PostingCosts, PostingSpec, PriceSpec, Tolerance,
+    PostingBookingError, PostingCost, PostingCosts, PostingSpec, Price, PriceSpec, Tolerance,
     TransactionBookingError,
 };
 
@@ -106,22 +106,14 @@ where
                 false,
             ))
         }
-        (
-            Some(UnitsAndCostPerUnit {
-                units,
-                cost_per_unit,
-            }),
-            Some(currency),
-            Some(cost),
-            _,
-        ) => {
+        (Some(UnitsAndPerUnit { units, per_unit }), Some(currency), Some(cost), _) => {
             tracing::debug!(
                                     "{date} {currency} interpolate_from_annotated {units} {:?} annotated cost currency {:?}",
                                     &cost,
                                     annotated.cost_currency,
                                 );
-            match (annotated.cost_currency, cost_per_unit) {
-                (Some(cost_currency), Some(cost_per_unit)) => Ok((
+            match (annotated.cost_currency, per_unit) {
+                (Some(cost_currency), Some(per_unit)) => Ok((
                     Interpolated {
                         posting: annotated.posting,
                         idx: annotated.idx,
@@ -132,12 +124,12 @@ where
                             adjustments: vec![PostingCost {
                                 date: cost.date().unwrap_or(date),
                                 units,
-                                per_unit: cost_per_unit,
+                                per_unit,
                                 label: cost.label(),
                                 merge: cost.merge(),
                             }],
                         }),
-                        price: None, // TODO price with cost
+                        price: None, // ignored in favour of cost
                     },
                     false,
                 )),
@@ -155,34 +147,46 @@ where
                 )),
             }
         }
-        (
-            Some(UnitsAndCostPerUnit {
-                units,
-                cost_per_unit: _,
-            }),
-            Some(currency),
-            None,
-            _,
-        ) => {
-            // TODO price without cost
+
+        (Some(UnitsAndPerUnit { units, per_unit }), Some(currency), None, Some(price)) => {
+            // price without cost
             tracing::debug!(
-                "price without cost {} {} {} {:?}",
+                "price without cost [{}] units: {} per-unit: {:?} currency: {} price: {:?}",
                 annotated.idx,
                 units,
+                per_unit,
                 currency,
-                annotated.posting.price()
+                price
             );
-            Ok((
-                Interpolated {
-                    posting: annotated.posting,
-                    idx: annotated.idx,
-                    units,
-                    currency,
-                    cost: None,
-                    price: None,
-                },
-                false,
-            ))
+
+            match (per_unit, annotated.price_currency) {
+                (Some(per_unit), Some(price_currency)) => Ok((
+                    Interpolated {
+                        posting: annotated.posting,
+                        idx: annotated.idx,
+                        units,
+                        currency,
+                        cost: None,
+                        price: Some(Price {
+                            per_unit,
+                            currency: price_currency,
+                        }),
+                    },
+                    false,
+                )),
+                (None, Some(_)) => Err(BookingError::Posting(
+                    annotated.idx,
+                    PostingBookingError::CannotInferPricePerUnit,
+                )),
+                (Some(_), None) => Err(BookingError::Posting(
+                    annotated.idx,
+                    PostingBookingError::CannotInferPriceCurrency,
+                )),
+                (None, None) => Err(BookingError::Posting(
+                    annotated.idx,
+                    PostingBookingError::CannotInferPrice,
+                )),
+            }
         }
 
         (None, Some(_), _, _) => Err(BookingError::Posting(
@@ -200,13 +204,14 @@ where
     }
 }
 
-struct UnitsAndCostPerUnit<N> {
+#[derive(Clone, Debug)]
+struct UnitsAndPerUnit<N> {
     units: N,
-    cost_per_unit: Option<N>,
+    per_unit: Option<N>,
 }
 
 // infer the units once we know the weight
-fn units<P>(posting: &P, weight: P::Number) -> Option<UnitsAndCostPerUnit<P::Number>>
+fn units<P>(posting: &P, weight: P::Number) -> Option<UnitsAndPerUnit<P::Number>>
 where
     P: PostingSpec,
 {
@@ -216,9 +221,9 @@ where
     } else if let Some(price_spec) = posting.price() {
         units_from_price_spec(posting.units(), weight, &price_spec)
     } else {
-        posting.units().map(|units| UnitsAndCostPerUnit {
+        posting.units().map(|units| UnitsAndPerUnit {
             units,
-            cost_per_unit: None,
+            per_unit: None,
         })
     }
 }
@@ -227,7 +232,7 @@ fn units_from_cost_spec<D, N, C, L, CS>(
     posting_units: Option<N>,
     weight: N,
     cost_spec: &CS,
-) -> Option<UnitsAndCostPerUnit<N>>
+) -> Option<UnitsAndPerUnit<N>>
 where
     D: Eq + Ord + Copy + Debug,
     N: Number + Debug,
@@ -236,27 +241,27 @@ where
     CS: CostSpec<Date = D, Number = N, Currency = C, Label = L> + Debug,
 {
     match (posting_units, cost_spec.per_unit(), cost_spec.total()) {
-        (Some(units), Some(cost_per_unit), _) => Some(UnitsAndCostPerUnit {
+        (Some(units), Some(per_unit), _) => Some(UnitsAndPerUnit {
             units,
-            cost_per_unit: Some(cost_per_unit),
+            per_unit: Some(per_unit),
         }),
-        (None, Some(cost_per_unit), _) => {
-            let units = (weight / cost_per_unit).rescaled(weight.scale());
-            Some(UnitsAndCostPerUnit {
+        (None, Some(per_unit), _) => {
+            let units = (weight / per_unit).rescaled(weight.scale());
+            Some(UnitsAndPerUnit {
                 units,
-                cost_per_unit: Some(cost_per_unit),
+                per_unit: Some(per_unit),
             })
         }
         (Some(units), None, Some(cost_total)) => {
-            let cost_per_unit = cost_total / units;
-            Some(UnitsAndCostPerUnit {
+            let per_unit = cost_total / units;
+            Some(UnitsAndPerUnit {
                 units,
-                cost_per_unit: Some(cost_per_unit),
+                per_unit: Some(per_unit),
             })
         }
-        (Some(units), None, None) => Some(UnitsAndCostPerUnit {
+        (Some(units), None, None) => Some(UnitsAndPerUnit {
             units,
-            cost_per_unit: None,
+            per_unit: None,
         }),
         (None, None, _) => None, // TODO is this correct?
     }
@@ -266,22 +271,19 @@ fn units_from_price_spec<N, C, PS>(
     posting_units: Option<N>,
     weight: N,
     price_spec: &PS,
-) -> Option<UnitsAndCostPerUnit<N>>
+) -> Option<UnitsAndPerUnit<N>>
 where
     N: Number + Debug,
     C: Eq + Ord + Clone + Debug,
     PS: PriceSpec<Number = N, Currency = C> + Debug,
 {
     match (posting_units, price_spec.per_unit(), price_spec.total()) {
-        (Some(units), _, _) => Some(UnitsAndCostPerUnit {
-            units,
-            cost_per_unit: None,
-        }),
-        (None, Some(price_per_unit), _) => {
-            let units = (weight / price_per_unit).rescaled(weight.scale());
-            Some(UnitsAndCostPerUnit {
+        (Some(units), per_unit, _) => Some(UnitsAndPerUnit { units, per_unit }),
+        (None, Some(per_unit), _) => {
+            let units = (weight / per_unit).rescaled(weight.scale());
+            Some(UnitsAndPerUnit {
                 units,
-                cost_per_unit: None,
+                per_unit: Some(per_unit),
             })
         }
         (None, None, _) => None,

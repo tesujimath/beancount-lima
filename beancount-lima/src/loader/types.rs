@@ -1,6 +1,9 @@
 use beancount_parser_lima as parser;
 use rust_decimal::Decimal;
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+};
 use tabulator::{Align, Cell};
 use time::Date;
 
@@ -25,6 +28,7 @@ pub(crate) enum DirectiveVariant<'a> {
 #[derive(Clone, Debug)]
 pub(crate) struct Transaction<'a> {
     pub(crate) postings: Vec<Posting<'a>>,
+    pub(crate) prices: HashSet<(parser::Currency<'a>, parser::Currency<'a>, Decimal)>,
 }
 
 #[derive(Clone, Debug)]
@@ -39,46 +43,8 @@ pub(crate) struct Posting<'a> {
     pub(crate) units: Decimal,
     pub(crate) currency: parser::Currency<'a>,
     pub(crate) cost: Option<Cost<'a>>,
-    pub(crate) price: Option<Price<'a>>,
+    // price appears at the top-level transaction prices for the implicit_prices plugin
     // pub(crate) metadata: Metadata<'a>,
-}
-
-impl<'a> beancount_lima_booking::PostingSpec for Posting<'a> {
-    type Date = Date;
-
-    type Account = &'a str;
-
-    type Currency = parser::Currency<'a>;
-
-    type Number = Decimal;
-
-    type CostSpec = &'a parser::CostSpec<'a>;
-
-    type PriceSpec = &'a parser::PriceSpec<'a>;
-
-    type Label = &'a str;
-
-    fn account(&self) -> Self::Account {
-        self.account
-    }
-
-    fn currency(&self) -> Option<Self::Currency> {
-        Some(self.currency)
-    }
-
-    fn units(&self) -> Option<Self::Number> {
-        Some(self.units)
-    }
-
-    fn cost(&self) -> Option<Self::CostSpec> {
-        // TODO cost_spec from cost
-        None
-    }
-
-    fn price(&self) -> Option<Self::PriceSpec> {
-        // TODO price_spec from price
-        None
-    }
 }
 
 pub(crate) type Cost<'a> =
