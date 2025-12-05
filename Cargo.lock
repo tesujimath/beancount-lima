@@ -261,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "beancount-lima"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "abi_stable",
  "beancount-lima-booking",
@@ -294,7 +294,7 @@ dependencies = [
 
 [[package]]
 name = "beancount-lima-booking"
-version = "0.1.0"
+version = "0.6.0"
 dependencies = [
  "beancount-parser-lima",
  "hashbrown 0.15.4",
