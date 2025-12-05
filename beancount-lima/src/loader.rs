@@ -239,6 +239,7 @@ impl<'a, 'b, T> Loader<'a, 'b, T> {
                                         units: cost.units,
                                         currency,
                                         cost: Some(cur_posting_cost_to_cost(cost_cur, cost)),
+                                        price: None,
                                     }
                                 })
                                 .collect::<Vec<_>>()
@@ -253,6 +254,7 @@ impl<'a, 'b, T> Loader<'a, 'b, T> {
                                 units,
                                 currency,
                                 cost: None,
+                                price,
                             }]
                         }
                     })
@@ -505,6 +507,7 @@ impl<'a, 'b, T> Loader<'a, 'b, T> {
                                     units: *number,
                                     currency: *cur,
                                     cost: None,
+                                    price: None,
                                 },
                                 Posting {
                                     flag: Some(pad_flag()),
@@ -512,6 +515,7 @@ impl<'a, 'b, T> Loader<'a, 'b, T> {
                                     units: -*number,
                                     currency: *cur,
                                     cost: None,
+                                    price: None,
                                 },
                             ]
                         })

@@ -9,7 +9,7 @@ use crate::format::*;
 
 impl Display for Directive {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use DirectiveVariant::*;
+        use directives::DirectiveVariant::*;
 
         match &self.variant {
             Transaction(x) => x.fmt(f, self.date /*, &self.metadata*/),
@@ -28,7 +28,7 @@ impl Display for Directive {
     }
 }
 
-impl Transaction {
+impl directives::Transaction {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} {}", date, &self.flag)?;
 
@@ -48,14 +48,14 @@ impl Transaction {
     }
 }
 
-impl Price {
+impl directives::Price {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} price {} {}", date, &self.currency, &self.amount)?;
         f.write_str(NEWLINE)
     }
 }
 
-impl Balance {
+impl directives::Balance {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} balance {} {}", date, &self.account, &self.amount)?;
         simple_format(f, self.tolerance.as_ref(), Some(TILDE_SPACE))?;
@@ -68,7 +68,7 @@ impl Balance {
     }
 }
 
-impl Open {
+impl directives::Open {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} open {}", date, &self.account)?;
         format(f, &self.currencies, plain, COMMA, Some(SPACE))?;
@@ -83,42 +83,42 @@ impl Open {
     }
 }
 
-impl Close {
+impl directives::Close {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} close {}", date, &self.account)?;
         f.write_str(NEWLINE)
     }
 }
 
-impl Commodity {
+impl directives::Commodity {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} commodity {}", date, &self.currency)?;
         f.write_str(NEWLINE)
     }
 }
 
-impl Pad {
+impl directives::Pad {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} pad {} {}", date, &self.account, &self.source)?;
         f.write_str(NEWLINE)
     }
 }
 
-impl Document {
+impl directives::Document {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} document {} \"{}\"", date, &self.account, &self.path)?;
         f.write_str(NEWLINE)
     }
 }
 
-impl Note {
+impl directives::Note {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} note {} \"{}\"", date, &self.account, &self.comment)?;
         f.write_str(NEWLINE)
     }
 }
 
-impl Event {
+impl directives::Event {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(
             f,
@@ -129,14 +129,14 @@ impl Event {
     }
 }
 
-impl Query {
+impl directives::Query {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(f, "{} query \"{}\" \"{}\"", date, &self.name, &self.content)?;
         f.write_str(NEWLINE)
     }
 }
 
-impl Custom {
+impl directives::Custom {
     fn fmt(&self, f: &mut Formatter<'_>, date: Date /*, metadata: &Metadata*/) -> fmt::Result {
         write!(
             f,
@@ -160,7 +160,7 @@ impl Display for Posting {
         )?;
 
         simple_format(f, &self.cost, Some(SPACE))?;
-        // simple_format(f, &self.price_annotation, Some(" @ "))?;
+        simple_format(f, &self.price, Some(SPACE))?;
         // self.metadata.fmt(f)
 
         Ok(())

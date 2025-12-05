@@ -22,19 +22,21 @@ pub(crate) fn convert_directives(
                     directives.push(prism::Directive {
                         date,
                         element: element.clone(),
-                        variant: prism::DirectiveVariant::Transaction(prism::Transaction {
-                            postings: loaded
-                                .postings
-                                .into_iter()
-                                .map(Into::<prism::Posting>::into)
-                                .collect::<Vec<_>>()
-                                .into(),
-                            flag: parsed_transaction.flag().to_string(),
-                            payee: parsed_transaction.payee().map(|payee| payee.to_string()),
-                            narration: parsed_transaction
-                                .narration()
-                                .map(|narration| narration.to_string()),
-                        }),
+                        variant: prism::DirectiveVariant::Transaction(
+                            prism::directives::Transaction {
+                                postings: loaded
+                                    .postings
+                                    .into_iter()
+                                    .map(Into::<prism::Posting>::into)
+                                    .collect::<Vec<_>>()
+                                    .into(),
+                                flag: parsed_transaction.flag().to_string(),
+                                payee: parsed_transaction.payee().map(|payee| payee.to_string()),
+                                narration: parsed_transaction
+                                    .narration()
+                                    .map(|narration| narration.to_string()),
+                            },
+                        ),
                     });
 
                     if internal_plugins.implicit_prices {
@@ -44,7 +46,7 @@ pub(crate) fn convert_directives(
                             directives.push(prism::Directive {
                                 date,
                                 element: element.clone(),
-                                variant: prism::DirectiveVariant::Price(prism::Price {
+                                variant: prism::DirectiveVariant::Price(prism::directives::Price {
                                     currency: currency.to_string(),
                                     amount: (price_per_unit, price_currency).into(),
                                 }),
@@ -61,13 +63,13 @@ pub(crate) fn convert_directives(
             PDV::Price(price) => directives.push(prism::Directive {
                 date,
                 element,
-                variant: prism::DirectiveVariant::Price(prism::Price {
+                variant: prism::DirectiveVariant::Price(prism::directives::Price {
                     currency: price.currency().item().to_string(),
                     amount: price.amount().item().into(),
                 }),
             }),
             PDV::Balance(balance) => {
-                let balance = prism::Balance {
+                let balance = prism::directives::Balance {
                     account: balance.account().item().to_string(),
                     amount: (
                         balance.atol().amount().number().value(),
@@ -96,7 +98,7 @@ pub(crate) fn convert_directives(
                 directives.push(prism::Directive {
                     date,
                     element,
-                    variant: prism::DirectiveVariant::Open(prism::Open {
+                    variant: prism::DirectiveVariant::Open(prism::directives::Open {
                         account: open.account().item().to_string(),
                         currencies,
                         booking: open.booking().map(|booking| (*booking.item()).into()),
@@ -106,14 +108,14 @@ pub(crate) fn convert_directives(
             PDV::Close(close) => directives.push(prism::Directive {
                 date,
                 element,
-                variant: prism::DirectiveVariant::Close(prism::Close {
+                variant: prism::DirectiveVariant::Close(prism::directives::Close {
                     account: close.account().item().to_string(),
                 }),
             }),
             PDV::Commodity(commodity) => directives.push(prism::Directive {
                 date,
                 element,
-                variant: prism::DirectiveVariant::Commodity(prism::Commodity {
+                variant: prism::DirectiveVariant::Commodity(prism::directives::Commodity {
                     currency: commodity.currency().item().to_string(),
                 }),
             }),
@@ -122,7 +124,7 @@ pub(crate) fn convert_directives(
                     directives.push(prism::Directive {
                         date,
                         element: element.clone(),
-                        variant: prism::DirectiveVariant::Pad(prism::Pad {
+                        variant: prism::DirectiveVariant::Pad(prism::directives::Pad {
                             account: parsed_pad.account().item().to_string(),
                             source: parsed_pad.source().to_string(),
                         }),
@@ -131,17 +133,19 @@ pub(crate) fn convert_directives(
                     directives.push(prism::Directive {
                         date,
                         element,
-                        variant: prism::DirectiveVariant::Transaction(prism::Transaction {
-                            postings: loaded
-                                .postings
-                                .into_iter()
-                                .map(Into::<prism::Posting>::into)
-                                .collect::<Vec<_>>()
-                                .into(),
-                            flag: crate::loader::pad_flag().to_string(),
-                            payee: None,
-                            narration: None,
-                        }),
+                        variant: prism::DirectiveVariant::Transaction(
+                            prism::directives::Transaction {
+                                postings: loaded
+                                    .postings
+                                    .into_iter()
+                                    .map(Into::<prism::Posting>::into)
+                                    .collect::<Vec<_>>()
+                                    .into(),
+                                flag: crate::loader::pad_flag().to_string(),
+                                payee: None,
+                                narration: None,
+                            },
+                        ),
                     });
                 } else {
                     panic!(
@@ -153,7 +157,7 @@ pub(crate) fn convert_directives(
             PDV::Document(document) => directives.push(prism::Directive {
                 date,
                 element: element.clone(),
-                variant: prism::DirectiveVariant::Document(prism::Document {
+                variant: prism::DirectiveVariant::Document(prism::directives::Document {
                     account: document.account().item().to_string(),
                     path: document.path().item().to_string(),
                 }),
@@ -161,7 +165,7 @@ pub(crate) fn convert_directives(
             PDV::Note(note) => directives.push(prism::Directive {
                 date,
                 element: element.clone(),
-                variant: prism::DirectiveVariant::Note(prism::Note {
+                variant: prism::DirectiveVariant::Note(prism::directives::Note {
                     account: note.account().item().to_string(),
                     comment: note.comment().item().to_string(),
                 }),
@@ -169,7 +173,7 @@ pub(crate) fn convert_directives(
             PDV::Event(event) => directives.push(prism::Directive {
                 date,
                 element: element.clone(),
-                variant: prism::DirectiveVariant::Event(prism::Event {
+                variant: prism::DirectiveVariant::Event(prism::directives::Event {
                     event_type: event.event_type().item().to_string(),
                     description: event.description().item().to_string(),
                 }),
@@ -177,7 +181,7 @@ pub(crate) fn convert_directives(
             PDV::Query(query) => directives.push(prism::Directive {
                 date,
                 element: element.clone(),
-                variant: prism::DirectiveVariant::Query(prism::Query {
+                variant: prism::DirectiveVariant::Query(prism::directives::Query {
                     name: query.name().item().to_string(),
                     content: query.content().item().to_string(),
                 }),
@@ -185,7 +189,7 @@ pub(crate) fn convert_directives(
             PDV::Custom(custom) => directives.push(prism::Directive {
                 date,
                 element: element.clone(),
-                variant: prism::DirectiveVariant::Custom(prism::Custom {
+                variant: prism::DirectiveVariant::Custom(prism::directives::Custom {
                     type_: custom.type_().item().to_string(),
                 }),
             }),
@@ -201,6 +205,7 @@ impl From<loader::Posting<'_>> for prism::Posting {
             (value.units, value.currency.to_string()).into(),
             value.flag,
             value.cost.map(Into::<prism::Cost>::into),
+            value.price.map(Into::<prism::Price>::into),
         )
     }
 }
@@ -225,6 +230,15 @@ impl<'a> From<booking::Cost<time::Date, Decimal, &'a str, &'a str>> for prism::C
             date: value.date,
             label: value.label.map(ToString::to_string),
             merge: value.merge,
+        }
+    }
+}
+
+impl From<loader::Price<'_>> for prism::Price {
+    fn from(value: loader::Price<'_>) -> Self {
+        Self {
+            per_unit: value.per_unit,
+            currency: value.currency.to_string(),
         }
     }
 }

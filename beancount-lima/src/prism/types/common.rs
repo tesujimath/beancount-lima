@@ -22,7 +22,7 @@ pub(crate) struct Posting {
     pub(crate) account: String,
     pub(crate) amount: Amount,
     pub(crate) cost: Option<Cost>,
-    // price appears at the top-level transaction prices for the implicit_prices plugin
+    pub(crate) price: Option<Price>,
     // pub(crate) metadata: Metadata<'a>,
 }
 
@@ -32,6 +32,7 @@ impl Posting {
         amount: Amount,
         flag: Option<S2>,
         cost: Option<Cost>,
+        price: Option<Price>,
     ) -> Self
     where
         S1: Display,
@@ -42,6 +43,7 @@ impl Posting {
             amount,
             flag: flag.map(|flag| flag.to_string()),
             cost,
+            price,
         }
     }
 
@@ -179,6 +181,32 @@ impl Custom for Cost {
 
     fn equality_hint(&self, other: &dyn CustomType) -> bool {
         if let Some(other) = as_underlying_type::<Cost>(other) {
+            self == other
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub(crate) struct Price {
+    pub(crate) per_unit: Decimal,
+    pub(crate) currency: String,
+}
+
+impl Display for Price {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@ {} {}", &self.per_unit, &self.currency)
+    }
+}
+
+impl Custom for Price {
+    fn fmt(&self) -> Option<Result<String, std::fmt::Error>> {
+        Some(Ok(self.to_string()))
+    }
+
+    fn equality_hint(&self, other: &dyn CustomType) -> bool {
+        if let Some(other) = as_underlying_type::<Price>(other) {
             self == other
         } else {
             false

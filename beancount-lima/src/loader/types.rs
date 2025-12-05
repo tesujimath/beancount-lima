@@ -43,7 +43,7 @@ pub(crate) struct Posting<'a> {
     pub(crate) units: Decimal,
     pub(crate) currency: parser::Currency<'a>,
     pub(crate) cost: Option<Cost<'a>>,
-    // price appears at the top-level transaction prices for the implicit_prices plugin
+    pub(crate) price: Option<Price<'a>>,
     // pub(crate) metadata: Metadata<'a>,
 }
 

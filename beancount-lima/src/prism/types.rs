@@ -16,7 +16,7 @@ pub(crate) use common::*;
 pub(crate) mod core;
 pub(crate) use core::*;
 pub(crate) mod directives;
-pub(crate) use directives::*;
+pub(crate) use directives::{Directive, DirectiveVariant};
 pub(crate) mod element;
 pub(crate) use element::*;
 pub(crate) mod steel_date;

@@ -37,8 +37,8 @@ plugin "beancount.plugins.implicit_prices"
 
 2020-09-02 * "Move some more"
   Assets:Bank:UK                                                        1328.00 GBP  @ 2.13294797687861 NZD
-  Income:Foreign                                                       -1155.00 GBP  @ 2.13294797687861 NZD
-  Assets:Bank:Current                                                   -369.00 NZD ; @ 0.4695
+  Income:Foreign                                                       -1155.00 GBP  @
+  Assets:Bank:Current                                                   -369.00 NZD
 
 2020-10-01 balance Assets:Bank:Current                                  6942.64 NZD
 2020-10-01 balance Assets:Bank:UK                                       2328.00 GBP

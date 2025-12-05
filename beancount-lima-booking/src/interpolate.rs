@@ -219,7 +219,15 @@ where
     if let Some(cost_spec) = posting.cost() {
         units_from_cost_spec(posting.units(), weight, &cost_spec)
     } else if let Some(price_spec) = posting.price() {
-        units_from_price_spec(posting.units(), weight, &price_spec)
+        let u = units_from_price_spec(posting.units(), weight, &price_spec);
+        tracing::debug!(
+            "units_from_price_spec({:?}, {}, {:?}) = {:?}",
+            posting.units(),
+            weight,
+            &price_spec,
+            &u
+        );
+        u
     } else {
         posting.units().map(|units| UnitsAndPerUnit {
             units,
@@ -278,9 +286,26 @@ where
     PS: PriceSpec<Number = N, Currency = C> + Debug,
 {
     match (posting_units, price_spec.per_unit(), price_spec.total()) {
-        (Some(units), per_unit, _) => Some(UnitsAndPerUnit { units, per_unit }),
+        (Some(units), Some(per_unit), _) => Some(UnitsAndPerUnit {
+            units,
+            per_unit: Some(per_unit),
+        }),
         (None, Some(per_unit), _) => {
             let units = (weight / per_unit).rescaled(weight.scale());
+            Some(UnitsAndPerUnit {
+                units,
+                per_unit: Some(per_unit),
+            })
+        }
+        (Some(units), None, Some(total)) => {
+            let per_unit = total / units;
+            Some(UnitsAndPerUnit {
+                units,
+                per_unit: Some(per_unit),
+            })
+        }
+        (Some(units), None, None) => {
+            let per_unit = weight / units;
             Some(UnitsAndPerUnit {
                 units,
                 per_unit: Some(per_unit),
