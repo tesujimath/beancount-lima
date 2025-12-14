@@ -48,12 +48,12 @@
             flakePkgs.steel
           ];
 
-          beancount-lima =
-            let cargo = builtins.fromTOML (builtins.readFile ./beancount-lima/Cargo.toml);
+          beancount-lima-rs =
+            let cargo = builtins.fromTOML (builtins.readFile ./Cargo.toml);
             in pkgs.rustPlatform.buildRustPackage
               {
-                pname = "beancount-lima";
-                version = cargo.package.version;
+                pname = "beancount-lima-rs";
+                version = cargo.workspace.package.version;
 
                 src = ./.;
 
@@ -80,6 +80,23 @@
                   # maintainers = [ maintainers.tesujimath ];
                 };
               };
+
+          beancount-lima = pkgs.stdenv.mkDerivation {
+            name = "beancount-lima";
+            src = ./.;
+            dontUnpack = true;
+            dontBuild = true;
+
+            installPhase = ''
+              mkdir -p $out/bin
+              ln -s ${beancount-lima-rs}/bin/lima $out/bin
+
+              mkdir -p $out/lib
+              cp -a $src/cogs $out/lib
+            '';
+          };
+
+
         in
         with pkgs;
         {
