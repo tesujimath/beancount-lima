@@ -3,7 +3,11 @@ use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess,
 };
 use color_eyre::eyre::{eyre, Result, WrapErr};
-use std::{io::Write, iter::once, path::Path};
+use std::{
+    io::{BufWriter, Write},
+    iter::once,
+    path::Path,
+};
 
 use crate::{
     loader::{Directive, InferredTolerance, LoadError, LoadSuccess, Loader},
@@ -61,7 +65,9 @@ where
                         sources.write_errors_or_warnings(error_w, warnings)?;
                     }
 
-                    write_as_beancount(&directives, out_w)
+                    // TODO both beancount and EDN format
+                    write_as_edn(&directives, out_w)
+                    // write_as_beancount(&directives, out_w)
                 }
                 Err(LoadError { errors, .. }) => {
                     sources.write_errors_or_warnings(error_w, errors)?;
@@ -85,6 +91,20 @@ where
     for d in directives {
         writeln!(out_w, "{}", d)?;
     }
+    Ok(())
+}
+
+fn write_as_edn<'a, W>(directives: &[Directive<'a>], out_w: W) -> Result<()>
+where
+    W: Write + Copy,
+{
+    let mut buffered_out_w = BufWriter::new(out_w);
+
+    writeln!(buffered_out_w, "{}", crate::format::edn::VECTOR_BEGIN)?;
+    for d in directives {
+        writeln!(buffered_out_w, "{}", crate::format::edn::Edn(d))?;
+    }
+    writeln!(buffered_out_w, "{}", crate::format::edn::VECTOR_END)?;
     Ok(())
 }
 
@@ -124,5 +144,3 @@ fn convert_parser_options(
             .to_string(),
     )))
 }
-
-mod beancount;

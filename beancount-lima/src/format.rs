@@ -78,3 +78,6 @@ pub(crate) const FLUSH: &str = "";
 pub(crate) const GUTTER_MINOR: &str = " ";
 pub(crate) const GUTTER_MEDIUM: &str = "  ";
 pub(crate) const GUTTER_MAJOR: &str = "   ";
+
+pub(crate) mod beancount;
+pub(crate) mod edn;
