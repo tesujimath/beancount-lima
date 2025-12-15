@@ -3,13 +3,13 @@ name = "beancount-lima"
 version.workspace = true
 edition = "2024"
 license = "MIT OR Apache-2.0"
-description = "Beancount frontend using Steel Scheme and Lima parser"
+description = "Beancount frontend using Lima parser"
 homepage = "https://github.com/tesujimath/beancount-lima"
 repository = "https://github.com/tesujimath/beancount-lima"
 readme = "../README.md"
 
 [[bin]]
-name = "lima"
+name = "lima-pp"
 path = "src/main.rs"
 
 [dependencies]
@@ -17,20 +17,7 @@ beancount-lima-booking = { workspace = true, features = [
   "lima-parser-types",
   "rust-decimal",
 ] }
-abi_stable = "0.11.3"
 beancount-parser-lima = { workspace = true }
-# steel-core = "0.7.0"
-# steel-repl = "0.7.0"
-# steel-derive = "0.6.0"
-steel-core = { git = "https://github.com/mattwparas/steel" }
-steel-repl = { git = "https://github.com/mattwparas/steel" }
-steel-derive = { git = "https://github.com/mattwparas/steel" }
-# steel-core = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
-# steel-repl = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
-# steel-derive = { git = "https://github.com/tesujimath/steel", branch = "vector-derive-debug" }
-# steel-core = { path = "../../third-party/steel/crates/steel-core" }
-# steel-repl = { path = "../../third-party/steel/crates/steel-repl" }
-# steel-derive = { path = "../../third-party/steel/crates/steel-derive" }
 rust_decimal = { workspace = true }
 hashbrown = { workspace = true }
 time = { workspace = true, features = ["local-offset", "parsing"] }

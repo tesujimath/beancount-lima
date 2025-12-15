@@ -2,9 +2,9 @@ use color_eyre::eyre::{eyre, Result};
 use regex::Regex;
 use std::{fs::read_to_string, path::Path};
 
-use crate::import::RawSource;
+use crate::import::Source;
 
-pub(crate) fn import(path: &Path) -> Result<RawSource> {
+pub(crate) fn import(path: &Path) -> Result<Source> {
     let ofx_content = read_to_string(path)?;
     let first_line = ofx_content.lines().next();
     if let Some(first_line) = first_line {

@@ -46,14 +46,6 @@ Income:Unknown                                                -4.72
 
 Note: the rollup ignores all but the primary currency (as determined by frequency of use).
 
-## Installation and configuration
-
-Currently Lima needs a separate installation of Steel Scheme, for its Scheme cogs, which must be on the `LIMA_COGPATH`, a colon separated list of directories which are searched in order for modules. (Nothing else from Steel is required to be installed separately.)
-
-Recommended practice for `LIMA_COGPATH` is local (user) directory for config and own modules, followed by the Lima native one, followed by the Steel one.
-
-Local configuration is done in `lima/config.scm` which must be on the `LIMA_COGPATH`.  See the [example](examples/cogs/lima/config.scm).
-
 ## Usage Examples
 
 ```

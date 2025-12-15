@@ -8,10 +8,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-utils.url = "github:numtide/flake-utils";
-    steel = {
-      url = "github:mattwparas/steel/master";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     autobean-format = {
       url = "github:SEIAROTg/autobean-format";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -27,7 +23,6 @@
             inherit system overlays;
           };
           flakePkgs = {
-            steel = inputs.steel.packages.${system}.default;
             autobean-format = inputs.autobean-format.packages.${system}.default;
           };
           # cargo-nightly based on https://github.com/oxalica/rust-overlay/issues/82
@@ -45,57 +40,28 @@
             just
             rust-bin.stable.latest.default
             gcc
-            flakePkgs.steel
           ];
 
-          beancount-lima-rs =
+          beancount-lima-pp =
             let cargo = builtins.fromTOML (builtins.readFile ./Cargo.toml);
             in pkgs.rustPlatform.buildRustPackage
               {
-                pname = "beancount-lima-rs";
+                pname = "beancount-lima-pp";
                 version = cargo.workspace.package.version;
 
                 src = ./.;
 
                 cargoDeps = pkgs.rustPlatform.importCargoLock {
                   lockFile = ./Cargo.lock;
-
-                  # when using a Steel directly from git:
-                  outputHashes =
-                    {
-                      "steel-core-0.7.0" = "sha256-Tpzsna8jZbsmNeFK/VoqTQTti82bXF6ugqHnd4bGZm0=";
-                    };
                 };
 
-                # skip tests which require environment
-                checkFlags = [
-                  "--skip=tests::beancount_tests"
-                  "--skip=tests::cog_tests"
-                ];
-
                 meta = with pkgs.lib; {
-                  description = "Beancount frontend using Steel Scheme and Lima parser";
+                  description = "Beancount frontend using Lima parser";
                   homepage = "https://github.com/tesujimath/beancount-lima";
                   license = with licenses; [ asl20 mit ];
                   # maintainers = [ maintainers.tesujimath ];
                 };
               };
-
-          beancount-lima = pkgs.stdenv.mkDerivation {
-            name = "beancount-lima";
-            src = ./.;
-            dontUnpack = true;
-            dontBuild = true;
-
-            installPhase = ''
-              mkdir -p $out/bin
-              ln -s ${beancount-lima-rs}/bin/lima $out/bin
-
-              mkdir -p $out/lib
-              cp -a $src/cogs $out/lib
-            '';
-          };
-
 
         in
         with pkgs;
@@ -116,24 +82,17 @@
             ] ++ ci-packages;
 
             shellHook = ''
-              # LSP config
-              # https://github.com/mattwparas/steel/tree/master/crates/steel-language-server#configuration
-              export STEEL_LSP_HOME=$(pwd)/steel-lsp
-
-              export LIMA_COGPATH="''${LIMA_COGPATH}''${LIMA_COGPATH:+:}$(pwd)/examples/cogs:$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
-
               PATH=$PATH:$(pwd)/target/debug
             '';
           };
 
-          packages.default = beancount-lima;
+          packages.default = beancount-lima-pp;
 
           apps = {
             tests = {
               type = "app";
               program = "${writeShellScript "beancount-lima-tests" ''
                 export PATH=${pkgs.lib.makeBinPath (ci-packages ++ [beancount-lima])}
-                export LIMA_COGPATH="$(pwd)/cogs:${flakePkgs.steel}/lib/steel/cogs"
                 just test
               ''}";
             };

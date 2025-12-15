@@ -304,6 +304,16 @@ where
     pub currency: C,
 }
 
+impl<N, C> Display for Price<N, C>
+where
+    N: Copy + Display,
+    C: Clone + Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@ {} {}", &self.per_unit, &self.currency)
+    }
+}
+
 #[derive(Debug)]
 pub struct Bookings<P>
 where

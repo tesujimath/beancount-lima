@@ -2,9 +2,9 @@ use color_eyre::eyre::Result;
 use slugify::slugify;
 use std::path::Path;
 
-use super::RawSource;
+use super::Source;
 
-pub(crate) fn import(path: &Path) -> Result<RawSource> {
+pub(crate) fn import(path: &Path) -> Result<Source> {
     let csv_file = std::fs::File::open(path)?;
     let mut rdr = csv::Reader::from_reader(csv_file);
     let fields = rdr
@@ -28,7 +28,7 @@ pub(crate) fn import(path: &Path) -> Result<RawSource> {
         ("path", path.to_string_lossy().into_owned()),
     ];
 
-    Ok(RawSource {
+    Ok(Source {
         header,
         fields,
         transactions,

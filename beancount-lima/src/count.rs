@@ -4,17 +4,16 @@ use beancount_parser_lima::{
 };
 use color_eyre::eyre::{eyre, Result, WrapErr};
 use std::{io::Write, iter::once, path::Path};
-use steel::{gc::Gc, rvals::IntoSteelVal, SteelVal};
 
 use crate::{
-    loader::{InferredTolerance, LoadError, LoadSuccess, Loader},
+    loader::{Directive, InferredTolerance, LoadError, LoadSuccess, Loader},
     plugins::InternalPlugins,
-    prism::Prism,
 };
 
-pub(crate) fn load_from<W>(path: &Path, error_w: W) -> Result<Prism>
+pub(crate) fn load_from<W1, W2>(path: &Path, out_w: W1, error_w: W2) -> Result<()>
 where
-    W: Write + Copy,
+    W1: Write + Copy,
+    W2: Write + Copy,
 {
     let sources = BeancountSources::try_from(path).wrap_err(format!("failed to read {path:?}"))?;
     let parser = BeancountParser::new(&sources);
@@ -62,21 +61,7 @@ where
                         sources.write_errors_or_warnings(error_w, warnings)?;
                     }
 
-                    let prism_directives =
-                        conversions::convert_directives(directives, &internal_plugins);
-
-                    let options = convert_parser_options(&options)
-                        .map(|(k, v)| (SteelVal::SymbolV(k.to_string().into()), v))
-                        .collect::<steel::HashMap<SteelVal, SteelVal>>();
-                    let options = Gc::new(options).into();
-
-                    drop(parser);
-
-                    Ok(Prism {
-                        sources: sources.into(),
-                        directives: prism_directives.into(),
-                        options,
-                    })
+                    write_as_beancount(&directives, out_w)
                 }
                 Err(LoadError { errors, .. }) => {
                     sources.write_errors_or_warnings(error_w, errors)?;
@@ -93,51 +78,51 @@ where
     }
 }
 
+fn write_as_beancount<'a, W>(directives: &[Directive<'a>], mut out_w: W) -> Result<()>
+where
+    W: Write + Copy,
+{
+    for d in directives {
+        writeln!(out_w, "{}", d)?;
+    }
+    Ok(())
+}
+
 /// Convert just those parser options that make sense to expose to Scheme.
 /// TODO options
 fn convert_parser_options(
     options: &parser::Options<'_>,
-) -> impl Iterator<Item = (&'static str, SteelVal)> {
+) -> impl Iterator<Item = (&'static str, String)> {
     once((
         "name_assets",
         options
             .account_type_name(parser::AccountType::Assets)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
+            .to_string(),
     ))
     .chain(once((
         "name_liabilities",
         options
             .account_type_name(parser::AccountType::Liabilities)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
+            .to_string(),
     )))
     .chain(once((
         "name_equity",
         options
             .account_type_name(parser::AccountType::Equity)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
+            .to_string(),
     )))
     .chain(once((
         "name_income",
         options
             .account_type_name(parser::AccountType::Income)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
+            .to_string(),
     )))
     .chain(once((
         "name_expenses",
         options
             .account_type_name(parser::AccountType::Expenses)
-            .to_string()
-            .into_steelval()
-            .unwrap(),
+            .to_string(),
     )))
 }
 
-mod conversions;
+mod beancount;
