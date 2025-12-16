@@ -38,8 +38,11 @@
             coreutils
             diffutils
             just
+
             rust-bin.stable.latest.default
             gcc
+
+            clojure
           ];
 
           beancount-lima-pp =
@@ -74,6 +77,9 @@
               cargo-outdated
               cargo-edit
               gdb
+
+              clojure-lsp
+              neil
 
               # useful tools:
               beancount
