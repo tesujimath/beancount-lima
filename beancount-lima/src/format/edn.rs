@@ -3,12 +3,77 @@ use time::Date;
 
 use crate::loader::*;
 use beancount_parser_lima as parser;
+use color_eyre::eyre::Result;
 use std::fmt::{self, Display, Formatter, Write};
 use std::iter::{empty, once, repeat};
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
+pub(crate) fn write_as_edn<'a, W>(
+    directives: &[Directive<'a>],
+    _options: &parser::Options,
+    out_w: W,
+) -> Result<()>
+where
+    W: std::io::Write + Copy,
+{
+    use std::io::{BufWriter, Write};
+
+    let mut buffered_out_w = BufWriter::new(out_w);
+
+    // TODO tidy up writing a large map
+    writeln!(
+        buffered_out_w,
+        "{MAP_BEGIN}\n{} {VECTOR_BEGIN}",
+        Edn(Keyword::Directives)
+    )?;
+
+    for d in directives {
+        writeln!(buffered_out_w, "{}", Edn(d))?;
+    }
+
+    writeln!(buffered_out_w, "{VECTOR_END}{MAP_END}")?;
+
+    Ok(())
+}
+
+// TODO write options as EDN
+// fn convert_parser_options(
+//     options: &parser::Options<'_>,
+// ) -> impl Iterator<Item = (&'static str, String)> {
+//     once((
+//         "name_assets",
+//         options
+//             .account_type_name(parser::AccountType::Assets)
+//             .to_string(),
+//     ))
+//     .chain(once((
+//         "name_liabilities",
+//         options
+//             .account_type_name(parser::AccountType::Liabilities)
+//             .to_string(),
+//     )))
+//     .chain(once((
+//         "name_equity",
+//         options
+//             .account_type_name(parser::AccountType::Equity)
+//             .to_string(),
+//     )))
+//     .chain(once((
+//         "name_income",
+//         options
+//             .account_type_name(parser::AccountType::Income)
+//             .to_string(),
+//     )))
+//     .chain(once((
+//         "name_expenses",
+//         options
+//             .account_type_name(parser::AccountType::Expenses)
+//             .to_string(),
+//     )))
+// }
+
 // TODO improve this, it's a bit ugly
-pub(crate) struct Edn<T>(pub(crate) T)
+struct Edn<T>(T)
 where
     T: FmtEdn + Clone;
 
@@ -21,7 +86,7 @@ where
     }
 }
 
-pub(crate) trait FmtEdn {
+trait FmtEdn {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result;
 }
 
@@ -412,6 +477,7 @@ enum Keyword {
     Date,
     Description,
     Directive,
+    Directives,
     Document,
     Event,
     Fifo,
@@ -517,11 +583,11 @@ where
 }
 
 fn map_begin(f: &mut Formatter<'_>) -> fmt::Result {
-    f.write_str("{")
+    f.write_str(MAP_BEGIN)
 }
 
 fn map_end(f: &mut Formatter<'_>) -> fmt::Result {
-    f.write_str("}")
+    f.write_str(MAP_END)
 }
 
 // an infinite iterator of separators, with the first one only being flush
@@ -531,10 +597,10 @@ fn separators() -> impl Iterator<Item = Separator> {
     once(Flush).chain(repeat(Spaced))
 }
 
-/// TODO these being public is ugh
-pub(crate) const VECTOR_BEGIN: &str = "[";
-pub(crate) const VECTOR_END: &str = "]";
-
+const VECTOR_BEGIN: &str = "[";
+const VECTOR_END: &str = "]";
+const MAP_BEGIN: &str = "{";
+const MAP_END: &str = "}";
 const SET_BEGIN: &str = "#{";
 const SET_END: &str = "}";
 

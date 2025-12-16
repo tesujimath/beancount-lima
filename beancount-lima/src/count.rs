@@ -3,13 +3,10 @@ use beancount_parser_lima::{
     self as parser, BeancountParser, BeancountSources, ParseError, ParseSuccess,
 };
 use color_eyre::eyre::{eyre, Result, WrapErr};
-use std::{
-    io::{BufWriter, Write},
-    iter::once,
-    path::Path,
-};
+use std::{io::Write, iter::once, path::Path};
 
 use crate::{
+    format::edn::write_as_edn,
     loader::{Directive, InferredTolerance, LoadError, LoadSuccess, Loader},
     plugins::InternalPlugins,
 };
@@ -66,7 +63,7 @@ where
                     }
 
                     // TODO both beancount and EDN format
-                    write_as_edn(&directives, out_w)
+                    write_as_edn(&directives, &options, out_w)
                     // write_as_beancount(&directives, out_w)
                 }
                 Err(LoadError { errors, .. }) => {
@@ -84,63 +81,16 @@ where
     }
 }
 
-fn write_as_beancount<'a, W>(directives: &[Directive<'a>], mut out_w: W) -> Result<()>
+fn write_as_beancount<'a, W>(
+    directives: &[Directive<'a>],
+    _options: &parser::Options,
+    mut out_w: W,
+) -> Result<()>
 where
     W: Write + Copy,
 {
     for d in directives {
-        writeln!(out_w, "{}", d)?;
+        writeln!(out_w, "{d}")?;
     }
     Ok(())
-}
-
-fn write_as_edn<'a, W>(directives: &[Directive<'a>], out_w: W) -> Result<()>
-where
-    W: Write + Copy,
-{
-    let mut buffered_out_w = BufWriter::new(out_w);
-
-    writeln!(buffered_out_w, "{}", crate::format::edn::VECTOR_BEGIN)?;
-    for d in directives {
-        writeln!(buffered_out_w, "{}", crate::format::edn::Edn(d))?;
-    }
-    writeln!(buffered_out_w, "{}", crate::format::edn::VECTOR_END)?;
-    Ok(())
-}
-
-/// Convert just those parser options that make sense to expose to Scheme.
-/// TODO options
-fn convert_parser_options(
-    options: &parser::Options<'_>,
-) -> impl Iterator<Item = (&'static str, String)> {
-    once((
-        "name_assets",
-        options
-            .account_type_name(parser::AccountType::Assets)
-            .to_string(),
-    ))
-    .chain(once((
-        "name_liabilities",
-        options
-            .account_type_name(parser::AccountType::Liabilities)
-            .to_string(),
-    )))
-    .chain(once((
-        "name_equity",
-        options
-            .account_type_name(parser::AccountType::Equity)
-            .to_string(),
-    )))
-    .chain(once((
-        "name_income",
-        options
-            .account_type_name(parser::AccountType::Income)
-            .to_string(),
-    )))
-    .chain(once((
-        "name_expenses",
-        options
-            .account_type_name(parser::AccountType::Expenses)
-            .to_string(),
-    )))
 }
