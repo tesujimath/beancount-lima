@@ -2,9 +2,9 @@ use rust_decimal::Decimal;
 use time::Date;
 
 use crate::loader::*;
-use beancount_parser_lima::{self as parser, ElementType};
+use beancount_parser_lima as parser;
 use std::fmt::{self, Display, Formatter, Write};
-use std::iter::{once, repeat};
+use std::iter::{empty, once, repeat};
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 // TODO improve this, it's a bit ugly
@@ -35,22 +35,42 @@ impl<'a> FmtEdn for &Directive<'a> {
 
         match (self.parsed.variant(), &self.loaded) {
             (PDV::Transaction(parsed), LDV::Transaction(loaded)) => {
-                (loaded, date, parsed).fmt_edn(f /*, &self.metadata*/)
+                (loaded, date, parsed).fmt_edn(f) // TODO metadata
             }
-            // (PDV::Pad(parsed), LDV::Pad(loaded)) => {
-            //     loaded.fmt_edn(f, date, directive /*, &self.metadata*/)
-            // }
-            _ => {
-                map_begin(f)?;
-                (
-                    Keyword::Directive,
-                    directive.element_type(),
-                    Separator::Flush,
-                )
-                    .fmt_edn(f)?;
-                (Keyword::Narration, "not yet implemented", Separator::Spaced).fmt_edn(f)?;
-                map_end(f)
+            (PDV::Pad(parsed), LDV::Pad(loaded)) => {
+                (loaded, date, parsed).fmt_edn(f) // TODO metadata
             }
+            (PDV::Price(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Balance(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Open(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Close(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Commodity(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Document(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Note(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Event(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Query(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (PDV::Custom(parsed), _) => {
+                (date, parsed).fmt_edn(f) // TODO metadata
+            }
+            (parsed, loaded) => panic!("impossible combination of {parsed:?} and {loaded:?}"),
         }
     }
 }
@@ -61,8 +81,8 @@ impl<'a> FmtEdn for (&Transaction<'a>, Date, &parser::Transaction<'a>) {
 
         let (loaded, date, parsed) = self;
         map_begin(f)?;
-        (Keyword::Directive, Keyword::Txn, Flush).fmt_edn(f)?;
-        (Keyword::Date, date, Spaced).fmt_edn(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Txn, Spaced).fmt_edn(f)?;
         (Keyword::Flag, *parsed.flag().item(), Spaced).fmt_edn(f)?;
         if let Some(payee) = parsed.payee().map(|x| *x.item()) {
             (Keyword::Payee, payee, Spaced).fmt_edn(f)?;
@@ -71,7 +91,193 @@ impl<'a> FmtEdn for (&Transaction<'a>, Date, &parser::Transaction<'a>) {
             (Keyword::Narration, narration, Spaced).fmt_edn(f)?;
         }
         (Keyword::Postings, EdnVector(loaded.postings.iter()), Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+impl<'a> FmtEdn for (&Pad<'a>, Date, &parser::Pad<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
 
+        let (loaded, date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Pad, Spaced).fmt_edn(f)?;
+        (Keyword::Account, parsed.account().item().as_ref(), Spaced).fmt_edn(f)?;
+        (Keyword::Source, parsed.source().item().as_ref(), Spaced).fmt_edn(f)?;
+        map_end(f)?;
+
+        f.write_str(NEWLINE)?;
+
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Txn, Spaced).fmt_edn(f)?;
+        (Keyword::Flag, pad_flag(), Spaced).fmt_edn(f)?;
+        (Keyword::Postings, EdnVector(loaded.postings.iter()), Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Price<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        let price = Price {
+            per_unit: parsed.amount().number().value(),
+            currency: *parsed.amount().currency().item(),
+        };
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Price, Spaced).fmt_edn(f)?;
+        (Keyword::Currency, parsed.currency().item().as_ref(), Spaced).fmt_edn(f)?;
+        (Keyword::Price, &price, Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Balance<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Balance, Spaced).fmt_edn(f)?;
+        (Keyword::Account, parsed.account().item().as_ref(), Spaced).fmt_edn(f)?;
+        (
+            Keyword::Units,
+            parsed.atol().amount().number().value(),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::Currency,
+            *parsed.atol().amount().currency().item(),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        if let Some(tolerance) = parsed.atol().tolerance() {
+            (Keyword::Tolerance, *tolerance.item(), Spaced).fmt_edn(f)?;
+        }
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Open<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Open, Spaced).fmt_edn(f)?;
+        (Keyword::Account, parsed.account().item().as_ref(), Spaced).fmt_edn(f)?;
+        (
+            Keyword::Currencies,
+            EdnSet(parsed.currencies().map(|cur| *cur.item())),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        if let Some(booking) = parsed.booking() {
+            (Keyword::Booking, *booking.item(), Spaced).fmt_edn(f)?;
+        }
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Close<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Close, Spaced).fmt_edn(f)?;
+        (Keyword::Account, parsed.account().item().as_ref(), Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Commodity<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Commodity, Spaced).fmt_edn(f)?;
+        (Keyword::Currency, *parsed.currency().item(), Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Document<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Document, Spaced).fmt_edn(f)?;
+        (Keyword::Account, parsed.account().item().as_ref(), Spaced).fmt_edn(f)?;
+        (Keyword::Path, *parsed.path().item(), Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Note<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Note, Spaced).fmt_edn(f)?;
+        (Keyword::Account, parsed.account().item().as_ref(), Spaced).fmt_edn(f)?;
+        (Keyword::Comment, *parsed.comment().item(), Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Event<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Event, Spaced).fmt_edn(f)?;
+        (Keyword::Type, *parsed.event_type().item(), Spaced).fmt_edn(f)?;
+        (Keyword::Description, *parsed.description().item(), Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Query<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Query, Spaced).fmt_edn(f)?;
+        (Keyword::Name, *parsed.name().item(), Spaced).fmt_edn(f)?;
+        (Keyword::Content, *parsed.content().item(), Spaced).fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl<'a> FmtEdn for (Date, &parser::Custom<'a>) {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        let (date, parsed) = self;
+        map_begin(f)?;
+        (Keyword::Date, date, Flush).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Custom, Spaced).fmt_edn(f)?;
+        (Keyword::Type, *parsed.type_().item(), Spaced).fmt_edn(f)?;
+        // TODO custom values, with metadata
+        (Keyword::Values, EdnVector(empty::<&str>()), Spaced).fmt_edn(f)?;
         map_end(f)
     }
 }
@@ -94,7 +300,6 @@ impl<'a> FmtEdn for &Posting<'a> {
             (Keyword::Flag, flag, Spaced).fmt_edn(f)?;
         }
         // TODO metadata
-
         map_end(f)
     }
 }
@@ -132,15 +337,31 @@ impl<'a> FmtEdn for parser::Currency<'a> {
     }
 }
 
+impl FmtEdn for parser::Booking {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use beancount_parser_lima::Booking::*;
+        let keyword = match self {
+            Strict => Keyword::Strict,
+            StrictWithSize => Keyword::StrictWithSize,
+            None => Keyword::None,
+            Average => Keyword::Average,
+            Fifo => Keyword::Fifo,
+            Lifo => Keyword::Lifo,
+            Hifo => Keyword::Hifo,
+        };
+        keyword.fmt_edn(f)
+    }
+}
+
 impl FmtEdn for Date {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, r#"#time/date "{}""#, self)
+        write!(f, r#"#time/date{SPACE}"{self}""#)
     }
 }
 
 impl FmtEdn for Decimal {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}M", self)
+        write!(f, "{self}M")
     }
 }
 
@@ -167,32 +388,6 @@ impl FmtEdn for &str {
     }
 }
 
-// TODO: remove
-// fn escape_string<'a>(s: &'a str) -> Cow<'a, str> {
-//     fn requires_escape(c: &char) -> bool {
-//         matches!(c, '\t' | '\r' | '\n' | '\\' | '"')
-//     }
-
-//     let n_escapes = s.chars().filter(requires_escape).count();
-//     if n_escapes > 0 {
-//         let mut escaped = String::with_capacity(s.len() + n_escapes);
-//         for c in s.chars() {
-//             match c {
-//                 '\t' => escaped.push_str(r#"\t"#),
-//                 '\r' => escaped.push_str(r#"\r"#),
-//                 '\n' => escaped.push_str(r#"\\n"#),
-//                 '\\' => escaped.push_str(r#"\\"#),
-//                 '\"' => escaped.push_str(r#"\"\""#),
-//                 c => escaped.push(c),
-//             }
-//         }
-//         return Cow::Owned(escaped);
-//     } else {
-//         return Cow::Borrowed(s);
-//     }
-// }
-//
-
 impl FmtEdn for parser::Flag {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
         self.to_string().fmt_edn(f)
@@ -203,20 +398,48 @@ impl FmtEdn for parser::Flag {
 #[strum(serialize_all = "kebab-case")]
 enum Keyword {
     Account,
+    Average,
+    Balance,
+    Booking,
+    Close,
+    Comment,
+    Commodity,
+    Content,
     Cost,
+    Currencies,
     Currency,
+    Custom,
     Date,
+    Description,
     Directive,
+    Document,
+    Event,
+    Fifo,
     Flag,
+    Hifo,
     Label,
+    Lifo,
     Merge,
+    Name,
     Narration,
+    None,
+    Note,
+    Open,
+    Pad,
+    Path,
     Payee,
     PerUnit,
     Postings,
     Price,
+    Query,
+    Source,
+    Strict,
+    StrictWithSize,
+    Tolerance,
     Txn,
+    Type,
     Units,
+    Values,
 }
 
 impl FmtEdn for Keyword {
@@ -241,15 +464,37 @@ where
     T: FmtEdn,
 {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("[")?;
+        f.write_str(VECTOR_BEGIN)?;
 
         for (item, sep) in self.0.zip(separators()) {
             if sep == Separator::Spaced {
-                f.write_str(" ")?;
+                f.write_str(SPACE)?;
             }
             item.fmt_edn(f)?;
         }
-        f.write_str("]")
+        f.write_str(VECTOR_END)
+    }
+}
+
+struct EdnSet<I, T>(I)
+where
+    I: Iterator<Item = T>;
+
+impl<I, T> FmtEdn for EdnSet<I, T>
+where
+    I: Iterator<Item = T>,
+    T: FmtEdn,
+{
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(SET_BEGIN)?;
+
+        for (item, sep) in self.0.zip(separators()) {
+            if sep == Separator::Spaced {
+                f.write_str(SPACE)?;
+            }
+            item.fmt_edn(f)?;
+        }
+        f.write_str(SET_END)
     }
 }
 
@@ -263,10 +508,10 @@ where
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
         let (name, value, sep) = self;
         if sep == Separator::Spaced {
-            f.write_str(", ")?;
+            f.write_str(COMMA_SPACE)?;
         }
         name.fmt_edn(f)?;
-        f.write_str(" ")?;
+        f.write_str(SPACE)?;
         value.fmt_edn(f)
     }
 }
@@ -286,6 +531,14 @@ fn separators() -> impl Iterator<Item = Separator> {
     once(Flush).chain(repeat(Spaced))
 }
 
-/// TODO this is ugh
+/// TODO these being public is ugh
 pub(crate) const VECTOR_BEGIN: &str = "[";
 pub(crate) const VECTOR_END: &str = "]";
+
+const SET_BEGIN: &str = "#{";
+const SET_END: &str = "}";
+
+// separators
+const COMMA_SPACE: &str = ", ";
+const SPACE: &str = " ";
+const NEWLINE: &str = "\n";
