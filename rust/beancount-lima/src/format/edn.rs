@@ -10,7 +10,7 @@ use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
 pub(crate) fn write_as_edn<'a, W>(
     directives: &[Directive<'a>],
-    _options: &parser::Options,
+    options: &parser::Options,
     out_w: W,
 ) -> Result<()>
 where
@@ -31,46 +31,14 @@ where
         writeln!(buffered_out_w, "{}", Edn(d))?;
     }
 
-    writeln!(buffered_out_w, "{VECTOR_END}{MAP_END}")?;
+    writeln!(buffered_out_w, "{VECTOR_END}")?;
+
+    writeln!(buffered_out_w, "{} {}", Edn(Keyword::Options), Edn(options))?;
+
+    writeln!(buffered_out_w, "{MAP_END}")?;
 
     Ok(())
 }
-
-// TODO write options as EDN
-// fn convert_parser_options(
-//     options: &parser::Options<'_>,
-// ) -> impl Iterator<Item = (&'static str, String)> {
-//     once((
-//         "name_assets",
-//         options
-//             .account_type_name(parser::AccountType::Assets)
-//             .to_string(),
-//     ))
-//     .chain(once((
-//         "name_liabilities",
-//         options
-//             .account_type_name(parser::AccountType::Liabilities)
-//             .to_string(),
-//     )))
-//     .chain(once((
-//         "name_equity",
-//         options
-//             .account_type_name(parser::AccountType::Equity)
-//             .to_string(),
-//     )))
-//     .chain(once((
-//         "name_income",
-//         options
-//             .account_type_name(parser::AccountType::Income)
-//             .to_string(),
-//     )))
-//     .chain(once((
-//         "name_expenses",
-//         options
-//             .account_type_name(parser::AccountType::Expenses)
-//             .to_string(),
-//     )))
-// }
 
 // TODO improve this, it's a bit ugly
 struct Edn<T>(T)
@@ -418,6 +386,193 @@ impl FmtEdn for parser::Booking {
     }
 }
 
+impl FmtEdn for parser::PluginProcessingMode {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use beancount_parser_lima::PluginProcessingMode::*;
+        let keyword = match self {
+            Default => Keyword::Default,
+            Raw => Keyword::Raw,
+        };
+        keyword.fmt_edn(f)
+    }
+}
+
+// plugin_processing_mode(&self) -> Option<&Spanned<PluginProcessingMode>> {
+//
+impl<'a> FmtEdn for &parser::Options<'a> {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        map_begin(f)?;
+        (
+            Keyword::NameAssets,
+            self.account_type_name(parser::AccountType::Assets).as_ref(),
+            Flush,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::NameLiabilities,
+            self.account_type_name(parser::AccountType::Liabilities)
+                .as_ref(),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::NameEquity,
+            self.account_type_name(parser::AccountType::Equity).as_ref(),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::NameIncome,
+            self.account_type_name(parser::AccountType::Income).as_ref(),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::NameExpenses,
+            self.account_type_name(parser::AccountType::Expenses)
+                .as_ref(),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        if let Some(title) = self.title() {
+            (Keyword::Title, *title.item(), Spaced).fmt_edn(f)?;
+        }
+        if let Some(account_previous_balances) = self.account_previous_balances() {
+            (
+                Keyword::AccountPreviousBalances,
+                account_previous_balances.item().as_ref(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+        if let Some(account_previous_earnings) = self.account_previous_earnings() {
+            (
+                Keyword::AccountPreviousEarnings,
+                account_previous_earnings.item().as_ref(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+        if let Some(account_previous_conversions) = self.account_previous_conversions() {
+            (
+                Keyword::AccountPreviousConversions,
+                account_previous_conversions.item().as_ref(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+        if let Some(account_current_earnings) = self.account_current_earnings() {
+            (
+                Keyword::AccountCurrentEarnings,
+                account_current_earnings.item().as_ref(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+        if let Some(account_current_conversions) = self.account_current_conversions() {
+            (
+                Keyword::AccountCurrentConversions,
+                account_current_conversions.item().as_ref(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+        if let Some(account_unrealized_gains) = self.account_unrealized_gains() {
+            (
+                Keyword::AccountUnrealizedGains,
+                account_unrealized_gains.item().as_ref(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+        if let Some(account_rounding) = self.account_rounding() {
+            (
+                Keyword::AccountRounding,
+                account_rounding.item().as_ref(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+        if let Some(conversion_currency) = self.conversion_currency() {
+            (
+                Keyword::ConversionCurrency,
+                conversion_currency.item().as_ref(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+
+        let mut inferred_tolerance_defaults = self.inferred_tolerance_defaults().peekable();
+        if inferred_tolerance_defaults.peek().is_some() {
+            write!(
+                f,
+                "{COMMA_SPACE}{}{SPACE}",
+                Edn(Keyword::InferredToleranceDefault)
+            )?;
+            map_begin(f)?;
+            for ((cur, tol), sep) in inferred_tolerance_defaults.zip(separators()) {
+                if let Some(cur) = cur {
+                    (cur, tol, sep).fmt_edn(f)?;
+                } else {
+                    (ANY, tol, sep).fmt_edn(f)?;
+                }
+            }
+            map_end(f)?;
+        }
+
+        if let Some(inferred_tolerance_multiplier) = self.inferred_tolerance_multiplier() {
+            (
+                Keyword::InferredToleranceMultiplier,
+                *inferred_tolerance_multiplier.item(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+
+        if let Some(infer_tolerance_from_cost) = self.infer_tolerance_from_cost() {
+            (
+                Keyword::InferToleranceFromCost,
+                *infer_tolerance_from_cost.item(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+
+        let mut documents = self.documents().peekable();
+        if documents.peek().is_some() {
+            write!(f, "{COMMA_SPACE}{}{SPACE}", Edn(Keyword::Documents))?;
+            let documents = documents
+                .map(|doc| doc.to_string_lossy())
+                .collect::<Vec<_>>();
+            EdnVector(documents.iter().map(|doc| doc.as_ref())).fmt_edn(f)?;
+        }
+
+        let mut operating_currency = self.operating_currency().peekable();
+        if operating_currency.peek().is_some() {
+            write!(f, "{COMMA_SPACE}{}{SPACE}", Edn(Keyword::OperatingCurrency))?;
+            EdnSet(operating_currency.map(|cur| cur.as_ref())).fmt_edn(f)?;
+        }
+
+        if let Some(render_commas) = self.render_commas() {
+            (Keyword::RenderCommas, *render_commas.item(), Spaced).fmt_edn(f)?;
+        }
+        if let Some(booking_method) = self.booking_method() {
+            (Keyword::Booking, *booking_method.item(), Spaced).fmt_edn(f)?;
+        }
+        if let Some(plugin_processing_mode) = self.plugin_processing_mode() {
+            (
+                Keyword::PluginProcessingMode,
+                *plugin_processing_mode.item(),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
+        map_end(f)
+    }
+}
+
 impl FmtEdn for Date {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, r#"#time/date{SPACE}"{self}""#)
@@ -463,6 +618,13 @@ impl FmtEdn for parser::Flag {
 #[strum(serialize_all = "kebab-case")]
 enum Keyword {
     Account,
+    AccountCurrentConversions,
+    AccountCurrentEarnings,
+    AccountPreviousBalances,
+    AccountPreviousConversions,
+    AccountPreviousEarnings,
+    AccountRounding,
+    AccountUnrealizedGains,
     Average,
     Balance,
     Booking,
@@ -470,37 +632,54 @@ enum Keyword {
     Comment,
     Commodity,
     Content,
+    ConversionCurrency,
     Cost,
     Currencies,
     Currency,
     Custom,
     Date,
+    Default,
     Description,
     Directive,
     Directives,
     Document,
+    Documents,
     Event,
     Fifo,
     Flag,
     Hifo,
+    InferToleranceFromCost,
+    InferredToleranceDefault,
+    InferredToleranceMultiplier,
     Label,
     Lifo,
     Merge,
     Name,
+    NameAssets,
+    NameEquity,
+    NameExpenses,
+    NameIncome,
+    NameLiabilities,
     Narration,
     None,
     Note,
     Open,
+    OperatingCurrency,
+    Options,
     Pad,
     Path,
     Payee,
     PerUnit,
+    PluginProcessingMode,
     Postings,
     Price,
     Query,
+    Raw,
+    RenderCommas,
     Source,
     Strict,
     StrictWithSize,
+    Title,
     Tolerance,
     Txn,
     Type,
@@ -567,16 +746,17 @@ where
 // a map entry with optional separator prefix
 //
 // we can't implement map formatting like we did with sets and vectors because of the heterogeny
-impl<T> FmtEdn for (Keyword, T, Separator)
+impl<K, V> FmtEdn for (K, V, Separator)
 where
-    T: FmtEdn,
+    K: FmtEdn,
+    V: FmtEdn,
 {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
-        let (name, value, sep) = self;
+        let (key, value, sep) = self;
         if sep == Separator::Spaced {
             f.write_str(COMMA_SPACE)?;
         }
-        name.fmt_edn(f)?;
+        key.fmt_edn(f)?;
         f.write_str(SPACE)?;
         value.fmt_edn(f)
     }
@@ -608,3 +788,5 @@ const SET_END: &str = "}";
 const COMMA_SPACE: &str = ", ";
 const SPACE: &str = " ";
 const NEWLINE: &str = "\n";
+
+const ANY: &str = "*";
