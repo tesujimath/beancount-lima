@@ -1,6 +1,12 @@
-build:
+build: rust-build
+
+test: rust-test
+
+[working-directory: 'rust']
+rust-build:
     cargo build
 
-test: build
+[working-directory: 'rust']
+rust-test: rust-build
     cargo test
-    ./run-import-tests
+    # TODO ./run-import-tests

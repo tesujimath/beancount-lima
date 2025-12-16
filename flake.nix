@@ -43,16 +43,16 @@
           ];
 
           beancount-lima-pp =
-            let cargo = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+            let cargo = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
             in pkgs.rustPlatform.buildRustPackage
               {
                 pname = "beancount-lima-pp";
                 version = cargo.workspace.package.version;
 
-                src = ./.;
+                src = ./rust;
 
                 cargoDeps = pkgs.rustPlatform.importCargoLock {
-                  lockFile = ./Cargo.lock;
+                  lockFile = ./rust/Cargo.lock;
                 };
 
                 meta = with pkgs.lib; {
@@ -82,7 +82,7 @@
             ] ++ ci-packages;
 
             shellHook = ''
-              PATH=$PATH:$(pwd)/target/debug
+              PATH=$PATH:$(pwd)/rust/target/debug
             '';
           };
 
@@ -92,7 +92,7 @@
             tests = {
               type = "app";
               program = "${writeShellScript "beancount-lima-tests" ''
-                export PATH=${pkgs.lib.makeBinPath (ci-packages ++ [beancount-lima])}
+                export PATH=${pkgs.lib.makeBinPath (ci-packages ++ [beancount-lima-pp])}
                 just test
               ''}";
             };
