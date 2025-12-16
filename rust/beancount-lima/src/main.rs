@@ -21,8 +21,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Main Lima preprocessor
-    Count {
+    /// Calculate all the bookings
+    Book {
         /// Beancount ledger
         ledger: PathBuf,
     },
@@ -50,7 +50,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Command::Count { ledger } => count::load_from(ledger, out_w, error_w),
+        Command::Book { ledger } => book::load_from(ledger, out_w, error_w),
 
         Command::Import {
             ledger,
@@ -79,7 +79,7 @@ const TXNID2_KEY: &str = "txnid2";
 const PAYEE2_KEY: &str = "payee2";
 const NARRATION2_KEY: &str = "narration2";
 
-pub(crate) mod count;
+pub(crate) mod book;
 pub(crate) mod format;
 pub(crate) mod import;
 pub(crate) mod loader;
