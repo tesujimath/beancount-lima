@@ -1,5 +1,6 @@
 use rust_decimal::Decimal;
 use time::Date;
+use tracing::Instrument;
 
 use crate::import::{Context, Import, Source};
 use crate::loader::*;
@@ -128,7 +129,7 @@ impl<'a> FmtEdn for (&Transaction<'a>, Date, &parser::Transaction<'a>) {
         let (loaded, date, parsed) = self;
         map_begin(f)?;
         (Keyword::Date, date, Flush).fmt_edn(f)?;
-        (Keyword::Directive, Keyword::Txn, Spaced).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Transaction, Spaced).fmt_edn(f)?;
         (Keyword::Flag, *parsed.flag().item(), Spaced).fmt_edn(f)?;
         if let Some(payee) = parsed.payee().map(|x| *x.item()) {
             (Keyword::Payee, payee, Spaced).fmt_edn(f)?;
@@ -156,7 +157,7 @@ impl<'a> FmtEdn for (&Pad<'a>, Date, &parser::Pad<'a>) {
 
         map_begin(f)?;
         (Keyword::Date, date, Flush).fmt_edn(f)?;
-        (Keyword::Directive, Keyword::Txn, Spaced).fmt_edn(f)?;
+        (Keyword::Directive, Keyword::Transaction, Spaced).fmt_edn(f)?;
         (Keyword::Flag, pad_flag(), Spaced).fmt_edn(f)?;
         (Keyword::Postings, EdnVector(loaded.postings.iter()), Spaced).fmt_edn(f)?;
         map_end(f)
@@ -218,12 +219,15 @@ impl<'a> FmtEdn for (Date, &parser::Open<'a>) {
         (Keyword::Date, date, Flush).fmt_edn(f)?;
         (Keyword::Directive, Keyword::Open, Spaced).fmt_edn(f)?;
         (Keyword::Account, parsed.account().item().as_ref(), Spaced).fmt_edn(f)?;
-        (
-            Keyword::Currencies,
-            EdnSet(parsed.currencies().map(|cur| *cur.item())),
-            Spaced,
-        )
-            .fmt_edn(f)?;
+        let mut currencies = parsed.currencies().peekable();
+        if currencies.peek().is_some() {
+            (
+                Keyword::Currencies,
+                EdnSet(currencies.map(|cur| *cur.item())),
+                Spaced,
+            )
+                .fmt_edn(f)?;
+        }
         if let Some(booking) = parsed.booking() {
             (Keyword::Booking, *booking.item(), Spaced).fmt_edn(f)?;
         }
@@ -361,7 +365,9 @@ impl<'a> FmtEdn for &Cost<'a> {
         if let Some(label) = self.label {
             (Keyword::Label, label, Spaced).fmt_edn(f)?;
         }
-        (Keyword::Merge, self.merge, Spaced).fmt_edn(f)?;
+        if self.merge {
+            (Keyword::Merge, self.merge, Spaced).fmt_edn(f)?;
+        }
         map_end(f)
     }
 }
@@ -714,9 +720,11 @@ impl FmtEdn for parser::Flag {
     }
 }
 
+// ubiquitous keywords, e.g. currency, are abbreviated
 #[derive(EnumString, EnumIter, IntoStaticStr, Clone, Debug)]
 #[strum(serialize_all = "kebab-case")]
 enum Keyword {
+    #[strum(to_string = "acc")]
     Account,
     AccountCurrentConversions,
     AccountCurrentEarnings,
@@ -736,11 +744,13 @@ enum Keyword {
     ConversionCurrency,
     Cost,
     Currencies,
+    #[strum(to_string = "cur")]
     Currency,
     Custom,
     Date,
     Default,
     Description,
+    #[strum(to_string = "dct")]
     Directive,
     Directives,
     Document,
@@ -787,8 +797,9 @@ enum Keyword {
     StrictWithSize,
     Title,
     Tolerance,
+    #[strum(to_string = "txn")]
+    Transaction,
     Transactions,
-    Txn,
     Txnids,
     Type,
     Units,

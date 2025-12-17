@@ -2,7 +2,8 @@
  :deps {org.clojure/clojure {:mvn/version "1.11.1"}
         io.forward/yaml       {:mvn/version "1.0.11"}
         org.clojure/data.csv  {:mvn/version "1.1.0"}
-        metosin/malli {:mvn/version "0.19.1"}}
+        metosin/malli {:mvn/version "0.19.1"}
+        clojure.java-time/clojure.java-time {:mvn/version "1.4.3"}}
  :aliases
  {:cider/nrepl {:extra-deps
                 {cider/cider-nrepl {:mvn/version "0.58.0"} ; CIDER middleware
