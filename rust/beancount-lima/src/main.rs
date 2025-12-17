@@ -1,4 +1,5 @@
 use crate::{
+    format::edn::write_import_as_edn,
     import::{Context, Import},
     loader::Loader,
 };
@@ -69,7 +70,7 @@ fn main() -> Result<()> {
             };
 
             let import = Import::parse_from(import_files.as_slice(), context, error_w)?;
-            todo!();
+            write_import_as_edn(&import, out_w)
         }
     }
 }

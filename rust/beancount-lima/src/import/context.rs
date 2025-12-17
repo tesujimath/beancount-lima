@@ -6,11 +6,11 @@ use std::{collections::HashSet, io::Write, path::Path};
 //
 // context for import, i.e. ledger
 #[derive(Debug)]
-pub struct Context {
-    path: String,
-    txnids: HashSet<String>,
-    payees: hashbrown::HashMap<String, hashbrown::HashMap<String, isize>>,
-    narrations: hashbrown::HashMap<String, hashbrown::HashMap<String, isize>>,
+pub(crate) struct Context {
+    pub(crate) path: String,
+    pub(crate) txnids: HashSet<String>,
+    pub(crate) payees: hashbrown::HashMap<String, hashbrown::HashMap<String, usize>>,
+    pub(crate) narrations: hashbrown::HashMap<String, hashbrown::HashMap<String, usize>>,
 }
 
 impl Context {
@@ -70,8 +70,8 @@ struct ContextBuilder<'a> {
     payee2_key: String,
     narration2_key: String,
     txnids: HashSet<String>,
-    payees: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
-    narrations: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
+    payees: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, usize>>,
+    narrations: hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, usize>>,
     errors: Vec<parser::Error>,
 }
 
@@ -235,7 +235,7 @@ fn hashmap_of_hashmaps_to_strings<T>(
 
 /// Accumulate the counts for the inferred accounts
 fn count_accounts<'a, I>(
-    buckets: &mut hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, isize>>,
+    buckets: &mut hashbrown::HashMap<&'a str, hashbrown::HashMap<&'a str, usize>>,
     key: &'a str,
     accounts: I,
 ) where

@@ -1,6 +1,7 @@
 use color_eyre::eyre::{eyre, Result};
 pub(crate) use context::Context;
 use std::{
+    collections::HashMap,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -13,7 +14,7 @@ pub(crate) struct Import {
 
 #[derive(Debug)]
 pub(crate) struct Source {
-    pub(crate) header: Vec<(&'static str, String)>,
+    pub(crate) header: HashMap<&'static str, String>,
     pub(crate) fields: Vec<String>,
     pub(crate) transactions: Vec<Vec<String>>,
 }

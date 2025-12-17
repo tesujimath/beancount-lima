@@ -1,6 +1,6 @@
 use color_eyre::eyre::{eyre, Result};
 use serde::Deserialize;
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use crate::import::Source;
 
@@ -151,14 +151,16 @@ pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source> {
         _ => Err(eyre!("unsupported OFX1 document {:?}", path)),
     }
     .map(|(curdef, acctid, balamt, dtasof, stmttrns)| Source {
-        header: vec![
+        header: [
             ("format", "ofx1".to_string()),
             ("curdef", curdef),
             ("acctid", acctid),
             ("balamt", balamt),
             ("dtasof", dtasof),
             ("path", path.to_string_lossy().into_owned()),
-        ],
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>(),
         fields: StmtTrn::fields(),
         transactions: stmttrns
             .into_iter()

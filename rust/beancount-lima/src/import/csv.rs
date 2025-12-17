@@ -1,6 +1,6 @@
 use color_eyre::eyre::Result;
 use slugify::slugify;
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use super::Source;
 
@@ -23,10 +23,12 @@ pub(crate) fn import(path: &Path) -> Result<Source> {
         transactions.push(transaction);
     }
 
-    let header = vec![
+    let header = [
         ("format", "csv".to_string()),
         ("path", path.to_string_lossy().into_owned()),
-    ];
+    ]
+    .into_iter()
+    .collect::<HashMap<_, _>>();
 
     Ok(Source {
         header,

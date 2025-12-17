@@ -6,7 +6,7 @@ use color_eyre::eyre::{eyre, Result, WrapErr};
 use std::{io::Write, iter::once, path::Path};
 
 use crate::{
-    format::edn::write_as_edn,
+    format::edn::write_booked_as_edn,
     loader::{Directive, InferredTolerance, LoadError, LoadSuccess, Loader},
     plugins::InternalPlugins,
 };
@@ -63,7 +63,7 @@ where
                     }
 
                     // TODO both beancount and EDN format
-                    write_as_edn(&directives, &options, out_w)
+                    write_booked_as_edn(&directives, &options, out_w)
                     // write_as_beancount(&directives, out_w)
                 }
                 Err(LoadError { errors, .. }) => {

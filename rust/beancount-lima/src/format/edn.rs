@@ -1,6 +1,7 @@
 use rust_decimal::Decimal;
 use time::Date;
 
+use crate::import::{Context, Import, Source};
 use crate::loader::*;
 use beancount_parser_lima as parser;
 use color_eyre::eyre::Result;
@@ -8,7 +9,7 @@ use std::fmt::{self, Display, Formatter, Write};
 use std::iter::{empty, once, repeat};
 use strum_macros::{EnumIter, EnumString, IntoStaticStr};
 
-pub(crate) fn write_as_edn<'a, W>(
+pub(crate) fn write_booked_as_edn<'a, W>(
     directives: &[Directive<'a>],
     options: &parser::Options,
     out_w: W,
@@ -36,6 +37,18 @@ where
     writeln!(buffered_out_w, "{} {}", Edn(Keyword::Options), Edn(options))?;
 
     writeln!(buffered_out_w, "{MAP_END}")?;
+
+    Ok(())
+}
+
+pub(crate) fn write_import_as_edn<W>(import: &Import, out_w: W) -> Result<()>
+where
+    W: std::io::Write + Copy,
+{
+    use std::io::{BufWriter, Write};
+
+    let mut buffered_out_w = BufWriter::new(out_w);
+    writeln!(buffered_out_w, "{}\n", Edn(import))?;
 
     Ok(())
 }
@@ -573,6 +586,87 @@ impl<'a> FmtEdn for &parser::Options<'a> {
     }
 }
 
+impl FmtEdn for &Import {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        map_begin(f)?;
+        (Keyword::Sources, EdnVector(self.sources.iter()), Flush).fmt_edn(f)?;
+        if let Some(context) = self.context.as_ref() {
+            (Keyword::Context, context, Spaced).fmt_edn(f)?;
+        }
+        map_end(f)
+    }
+}
+
+impl FmtEdn for &Source {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        map_begin(f)?;
+        (
+            Keyword::Header,
+            EdnMap(self.header.iter().map(|(k, v)| (*k, v.as_str()))),
+            Flush,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::Fields,
+            EdnVector(self.fields.iter().map(|v| v.as_str())),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::Transactions,
+            EdnVector(
+                self.transactions
+                    .iter()
+                    .map(|vs| EdnVector(vs.iter().map(|v| v.as_str()))),
+            ),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
+impl FmtEdn for &Context {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Separator::*;
+
+        map_begin(f)?;
+
+        (Keyword::Path, self.path.as_str(), Flush).fmt_edn(f)?;
+        (
+            Keyword::Txnids,
+            EdnSet(self.txnids.iter().map(|x| x.as_str())),
+            Spaced,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::Payees,
+            EdnMap(
+                self.payees
+                    .iter()
+                    .map(|(x, m)| (x.as_str(), EdnMap(m.iter().map(|(k, v)| (k.as_str(), *v))))),
+            ),
+            Flush,
+        )
+            .fmt_edn(f)?;
+        (
+            Keyword::Narrations,
+            EdnMap(
+                self.narrations
+                    .iter()
+                    .map(|(x, m)| (x.as_str(), EdnMap(m.iter().map(|(k, v)| (k.as_str(), *v))))),
+            ),
+            Flush,
+        )
+            .fmt_edn(f)?;
+        map_end(f)
+    }
+}
+
 impl FmtEdn for Date {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, r#"#time/date{SPACE}"{self}""#)
@@ -582,6 +676,12 @@ impl FmtEdn for Date {
 impl FmtEdn for Decimal {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{self}M")
+    }
+}
+
+impl FmtEdn for usize {
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
     }
 }
 
@@ -632,6 +732,7 @@ enum Keyword {
     Comment,
     Commodity,
     Content,
+    Context,
     ConversionCurrency,
     Cost,
     Currencies,
@@ -645,8 +746,10 @@ enum Keyword {
     Document,
     Documents,
     Event,
+    Fields,
     Fifo,
     Flag,
+    Header,
     Hifo,
     InferToleranceFromCost,
     InferredToleranceDefault,
@@ -661,6 +764,7 @@ enum Keyword {
     NameIncome,
     NameLiabilities,
     Narration,
+    Narrations,
     None,
     Note,
     Open,
@@ -669,6 +773,7 @@ enum Keyword {
     Pad,
     Path,
     Payee,
+    Payees,
     PerUnit,
     PluginProcessingMode,
     Postings,
@@ -677,11 +782,14 @@ enum Keyword {
     Raw,
     RenderCommas,
     Source,
+    Sources,
     Strict,
     StrictWithSize,
     Title,
     Tolerance,
+    Transactions,
     Txn,
+    Txnids,
     Type,
     Units,
     Values,
@@ -740,6 +848,27 @@ where
             item.fmt_edn(f)?;
         }
         f.write_str(SET_END)
+    }
+}
+
+// a homgeneous map
+struct EdnMap<I, K, V>(I)
+where
+    I: Iterator<Item = (K, V)>;
+
+impl<I, K, V> FmtEdn for EdnMap<I, K, V>
+where
+    I: Iterator<Item = (K, V)>,
+    K: FmtEdn,
+    V: FmtEdn,
+{
+    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(MAP_BEGIN)?;
+
+        for ((k, v), sep) in self.0.zip(separators()) {
+            (k, v, sep).fmt_edn(f)?;
+        }
+        f.write_str(MAP_END)
     }
 }
 
