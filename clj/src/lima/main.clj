@@ -1,4 +1,4 @@
-(ns lima.lima
+(ns lima.main
   (:gen-class))
 
 (defn greet

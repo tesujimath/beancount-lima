@@ -4,7 +4,7 @@
 
 (def lib 'net.clojars.lima/lima)
 (def version "0.1.0-SNAPSHOT")
-(def main 'lima.lima)
+(def main 'lima.main)
 (def class-dir "target/classes")
 
 (defn test "Run all the tests." [opts]

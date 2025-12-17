@@ -1,6 +1,6 @@
 (ns lima.lima-test
   (:require [clojure.test :refer :all]
-            [lima.lima :refer :all]))
+            [lima.core :refer :all]))
 
 (deftest a-test
   (testing "FIXME, I fail."
