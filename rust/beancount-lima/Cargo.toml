@@ -9,7 +9,7 @@ repository = "https://github.com/tesujimath/beancount-lima"
 readme = "../README.md"
 
 [[bin]]
-name = "lima-pp"
+name = "lima-pod"
 path = "src/main.rs"
 
 [dependencies]

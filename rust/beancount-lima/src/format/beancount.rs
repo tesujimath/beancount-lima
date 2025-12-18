@@ -1,16 +1,30 @@
 use beancount_parser_lima as parser;
+use color_eyre::eyre::Result;
 use std::fmt::{self, Display, Formatter};
 use time::Date;
 
 use super::*;
-use crate::format::*;
-use crate::loader::*;
+use crate::book::{pad_flag, types::*};
+
+pub(crate) fn write_booked_as_beancount<'a, W>(
+    directives: &[Directive<'a>],
+    _options: &parser::Options,
+    mut out_w: W,
+) -> Result<()>
+where
+    W: std::io::Write + Copy,
+{
+    for d in directives {
+        writeln!(out_w, "{d}")?;
+    }
+    Ok(())
+}
 
 // adapted from beancount-parser-lima
 
 impl<'a> Display for Directive<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        use crate::loader::DirectiveVariant as LDV;
+        use crate::book::DirectiveVariant as LDV;
         use parser::DirectiveVariant as PDV;
 
         let directive = self.parsed.item();
@@ -21,6 +35,7 @@ impl<'a> Display for Directive<'a> {
                 loaded.fmt(f, date, parsed /*, &self.metadata*/)
             }
             (PDV::Pad(parsed), LDV::Pad(loaded)) => {
+                // TODO write pad postings as a transaction
                 loaded.fmt(f, date, directive /*, &self.metadata*/)
             }
             _ => writeln!(f, "{}", directive),
@@ -75,7 +90,7 @@ impl<'a> Pad<'a> {
 
 impl<'a> Display for Posting<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        simple_format(f, &self.flag, None)?;
+        simple_format(f, self.flag, None)?;
 
         write!(
             f,

@@ -3,17 +3,15 @@ use beancount_parser_lima::{
 };
 use color_eyre::eyre::{eyre, Result};
 use std::{collections::HashSet, io::Write, path::Path};
-//
-// context for import, i.e. ledger
+
 #[derive(Debug)]
-pub(crate) struct Context {
-    pub(crate) path: String,
+pub(crate) struct Digest {
     pub(crate) txnids: HashSet<String>,
     pub(crate) payees: hashbrown::HashMap<String, hashbrown::HashMap<String, usize>>,
     pub(crate) narrations: hashbrown::HashMap<String, hashbrown::HashMap<String, usize>>,
 }
 
-impl Context {
+impl Digest {
     pub(crate) fn load_from<W>(
         path: &Path,
         txnid_keys: Vec<String>,
@@ -35,12 +33,7 @@ impl Context {
                 warnings,
             }) => {
                 sources.write_errors_or_warnings(error_w, warnings)?;
-                let mut builder = ContextBuilder::new(
-                    path.to_string_lossy().into_owned(),
-                    txnid_keys,
-                    payee2_key,
-                    narration2_key,
-                );
+                let mut builder = DigestBuilder::new(txnid_keys, payee2_key, narration2_key);
 
                 for directive in &directives {
                     builder.directive(directive);
@@ -64,8 +57,7 @@ impl Context {
 }
 
 #[derive(Default, Debug)]
-struct ContextBuilder<'a> {
-    path: String,
+struct DigestBuilder<'a> {
     txnid_keys: Vec<String>,
     payee2_key: String,
     narration2_key: String,
@@ -75,15 +67,9 @@ struct ContextBuilder<'a> {
     errors: Vec<parser::Error>,
 }
 
-impl<'a> ContextBuilder<'a> {
-    fn new(
-        path: String,
-        txnid_keys: Vec<String>,
-        payee2_key: String,
-        narration2_key: String,
-    ) -> Self {
+impl<'a> DigestBuilder<'a> {
+    fn new(txnid_keys: Vec<String>, payee2_key: String, narration2_key: String) -> Self {
         Self {
-            path,
             txnid_keys,
             payee2_key,
             narration2_key,
@@ -94,21 +80,19 @@ impl<'a> ContextBuilder<'a> {
         }
     }
 
-    fn build<W>(self, sources: &BeancountSources, error_w: W) -> Result<Context>
+    fn build<W>(self, sources: &BeancountSources, error_w: W) -> Result<Digest>
     where
         W: Write + Copy,
     {
         if self.errors.is_empty() {
             let Self {
-                path,
                 txnids,
                 payees,
                 narrations,
                 ..
             } = self;
 
-            Ok(Context {
-                path,
+            Ok(Digest {
                 txnids,
                 payees: hashmap_of_hashmaps_to_strings(payees),
                 narrations: hashmap_of_hashmaps_to_strings(narrations),

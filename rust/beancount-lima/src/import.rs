@@ -1,19 +1,8 @@
 use color_eyre::eyre::{eyre, Result};
-pub(crate) use context::Context;
-use std::{
-    collections::HashMap,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, io::Write, path::Path};
 
 #[derive(Debug)]
 pub(crate) struct Import {
-    pub(crate) sources: Vec<Source>,
-    pub(crate) context: Option<Context>,
-}
-
-#[derive(Debug)]
-pub(crate) struct Source {
     pub(crate) header: HashMap<&'static str, String>,
     pub(crate) fields: Vec<String>,
     pub(crate) transactions: Vec<Vec<String>>,
@@ -39,24 +28,6 @@ fn get_format(path: &Path) -> Result<Format> {
 }
 
 impl Import {
-    pub(crate) fn parse_from<W>(
-        paths: &[PathBuf],
-        context: Option<Context>,
-        error_w: W,
-    ) -> Result<Self>
-    where
-        W: Write + Copy,
-    {
-        let sources = paths
-            .iter()
-            .map(|path| Source::parse_from(path, error_w))
-            .collect::<Result<Vec<_>>>()?;
-
-        Ok(Import { sources, context })
-    }
-}
-
-impl Source {
     pub(crate) fn parse_from<W>(path: &Path, _error_w: W) -> Result<Self>
     where
         W: Write + Copy,
@@ -67,6 +38,6 @@ impl Source {
         }
     }
 }
-mod context;
+
 mod csv;
 mod ofx;

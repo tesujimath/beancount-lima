@@ -1,7 +1,7 @@
 use crate::{
-    format::edn::write_import_as_edn,
-    import::{Context, Import},
-    loader::Loader,
+    digest::Digest,
+    format::edn::{write_digest_as_edn, write_import_as_edn},
+    import::Import,
 };
 use color_eyre::eyre::Result;
 use std::path::PathBuf;
@@ -28,14 +28,16 @@ enum Command {
         ledger: PathBuf,
     },
 
-    /// Import from external CSV or OFX file
-    Import {
+    /// Digest the Beancount ledger for import
+    Digest {
         /// Beancount ledger
-        #[arg(long)]
-        ledger: Option<PathBuf>,
+        ledger: PathBuf,
+    },
 
-        /// Files to import
-        import_files: Vec<PathBuf>,
+    /// Import from external CSV or OFX files
+    Import {
+        /// File to import
+        import_file: PathBuf,
     },
 }
 
@@ -53,23 +55,19 @@ fn main() -> Result<()> {
     match &cli.command {
         Command::Book { ledger } => book::load_from(ledger, out_w, error_w),
 
-        Command::Import {
-            ledger,
-            import_files,
-        } => {
-            let context = if let Some(ledger) = ledger.as_ref() {
-                Some(Context::load_from(
-                    ledger,
-                    vec![TXNID_KEY.to_string(), TXNID2_KEY.to_string()],
-                    PAYEE2_KEY.to_string(),
-                    NARRATION2_KEY.to_string(),
-                    error_w,
-                )?)
-            } else {
-                None
-            };
+        Command::Digest { ledger } => {
+            let digest = Digest::load_from(
+                ledger,
+                vec![TXNID_KEY.to_string(), TXNID2_KEY.to_string()],
+                PAYEE2_KEY.to_string(),
+                NARRATION2_KEY.to_string(),
+                error_w,
+            )?;
+            write_digest_as_edn(&digest, out_w)
+        }
 
-            let import = Import::parse_from(import_files.as_slice(), context, error_w)?;
+        Command::Import { import_file } => {
+            let import = Import::parse_from(import_file, error_w)?;
             write_import_as_edn(&import, out_w)
         }
     }
@@ -81,8 +79,8 @@ const PAYEE2_KEY: &str = "payee2";
 const NARRATION2_KEY: &str = "narration2";
 
 pub(crate) mod book;
+pub(crate) mod digest;
 pub(crate) mod format;
 pub(crate) mod import;
-pub(crate) mod loader;
 pub(crate) mod options;
 pub(crate) mod plugins;

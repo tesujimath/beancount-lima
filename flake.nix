@@ -45,11 +45,11 @@
             clojure
           ];
 
-          beancount-lima-pp =
+          beancount-lima-pod =
             let cargo = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
             in pkgs.rustPlatform.buildRustPackage
               {
-                pname = "beancount-lima-pp";
+                pname = "beancount-lima-pod";
                 version = cargo.workspace.package.version;
 
                 src = ./rust;
@@ -92,13 +92,13 @@
             '';
           };
 
-          packages.default = beancount-lima-pp;
+          packages.default = beancount-lima-pod;
 
           apps = {
             tests = {
               type = "app";
               program = "${writeShellScript "beancount-lima-tests" ''
-                export PATH=${pkgs.lib.makeBinPath (ci-packages ++ [beancount-lima-pp])}
+                export PATH=${pkgs.lib.makeBinPath (ci-packages ++ [beancount-lima-pod])}
                 just test
               ''}";
             };

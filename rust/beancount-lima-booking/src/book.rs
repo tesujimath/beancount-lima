@@ -6,8 +6,8 @@ use std::{fmt::Debug, iter::repeat_n};
 
 use super::{
     book_reductions, categorize_by_currency, interpolate_from_costed, Booking, BookingError,
-    Bookings, Cost, Interpolated, Interpolation, Inventory, Number, Position, Positions, Posting,
-    PostingCost, PostingSpec, Reductions, Tolerance, TransactionBookingError,
+    Bookings, Interpolated, Interpolation, Inventory, Positions, Posting, PostingSpec, Reductions,
+    Tolerance, TransactionBookingError,
 };
 
 pub fn is_supported_method(method: Booking) -> bool {

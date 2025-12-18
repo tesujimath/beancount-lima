@@ -1,9 +1,11 @@
 use rust_decimal::Decimal;
 use time::Date;
-use tracing::Instrument;
 
-use crate::import::{Context, Import, Source};
-use crate::loader::*;
+use crate::{
+    book::{pad_flag, types::*},
+    digest::Digest,
+    import::Import,
+};
 use beancount_parser_lima as parser;
 use color_eyre::eyre::Result;
 use std::fmt::{self, Display, Formatter, Write};
@@ -42,6 +44,18 @@ where
     Ok(())
 }
 
+pub(crate) fn write_digest_as_edn<W>(digest: &Digest, out_w: W) -> Result<()>
+where
+    W: std::io::Write + Copy,
+{
+    use std::io::{BufWriter, Write};
+
+    let mut buffered_out_w = BufWriter::new(out_w);
+    writeln!(buffered_out_w, "{}\n", Edn(digest))?;
+
+    Ok(())
+}
+
 pub(crate) fn write_import_as_edn<W>(import: &Import, out_w: W) -> Result<()>
 where
     W: std::io::Write + Copy,
@@ -74,7 +88,7 @@ trait FmtEdn {
 
 impl<'a> FmtEdn for &Directive<'a> {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
-        use crate::loader::DirectiveVariant as LDV;
+        use crate::book::DirectiveVariant as LDV;
         use parser::DirectiveVariant as PDV;
 
         let directive = self.parsed.item();
@@ -597,19 +611,6 @@ impl FmtEdn for &Import {
         use Separator::*;
 
         map_begin(f)?;
-        (Keyword::Sources, EdnVector(self.sources.iter()), Flush).fmt_edn(f)?;
-        if let Some(context) = self.context.as_ref() {
-            (Keyword::Context, context, Spaced).fmt_edn(f)?;
-        }
-        map_end(f)
-    }
-}
-
-impl FmtEdn for &Source {
-    fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
-        use Separator::*;
-
-        map_begin(f)?;
         (
             Keyword::Header,
             EdnMap(self.header.iter().map(|(k, v)| (*k, v.as_str()))),
@@ -636,17 +637,16 @@ impl FmtEdn for &Source {
     }
 }
 
-impl FmtEdn for &Context {
+impl FmtEdn for &Digest {
     fn fmt_edn(self, f: &mut Formatter<'_>) -> fmt::Result {
         use Separator::*;
 
         map_begin(f)?;
 
-        (Keyword::Path, self.path.as_str(), Flush).fmt_edn(f)?;
         (
             Keyword::Txnids,
             EdnSet(self.txnids.iter().map(|x| x.as_str())),
-            Spaced,
+            Flush,
         )
             .fmt_edn(f)?;
         (
@@ -656,7 +656,7 @@ impl FmtEdn for &Context {
                     .iter()
                     .map(|(x, m)| (x.as_str(), EdnMap(m.iter().map(|(k, v)| (k.as_str(), *v))))),
             ),
-            Flush,
+            Spaced,
         )
             .fmt_edn(f)?;
         (
@@ -666,7 +666,7 @@ impl FmtEdn for &Context {
                     .iter()
                     .map(|(x, m)| (x.as_str(), EdnMap(m.iter().map(|(k, v)| (k.as_str(), *v))))),
             ),
-            Flush,
+            Spaced,
         )
             .fmt_edn(f)?;
         map_end(f)
@@ -740,7 +740,6 @@ enum Keyword {
     Comment,
     Commodity,
     Content,
-    Context,
     ConversionCurrency,
     Cost,
     Currencies,
@@ -792,7 +791,6 @@ enum Keyword {
     Raw,
     RenderCommas,
     Source,
-    Sources,
     Strict,
     StrictWithSize,
     Title,

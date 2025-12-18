@@ -2,7 +2,7 @@ use color_eyre::eyre::{eyre, Result};
 use serde::Deserialize;
 use std::{collections::HashMap, path::Path};
 
-use crate::import::Source;
+use crate::import::Import;
 
 #[derive(Deserialize, Debug)]
 struct Document {
@@ -99,7 +99,7 @@ impl StmtTrn {
     }
 }
 
-pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source> {
+pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Import> {
     let sgml = sgmlish::Parser::builder()
         .lowercase_names()
         .expand_entities(|entity| match entity {
@@ -150,7 +150,7 @@ pub(crate) fn parse(path: &Path, ofx_content: &str) -> Result<Source> {
 
         _ => Err(eyre!("unsupported OFX1 document {:?}", path)),
     }
-    .map(|(curdef, acctid, balamt, dtasof, stmttrns)| Source {
+    .map(|(curdef, acctid, balamt, dtasof, stmttrns)| Import {
         header: [
             ("format", "ofx1".to_string()),
             ("curdef", curdef),

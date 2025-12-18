@@ -14,11 +14,11 @@
   (edn/read-string {:readers readers} s))
 
 (defn book
-  "Read EDN from lima-pp-book and return or throw"
+  "Read EDN from lima-pod book and return or throw"
   [beancount-path]
-  (let [booked (shell/sh "lima-pp" "book" beancount-path)]
+  (let [booked (shell/sh "lima-pod" "book" beancount-path)]
     (if (= (booked :exit) 0)
       (read-edn-string (booked :out))
-      (do (println "lima-pp error" (booked :err))
-          (throw (Exception. "lima-pp failed"))
+      (do (println "lima-pod error" (booked :err))
+          (throw (Exception. "lima-pod failed"))
           ))))

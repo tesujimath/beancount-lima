@@ -2,9 +2,9 @@ use color_eyre::eyre::Result;
 use slugify::slugify;
 use std::{collections::HashMap, path::Path};
 
-use super::Source;
+use super::Import;
 
-pub(crate) fn import(path: &Path) -> Result<Source> {
+pub(crate) fn import(path: &Path) -> Result<Import> {
     let csv_file = std::fs::File::open(path)?;
     let mut rdr = csv::Reader::from_reader(csv_file);
     let fields = rdr
@@ -30,7 +30,7 @@ pub(crate) fn import(path: &Path) -> Result<Source> {
     .into_iter()
     .collect::<HashMap<_, _>>();
 
-    Ok(Source {
+    Ok(Import {
         header,
         fields,
         transactions,
