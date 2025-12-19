@@ -50,7 +50,7 @@ pub(crate) struct Posting<'a> {
 pub(crate) type Cost<'a> =
     beancount_lima_booking::Cost<Date, Decimal, parser::Currency<'a>, &'a str>;
 
-pub(crate) fn cost_to_cell<'a, 'b>(cost: &'b Cost<'a>) -> Cell<'a>
+pub(crate) fn cost_to_cell<'a, 'b>(cost: &'b Cost<'a>) -> Cell<'a, 'static>
 where
     'b: 'a,
 {
@@ -112,7 +112,7 @@ impl<'a> From<&'a parser::Amount<'a>> for Amount<'a> {
     }
 }
 
-impl<'a> From<Amount<'a>> for Cell<'static> {
+impl<'a> From<Amount<'a>> for Cell<'static, 'static> {
     fn from(value: Amount) -> Self {
         Cell::Row(
             vec![
@@ -124,7 +124,7 @@ impl<'a> From<Amount<'a>> for Cell<'static> {
     }
 }
 
-impl<'a, 'b> From<&'b Amount<'a>> for Cell<'a>
+impl<'a, 'b> From<&'b Amount<'a>> for Cell<'a, 'static>
 where
     'b: 'a,
 {
@@ -143,7 +143,7 @@ pub(crate) type Positions<'a> =
     beancount_lima_booking::Positions<Date, Decimal, parser::Currency<'a>, &'a str>;
 
 // should be From, but both types are third-party
-pub(crate) fn positions_to_cell<'a, 'b>(positions: &'b Positions<'a>) -> Cell<'a>
+pub(crate) fn positions_to_cell<'a, 'b>(positions: &'b Positions<'a>) -> Cell<'a, 'static>
 where
     'b: 'a,
 {
@@ -153,7 +153,7 @@ where
 pub(crate) type Position<'a> =
     beancount_lima_booking::Position<Date, Decimal, parser::Currency<'a>, &'a str>;
 
-pub(crate) fn position_to_cell<'a, 'b>(position: &'b Position<'a>) -> Cell<'a>
+pub(crate) fn position_to_cell<'a, 'b>(position: &'b Position<'a>) -> Cell<'a, 'static>
 where
     'b: 'a,
 {

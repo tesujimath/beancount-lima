@@ -4,7 +4,12 @@ use crate::{
     import::Import,
 };
 use color_eyre::eyre::Result;
-use std::path::PathBuf;
+use std::{
+    io::{self, Read},
+    path::PathBuf,
+    process::exit,
+};
+use tabulator::Cell;
 use tracing_subscriber::EnvFilter;
 
 use clap::{Parser, Subcommand};
@@ -39,6 +44,9 @@ enum Command {
         /// File to import
         import_file: PathBuf,
     },
+
+    /// Tabulate JSON according to tabulator
+    Tabulate,
 }
 
 fn main() -> Result<()> {
@@ -69,6 +77,27 @@ fn main() -> Result<()> {
         Command::Import { import_file } => {
             let import = Import::parse_from(import_file, error_w)?;
             write_import_as_edn(&import, out_w)
+        }
+
+        Command::Tabulate => {
+            let mut input = String::new();
+
+            if let Err(e) = io::stdin().read_to_string(&mut input) {
+                eprintln!("Error in input: {}", &e);
+                exit(1);
+            }
+
+            match Cell::from_json(&input) {
+                Ok(cell) => {
+                    println!("{}", &cell);
+                }
+                Err(e) => {
+                    eprintln!("JSON decode error: {}", &e);
+                    exit(1);
+                }
+            };
+
+            Ok(())
         }
     }
 }
