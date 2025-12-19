@@ -1,66 +1,15 @@
 # beancount-lima
 
-This is new implementation of Beancount using [Steel Scheme](https://github.com/mattwparas/steel) and the [Lima parser](https://github.com/tesujimath/beancount-parser-lima).
+This is a new implementation of [Beancount](https://github.com/beancount/beancount) using [Rust](https://rust-lang.org) and [Clojure](https://clojure.org/) and the [Lima parser](https://github.com/tesujimath/beancount-parser-lima).
 
-The observation is that Rust is at the same time both wonderful and uncomfortable for end-users.  The idea is to use Steel Scheme for interactive Beancounting.
-Instead of [Beancount Query Language](https://beancount.github.io/docs/beancount_query_language.html), Steel Scheme is used.
-(There is currently no intention to reimplement the existing query language.)
+Rust is purely used for backend processing, and has no visbility to end users beyond the build process.  The idea is to use Clojure for interactive Beancounting instead of
+[Beancount Query Language](https://beancount.github.io/docs/beancount_query_language.html) and Python.  The Clojure REPL will provide all interactivity required.
 
-A number of useful queries are provided out-of-the-box.
+There is no intention to support either Beancount Query Language or Python within Lima.
 
-## Example
+Some pre-canned queries are likely to be provided as command line options, but the main interactive experience is intended to be within the Clojure REPL.
 
-```
-aya> lima
-
-     _____ __            __
-    / ___// /____  ___  / /          Version 0.7.0
-    \__ \/ __/ _ \/ _ \/ /           https://github.com/mattwparas/steel
-   ___/ / /_/  __/  __/ /            :? for help
-  /____/\__/\___/\___/_/
-
-λ > (display-balance-sheet (cumulate-postings *directives*))
-                                           GBP     NZD
-Assets:Bank:Current                              -100.78
-Assets:Bank:UK                            -5.00
-Expenses:Donations                                 10.00
-Expenses:Donations:Other                           20.00
-Expenses:Entertainment:Drinks-and-snacks           48.00
-Expenses:Groceries                         5.00    27.50
-Income:Unknown                                     -4.72
-
-
-λ > (display-rollup (cumulate-postings *directives*))
-Assets                                    -100.78
-Assets:Bank                                        -100.78
-Assets:Bank:Current                                         -100.78
-Expenses                                   105.50
-Expenses:Donations                                   30.00    10.00
-Expenses:Donations:Other                                      20.00
-Expenses:Entertainment                               48.00
-Expenses:Entertainment:Drinks-and-snacks                      48.00
-Expenses:Groceries                                            27.50
-Income                                      -4.72
-Income:Unknown                                                -4.72
-```
-
-Note: the rollup ignores all but the primary currency (as determined by frequency of use).
-
-## Usage Examples
-
-```
-$ lima --help
-
-$ lima
-
-$ lima -o rollup report assets
-
-$ lima -o standalone import kiwibank/*250807.ofx >imported.beancount
-
-$ lima --ledger imported.beancount
-
-$ lima import kiwibank/*250807.ofx >>my-existing.beancount
-```
+This is a work-in-progress.  Check back early in the new year!
 
 ## Import
 
@@ -78,7 +27,7 @@ Unless the plugin is enabled, the default behaviour is not to do this.
 
 ## Plugins
 
-Lima does not support externally provided plugins.  The intention is that all desired behaviour may be implemented by the end user in Steel Scheme.
+Lima does not support externally provided plugins.  The intention is that all desired behaviour may be implemented by the end user in Clojure. It remains to be seen whether auto-loading of Clojure plugins will be a useful feature.
 
 That said, there are a handful of internal plugins, as follows.
 
