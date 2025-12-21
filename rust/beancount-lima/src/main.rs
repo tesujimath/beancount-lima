@@ -12,7 +12,7 @@ use std::{
 use tabulator::Cell;
 use tracing_subscriber::EnvFilter;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -31,6 +31,10 @@ enum Command {
     Book {
         /// Beancount ledger
         ledger: PathBuf,
+
+        /// Output format, defaults to beancount
+        #[clap(short)]
+        format: Option<Format>,
     },
 
     /// Digest the Beancount ledger for import
@@ -49,6 +53,25 @@ enum Command {
     Tabulate,
 }
 
+#[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
+pub(crate) enum Format {
+    #[default]
+    Beancount,
+    Edn,
+}
+
+impl From<Format> for book::Format {
+    fn from(value: Format) -> Self {
+        use book::Format as B;
+        use Format::*;
+
+        match value {
+            Beancount => B::Beancount,
+            Edn => B::Edn,
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let out_w = &std::io::stdout();
     let error_w = &std::io::stderr();
@@ -61,7 +84,12 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Command::Book { ledger } => book::load_from(ledger, out_w, error_w),
+        Command::Book { ledger, format } => book::write_bookings_from(
+            ledger,
+            format.unwrap_or(Format::default()).into(),
+            out_w,
+            error_w,
+        ),
 
         Command::Digest { ledger } => {
             let digest = Digest::load_from(

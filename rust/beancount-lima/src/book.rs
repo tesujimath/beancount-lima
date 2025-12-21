@@ -21,7 +21,18 @@ use crate::{
     plugins::InternalPlugins,
 };
 
-pub(crate) fn load_from<W1, W2>(path: &Path, out_w: W1, error_w: W2) -> Result<()>
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub(crate) enum Format {
+    Beancount,
+    Edn,
+}
+
+pub(crate) fn write_bookings_from<W1, W2>(
+    path: &Path,
+    format: Format,
+    out_w: W1,
+    error_w: W2,
+) -> Result<()>
 where
     W1: Write + Copy,
     W2: Write + Copy,
@@ -72,9 +83,12 @@ where
                         sources.write_errors_or_warnings(error_w, warnings)?;
                     }
 
-                    // TODO both beancount and EDN format
-                    write_booked_as_edn(&directives, &options, out_w)?;
-                    write_booked_as_beancount(&directives, &options, out_w)
+                    match format {
+                        Format::Beancount => {
+                            write_booked_as_beancount(&directives, &options, out_w)
+                        }
+                        Format::Edn => write_booked_as_edn(&directives, &options, out_w),
+                    }
                 }
                 Err(LoadError { errors, .. }) => {
                     sources.write_errors_or_warnings(error_w, errors)?;
