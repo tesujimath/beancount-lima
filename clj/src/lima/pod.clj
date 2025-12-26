@@ -1,12 +1,13 @@
-(ns lima.pp
+(ns lima.pod
   (:require [clojure.edn :as edn]))
 
 (require '[clojure.edn :as edn])
 (require '[clojure.java.shell :as shell])
 (require '[java-time.api :as jt])
 
-(def readers
-  {'time/date #(jt/local-date %)})
+(require '[lima.cumulate :refer [cumulate]])
+
+(def readers {'time/date #(jt/local-date %)})
 
 (defn read-edn-string
   "Read string as LIma PP EDN"
@@ -16,9 +17,8 @@
 (defn book
   "Read EDN from lima-pod book and return or throw"
   [beancount-path]
-  (let [booked (shell/sh "lima-pod" "book" beancount-path)]
+  (let [booked (shell/sh "lima-pod" "book" "-f" "edn" beancount-path)]
     (if (= (booked :exit) 0)
-      (read-edn-string (booked :out))
+      (let [booked (read-edn-string (booked :out))] (cumulate booked))
       (do (println "lima-pod error" (booked :err))
-          (throw (Exception. "lima-pod failed"))
-          ))))
+          (throw (Exception. "lima-pod failed"))))))
