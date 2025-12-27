@@ -34,6 +34,11 @@
             directives)
         invs (:invs cumulated)
         accounts (sort (keys invs))]
-    (reduce (fn [result acc] (assoc result acc (inv/finalize (get invs acc))))
+    (reduce (fn [result account]
+              (let [account-positions (inv/finalize (get invs account))]
+                (if (seq account-positions)
+                  ;; only keep the non-empty positions
+                  (assoc result account account-positions)
+                  result)))
       {}
       accounts)))
