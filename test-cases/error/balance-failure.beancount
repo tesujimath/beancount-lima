@@ -1,0 +1,31 @@
+2016-03-01 open Assets:Bank
+
+2016-03-01 open Assets:Bank:Current
+
+2016-03-01 open Assets:Bank:Savings
+
+2016-03-01 open Expenses:Groceries NZD
+
+2016-03-01 open Expenses:Entertainment NZD
+
+2016-03-01 open Income:Unknown NZD
+
+2020-01-01 * "Initial income"
+  Assets:Bank:Current                                                   1000.00 NZD
+  Income:Unknown
+
+2020-01-01 * "Initial savings"
+  Assets:Bank:Savings                                                   5000.00 NZD
+  Income:Unknown
+
+2020-02-01 * "Food"
+  Assets:Bank:Current                                                    -50.00 NZD
+  Expenses:Groceries
+
+2020-02-02 * "Drinks"
+  Assets:Bank:Current                                                    -15.00 NZD
+  Expenses:Entertainment
+
+2020-02-28 balance Assets:Bank:Current                                   835.00 NZD
+
+2020-02-28 balance Assets:Bank:Savings                                  4000.00 NZD

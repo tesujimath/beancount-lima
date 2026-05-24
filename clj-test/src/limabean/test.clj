@@ -7,6 +7,7 @@
             [clojure.walk :as walk]
             [limabean]
             [limabean.adapter.edn :as limabean-edn]
+            [limabean.adapter.error :as error]
             [limabean.adapter.json]
             [limabean.adapter.print]
             [limabean.app :as app]
@@ -67,6 +68,11 @@
         false)
       true)))
 
+(defmacro with-out-file-path
+  "Run forms with `*out*` bound to a writer for `out-file-path`."
+  [out-file-path & forms]
+  `(with-open [w# (io/writer ~out-file-path)] (binding [*out* w#] ~@forms)))
+
 (defn app-tests
   [root-dir]
   (doseq [{:keys [test-name beanfile golden-dir]} (find-golden-tests root-dir)]
@@ -78,9 +84,9 @@
                            "rollup" "(show (rollup (inventory)))"
                            (format "(show (%s))" query))]
           (when (.exists expected)
-            (with-open [w (io/writer actual)]
-              (binding [*out* w]
-                (app/run {:beanfile beanfile, :eval query-expr})))
+            (with-out-file-path actual
+                                (app/run {:beanfile beanfile,
+                                          :eval query-expr}))
             (is (golden-text (format "%s.%s" test-name query)
                              actual
                              (.getPath expected)))))))))
@@ -108,4 +114,14 @@
                                           (with-meta x {:matcho/strict true})
                                           x))
                                       expected)]
-                (matcho/assert expected-strict (get actual key))))))))))
+                (matcho/assert expected-strict (get actual key))
+                (when (= key :error)
+                  (let [actual-ansi-file (temp-file-path test-name "error.ansi")
+                        _ (println "writing ANSI output to" actual-ansi-file)
+                        expected-ansi-file (io/file golden-dir
+                                                    (str (name key) ".ansi"))]
+                    (with-out-file-path actual-ansi-file
+                                        (error/print-errors actual))
+                    (is (golden-text (format "%s/error.ansi" test-name)
+                                     actual-ansi-file
+                                     (.getPath expected-ansi-file)))))))))))))

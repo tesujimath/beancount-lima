@@ -1,6 +1,7 @@
 (ns limabean.test.create-golden
   (:require [clojure.java.io :as io]
             [limabean]
+            [limabean.adapter.error :as error]
             [limabean.adapter.json]
             [limabean.adapter.loader :as loader]
             [limabean.adapter.print]
@@ -81,9 +82,12 @@
                                    "for information only")
                           (create-output-file beans fyi-f fyi-file))))))
                 OUTPUTS)
-          (let [error-file (io/file golden-dir "error.edn")]
+          (let [error-edn-file (io/file golden-dir "error.edn")
+                error-ansi-file (io/file golden-dir "error.ansi")]
             (println "ERROR loading" beanfile
-                     "written to" (.getPath error-file))
-            (with-open [w (io/writer error-file)]
-              (binding [*out* w] (zprint (:error beans))))))))
+                     "written to" (.getPath error-edn-file))
+            (with-open [w (io/writer error-edn-file)]
+              (binding [*out* w] (zprint (:error beans))))
+            (with-open [w (io/writer error-ansi-file)]
+              (binding [*out* w] (error/print-errors beans)))))))
     (limabean.test/find-golden-tests root-dir :ignore-golden-dirs true)))

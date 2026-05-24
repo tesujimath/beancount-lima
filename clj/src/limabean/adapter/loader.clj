@@ -171,8 +171,9 @@
             (debug/dump-configured?) (dump :booked-directives)
             (seq warnings) (assoc :booked-warnings warnings)))
         (let [indexed-reports (:indexed-reports err)
-              spanned-reports (resolve-reports-from-raw indexed-reports
-                                                        raw-directives)]
+              spanned-reports (or (:spanned-reports err)
+                                  (resolve-reports-from-raw indexed-reports
+                                                            raw-directives))]
           (assoc-in m [:error :booking] {:spanned-reports spanned-reports}))))
     (catch Exception e
       (assoc-in m [:error :booking] {:exception (Throwable->map e)}))))

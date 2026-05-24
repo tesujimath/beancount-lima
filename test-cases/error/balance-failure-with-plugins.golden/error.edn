@@ -1,0 +1,11 @@
+{:booking
+   {:spanned-reports
+      ({:annotation
+          "2020-01-01    1000.00  1000.00  Initial income\n2020-02-01     -50.00   950.00  Food          \n2020-02-02     -15.00   935.00  Drinks        ",
+        :message "invalid balance",
+        :reason "accumulated 935.00, error -100.00 NZD",
+        :span [0 787 872]}
+       {:annotation "2020-01-01    5000.00  5000.00  Initial savings",
+        :message "invalid balance",
+        :reason "accumulated 5000.00, error -1000.00 NZD",
+        :span [0 872 956]})}}
