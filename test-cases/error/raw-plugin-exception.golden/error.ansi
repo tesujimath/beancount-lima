@@ -1,0 +1,3 @@
+Exception thrown by raw plugin, all raw plugins ignored
+
+test plugin simulating exception: Plugin configured to fail on any transaction

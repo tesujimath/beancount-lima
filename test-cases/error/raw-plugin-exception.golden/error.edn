@@ -1,0 +1,5 @@
+{:raw-plugins
+   {:exception
+      {:message
+         "test plugin simulating exception: Plugin configured to fail on any transaction"},
+    :message "Exception thrown by raw plugin, all raw plugins ignored"}}

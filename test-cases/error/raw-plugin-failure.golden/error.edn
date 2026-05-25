@@ -1,0 +1,37 @@
+{:raw-plugins
+   {:dct-errors
+      [{:date #time/date "2023-04-10",
+        :dct :txn,
+        :err [{:message "Plugin configured to fail on any transaction",
+               :plugin "limabean.test.plugins.fail"}],
+        :flag "*",
+        :metadata {:dup nil},
+        :narration "WIKIMEDIA ;",
+        :payee "WIKIMEDIA",
+        :postings [{:acc "Assets:Bank:Current",
+                    :cur "NZD",
+                    :span-p [1 38 71],
+                    :units -10.00M}
+                   {:acc "Expenses:Donations", :span-p [1 71 92]}],
+        :provenance ["limabean.test.plugins.duplicate-txns"],
+        :span-p [1 0 38]}
+       {:date #time/date "2023-04-10",
+        :dct :txn,
+        :err [{:message "Plugin configured to fail on any transaction",
+               :plugin "limabean.test.plugins.fail"}],
+        :flag "*",
+        :narration "WIKIMEDIA ;",
+        :payee "WIKIMEDIA",
+        :postings [{:acc "Assets:Bank:Current",
+                    :cur "NZD",
+                    :span [0 465 546],
+                    :units -10.00M}
+                   {:acc "Expenses:Donations", :span [0 549 567]}],
+        :span [0 424 569]}
+       {:date #time/date "2024-12-31",
+        :dct :event,
+        :description "Doomed",
+        :err [{:message "Plugin configured to fail on any event",
+               :plugin "limabean.test.plugins.fail"}],
+        :span [0 569 605],
+        :type "Failure"}]}}

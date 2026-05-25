@@ -1,5 +1,5 @@
 plugin "limabean.test.plugins.duplicate-txns"
-;plugin "limabean.test.plugins.fail" "{:phase :raw :matching {:dct :txn} :message \"Plugin configured to fail on any transaction\"}"
+plugin "limabean.test.plugins.fail" "{:phase :booked :matching {:dct :txn} :message \"Plugin configured to fail on any transaction\"}"
 plugin "limabean.test.plugins.create-event"
 plugin "limabean.test.plugins.fail" "{:phase :booked :matching {:dct :event} :message \"Plugin configured to fail on any event\"}"
 

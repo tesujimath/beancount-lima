@@ -14,6 +14,16 @@
             [matcho.core :as matcho])
   (:import [java.nio.file Files]))
 
+(defn trim-exception
+  "Trim any exception for test comparison"
+  [data]
+  (walk/postwalk
+    (fn [x]
+      (if (and (map? x) (:exception x) (instance? Throwable (:exception x)))
+        (update x :exception (fn [exc] {:message (.getMessage exc)}))
+        x))
+    data))
+
 (defn find-golden-tests
   "Walk the filesystem from root-dir looking for beancount files and golden directories, ignoring .fyi.beancount files."
   [root-dir & {:keys [ignore-golden-dirs]}]
@@ -106,7 +116,8 @@
         (doseq [key [:raw-xf-directives :directives :error]]
           (let [expected-file (io/file golden-dir (str (name key) ".edn"))]
             (when (.exists expected-file)
-              (let [actual (force beans)
+              (let [actual (cond-> (force beans)
+                             (= :error key) (trim-exception))
                     expected (limabean-edn/read-string (slurp expected-file))
                     expected-strict (walk/postwalk
                                       (fn [x]

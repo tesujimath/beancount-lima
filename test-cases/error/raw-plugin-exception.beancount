@@ -1,0 +1,11 @@
+plugin "limabean.test.plugins.exception" "{:phase :raw :matching {:dct :txn} :message \"Plugin configured to fail on any transaction\"}"
+
+2016-03-01 open Assets:Bank:Current
+
+2016-03-01 open Expenses:Donations
+
+2023-04-10 * "WIKIMEDIA" "WIKIMEDIA ;"
+  Assets:Bank:Current                                                    -10.00 NZD
+  Expenses:Donations
+
+2024-12-31 event "Failure" "Doomed"

@@ -83,11 +83,12 @@
                           (create-output-file beans fyi-f fyi-file))))))
                 OUTPUTS)
           (let [error-edn-file (io/file golden-dir "error.edn")
-                error-ansi-file (io/file golden-dir "error.ansi")]
+                error-ansi-file (io/file golden-dir "error.ansi")
+                trimmed-beans (limabean.test/trim-exception beans)]
             (println "ERROR loading" beanfile
                      "written to" (.getPath error-edn-file))
             (with-open [w (io/writer error-edn-file)]
-              (binding [*out* w] (zprint (:error beans))))
+              (binding [*out* w] (zprint (:error trimmed-beans))))
             (with-open [w (io/writer error-ansi-file)]
-              (binding [*out* w] (error/print-errors beans)))))))
+              (binding [*out* w] (error/print-errors trimmed-beans)))))))
     (limabean.test/find-golden-tests root-dir :ignore-golden-dirs true)))

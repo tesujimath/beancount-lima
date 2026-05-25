@@ -1,0 +1,4 @@
+{:booking {:spanned-reports
+             ({:message "invalid transaction",
+               :reason "unbalanced transaction with residual -5.00 NZD",
+               :span [0 114 321]})}}

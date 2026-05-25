@@ -1,0 +1,14 @@
+plugin "limabean.test.plugins.duplicate-txns"
+plugin "limabean.test.plugins.fail" "{:phase :raw :matching {:dct :txn} :message \"Plugin configured to fail on any transaction\"}"
+plugin "limabean.test.plugins.create-event"
+plugin "limabean.test.plugins.fail" "{:phase :raw :matching {:dct :event} :message \"Plugin configured to fail on any event\"}"
+
+2016-03-01 open Assets:Bank:Current
+
+2016-03-01 open Expenses:Donations
+
+2023-04-10 * "WIKIMEDIA" "WIKIMEDIA ;"
+  Assets:Bank:Current                                                    -10.00 NZD
+  Expenses:Donations
+
+2024-12-31 event "Failure" "Doomed"
