@@ -28,7 +28,6 @@
 <p>To use a library directly from GitHub: <code>io.github.tesujimath/limabean-contrib {:git/sha "bc55aa4105ca1b050fffe12301e1829c908a4689"}</code> - in this case the GitHub organization and repo are inferred from the library name, <a href="https://clojure.org/reference/deps_edn#deps_git">unless overridden</a> using <code>:git/url</code>.</p>
 <p>To use a library from a local path: <code>io.github.tesujimath/limabean-contrib {:local/root "/path/to/limabean-contrib"}</code></p>
 <p>As always, run with <code>limabean -v</code> to see what is going on with the Clojure invocation.</p>
-<p>Note: it is not possible to load additional plugins when running in the standalone mode, which uses <code>java</code> rather than <code>clojure</code>.  This is essentially a constraint imposed by the Clojure tools.</p>
 <h2><a href="#writing-plugins" id="writing-plugins"></a>Writing plugins</h2>
 <h3><a href="#plugin-namespaces" id="plugin-namespaces"></a>Plugin namespaces</h3>
 <p>A limabean plugin namespace is simply a <a href="https://guide.clojure.style/#naming-ns-naming-schemas">Clojure namespace</a>.  Please avoid defining your own plugins in the <code>limabean</code> namespace, although <a href="https://github.com/tesujimath/limabean-contrib">limabean.contrib.plugins</a> is a good choice if you want to contribute your plugin there (please do!).  Otherwise, use your own domain.</p>

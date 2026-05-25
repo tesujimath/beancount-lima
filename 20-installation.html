@@ -13,12 +13,12 @@
 <p>There are two ways to run <code>limabean</code>, either standalone or from Clojars.  Running from Clojars means that the required Clojure packages are downloaded by the Clojure runtime on first use.</p>
 <p>Selection of runtime is determined by the following:</p>
 <ol>
-<li>If the environment variable <code>LIMABEAN_CLJ_LOCAL_ROOT</code> is defined at runtime, that is the path to local Clojure source, and is used to run the <a href="50-development.html">development version</a> using <code>clojure</code></li>
-<li>If the environment variable <code>LIMABEAN_UBERJAR</code> is defined at runtime, that is the path to the standalone application jarfile, which is run using <code>java</code></li>
-<li>If the environment variable <code>LIMABEAN_UBERJAR</code> was defined at buildtime, that is the path to the standalone application jarfile, which is run using <code>java</code></li>
-<li>Otherwise, the application whose version matches <code>limabean</code> is run from Clojars using <code>clojure</code></li>
+<li>If the environment variable <code>LIMABEAN_CLJ_LOCAL_ROOT</code> is defined at runtime, that is the path to local Clojure source, and is used to run the <a href="50-development.html">development version</a></li>
+<li>If the environment variable <code>LIMABEAN_UBERJAR</code> is defined at runtime, that is the path to the standalone application jarfile</li>
+<li>If the environment variable <code>LIMABEAN_UBERJAR</code> was defined at buildtime, that is the path to the standalone application jarfile</li>
+<li>Otherwise, the application whose version matches <code>limabean</code> is run from Clojars</li>
 </ol>
-<p>Note that when running standalone plugins from arbitrary sources are not supported.  Only the core plugins are available in this case.</p>
+<p>Even when running from a jarfile, <code>clojure</code> is used rather than <code>java</code>, in order to support plugins from arbitrary sources.</p>
 <h2><a href="#manual-installation" id="manual-installation"></a>Manual Installation</h2>
 <p>Running from Clojars is recommended for anyone using the <a href="https://github.com/tesujimath/limabean/releases">GitHub release</a>, that is, not setting any of the environment variables listed above.</p>
 <h2><a href="#running-from-podman" id="running-from-podman"></a>Running from Podman</h2>
@@ -59,7 +59,7 @@ podman build -f Containerfile --build-arg VERSION=$VERSION -t limabean:$VERSION
 <p>Requirements:</p>
 <ol>
 <li>
-<p>Java runtime installed separately, with <code>java</code> on the user’s path.  Note that the <code>java.sql</code> module at least is required, so a minimal jre may be insufficient.</p>
+<p>The <a href="https://clojure.org/reference/clojure_cli">Clojure CLI</a> is required to be installed separately, and <code>clojure</code> must be on the user’s path.</p>
 </li>
 <li>
 <p>The two Rust binaries <code>limabean</code> and <code>limabean-pod</code> must be installed and on the path.</p>
