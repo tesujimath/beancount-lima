@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. This change
 
 ## [Unreleased]
 
+### Fixed
+
+- no errors printed if booking failure without plugins #118
+
 [commit log]: https://github.com/tesujimath/limabean/compare/0.6.0...HEAD
 
 ## [0.6.0] - 2026-05-20
