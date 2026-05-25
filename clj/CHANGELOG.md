@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file. This change
 ### Fixed
 
 - no errors printed if booking failure without plugins #118
+- don't leave temp files behind after running tests #122
 
 ### Changed
 

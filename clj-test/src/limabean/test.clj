@@ -12,7 +12,7 @@
             [limabean.adapter.print]
             [limabean.app :as app]
             [matcho.core :as matcho])
-  (:import [java.nio.file Files]))
+  (:import [java.nio.file Files Paths]))
 
 (defn trim-exception
   "Trim any exception for test comparison"
@@ -46,12 +46,16 @@
           (file-seq (io/file root-dir)))))
 
 
-(defn- temp-file-path
-  [prefix ext]
-  (str (Files/createTempFile prefix
-                             ext
-                             (make-array java.nio.file.attribute.FileAttribute
-                                         0))))
+(defmacro with-temp-file-path
+  "Bind `name` to a temporary file path built from `prefix` and `ext`, execute `forms`, then delete the file."
+  [[name [prefix ext]] & forms]
+  `(let [~name (str (Files/createTempFile
+                      ~prefix
+                      ~ext
+                      (make-array java.nio.file.attribute.FileAttribute 0)))]
+     (try ~@forms
+          (finally (Files/deleteIfExists (Paths/get ~name
+                                                    (make-array String 0)))))))
 
 (defn- diff
   "Return diff as a string, or nil if no diffs"
@@ -88,18 +92,19 @@
   (doseq [{:keys [test-name beanfile golden-dir]} (find-golden-tests root-dir)]
     (testing test-name
       (doseq [query ["inventory" "rollup" "journal"]]
-        (let [actual (temp-file-path test-name query)
-              expected (io/file golden-dir query)
-              query-expr (case query
-                           "rollup" "(show (rollup (inventory)))"
-                           (format "(show (%s))" query))]
-          (when (.exists expected)
-            (with-out-file-path actual
-                                (app/run {:beanfile beanfile,
-                                          :eval query-expr}))
-            (is (golden-text (format "%s.%s" test-name query)
-                             actual
-                             (.getPath expected)))))))))
+        (with-temp-file-path
+          [actual [test-name query]]
+          (let [expected (io/file golden-dir query)
+                query-expr (case query
+                             "rollup" "(show (rollup (inventory)))"
+                             (format "(show (%s))" query))]
+            (when (.exists expected)
+              (with-out-file-path actual
+                                  (app/run {:beanfile beanfile,
+                                            :eval query-expr}))
+              (is (golden-text (format "%s.%s" test-name query)
+                               actual
+                               (.getPath expected))))))))))
 
 (defn api-tests
   [root-dir]
@@ -127,12 +132,13 @@
                                       expected)]
                 (matcho/assert expected-strict (get actual key))
                 (when (= key :error)
-                  (let [actual-ansi-file (temp-file-path test-name "error.ansi")
-                        _ (println "writing ANSI output to" actual-ansi-file)
-                        expected-ansi-file (io/file golden-dir
-                                                    (str (name key) ".ansi"))]
-                    (with-out-file-path actual-ansi-file
-                                        (error/print-errors actual))
-                    (is (golden-text (format "%s/error.ansi" test-name)
-                                     actual-ansi-file
-                                     (.getPath expected-ansi-file)))))))))))))
+                  (with-temp-file-path
+                    [actual-ansi-file [test-name "error.ansi"]]
+                    (let [expected-ansi-file (io/file golden-dir
+                                                      (str (name key) ".ansi"))]
+                      (with-out-file-path actual-ansi-file
+                                          (error/print-errors actual))
+                      (is (golden-text (format "%s/error.ansi" test-name)
+                                       actual-ansi-file
+                                       (.getPath
+                                         expected-ansi-file))))))))))))))
