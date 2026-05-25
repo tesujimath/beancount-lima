@@ -1,10 +1,5 @@
 use std::{ffi::OsStr, process::Command};
 
-pub(crate) enum Runtime {
-    Java(String),
-    Clojure(String),
-}
-
 const LIMABEAN_CLJ_LOCAL_ROOT: &str = "LIMABEAN_CLJ_LOCAL_ROOT";
 const LIMABEAN_CLJ_DEPS: &str = "LIMABEAN_CLJ_DEPS";
 const LIMABEAN_UBERJAR: &str = "LIMABEAN_UBERJAR";
@@ -16,86 +11,45 @@ const JVM_OPTIONS: &[&str] = &[
     "--enable-native-access=ALL-UNNAMED", // inhibit warning triggered by JLine
 ];
 
-fn warn_uberjar_extra_deps_ignored() {
-    eprintln!(
-        "warning: {} not supported when running from uberjar - ignored",
-        LIMABEAN_CLJ_DEPS
-    );
+fn deps_from_env() -> String {
+    let limabean_coord = if let Ok(local_root) = std::env::var(LIMABEAN_CLJ_LOCAL_ROOT) {
+        format!(r###"{{:local/root "{}"}}"###, &local_root,)
+    } else if let Ok(uberjar) = std::env::var(LIMABEAN_UBERJAR) {
+        format!(r###"{{:local/root "{}"}}"###, &uberjar,)
+    } else if let Some(uberjar) = LIMABEAN_UBERJAR_BUILDTIME {
+        format!(r###"{{:local/root "{}"}}"###, &uberjar,)
+    } else {
+        format!(r###"{{:mvn/version "{}"}}"###, VERSION,)
+    };
+
+    let extra_deps = std::env::var(LIMABEAN_CLJ_DEPS).map(|s| format!(" {}", s));
+
+    format!(
+        r###"{{:deps {{io.github.tesujimath/limabean {}{}}}}}"###,
+        limabean_coord,
+        extra_deps.unwrap_or("".to_string())
+    )
 }
 
-impl Runtime {
-    fn clojure(limabean_coord: String) -> Self {
-        Runtime::Clojure(format!(
-            r###"{{:deps {{io.github.tesujimath/limabean {}}}}}"###,
-            limabean_coord
-        ))
-    }
+fn command<S>(deps: &str, args: &[S]) -> Command
+where
+    S: AsRef<str>,
+{
+    let mut cmd = Command::new("clojure"); // use clojure not clj to avoid rlwrap
+    cmd.args(JVM_OPTIONS.iter().map(|opt| format!("-J{}", opt)))
+        .arg("-Sdeps")
+        .arg(deps)
+        .arg("-M")
+        .arg("-m")
+        .arg("limabean.main");
 
-    fn java(uberjar: String) -> Self {
-        Runtime::Java(uberjar)
-    }
+    cmd.args(
+        args.iter()
+            .map(|s| OsStr::new(s.as_ref()))
+            .collect::<Vec<_>>(),
+    );
 
-    pub(crate) fn from_env() -> Self {
-        let extra_deps = std::env::var(LIMABEAN_CLJ_DEPS).map(|s| format!(" {}", s));
-
-        if let Ok(local_root) = std::env::var(LIMABEAN_CLJ_LOCAL_ROOT) {
-            Runtime::clojure(format!(
-                r###"{{:local/root "{}"}}{}"###,
-                &local_root,
-                extra_deps.unwrap_or("".to_string())
-            ))
-        } else if let Ok(uberjar) = std::env::var(LIMABEAN_UBERJAR) {
-            if extra_deps.is_ok() {
-                warn_uberjar_extra_deps_ignored();
-            }
-            Runtime::java(uberjar)
-        } else if let Some(uberjar) = LIMABEAN_UBERJAR_BUILDTIME {
-            if extra_deps.is_ok() {
-                warn_uberjar_extra_deps_ignored();
-            }
-            Runtime::java(uberjar.to_string())
-        } else {
-            Runtime::clojure(format!(
-                r###"{{:mvn/version "{}"}}{}"###,
-                VERSION,
-                extra_deps.unwrap_or("".to_string())
-            ))
-        }
-    }
-
-    fn command<S>(&self, args: &[S]) -> Command
-    where
-        S: AsRef<str>,
-    {
-        use Runtime::*;
-
-        let mut cmd = match self {
-            Java(uberjar) => {
-                let mut java_cmd = Command::new("java");
-                java_cmd.args(JVM_OPTIONS.iter()).arg("-jar").arg(uberjar);
-                java_cmd
-            }
-            Clojure(deps) => {
-                let mut clojure_cmd = Command::new("clojure"); // use clojure not clj to avoid rlwrap
-                clojure_cmd
-                    .args(JVM_OPTIONS.iter().map(|opt| format!("-J{}", opt)))
-                    .arg("-Sdeps")
-                    .arg(deps)
-                    .arg("-M")
-                    .arg("-m")
-                    .arg("limabean.main");
-                clojure_cmd
-            }
-        };
-
-        cmd.args(
-            args.iter()
-                .map(|s| OsStr::new(s.as_ref()))
-                .collect::<Vec<_>>(),
-        );
-
-        cmd
-    }
+    cmd
 }
 
 #[cfg(unix)]
@@ -112,7 +66,7 @@ fn run_or_fail(mut cmd: Command) {
     std::process::exit(1);
 }
 
-pub(crate) fn run(runtime: &Runtime, args: &[String]) {
+pub(crate) fn run(args: &[String]) {
     let verbose = args.iter().any(|arg| arg == "-v" || arg == "--verbose");
     let version = args.iter().any(|arg| arg == "--version");
 
@@ -120,7 +74,8 @@ pub(crate) fn run(runtime: &Runtime, args: &[String]) {
         println!("limabean.rs  {VERSION}");
     }
 
-    let cmd = runtime.command(args);
+    let deps = deps_from_env();
+    let cmd = command(&deps, args);
 
     if verbose {
         eprintln!("{:?}", &cmd);

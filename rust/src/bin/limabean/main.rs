@@ -6,16 +6,14 @@ fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let runtime = Runtime::from_env();
     let args = std::env::args().collect::<Vec<_>>();
 
     if let Some("health") = args.get(1).map(String::as_str) {
-        health::check(&runtime, true);
+        health::check(true);
     } else {
-        run::run(&runtime, &args[1..]);
+        run::run(&args[1..]);
     }
 }
 
 mod health;
 mod run;
-use run::Runtime;

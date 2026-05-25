@@ -92,7 +92,6 @@
               clippy
               rustc
 
-              jre
               # useful tools:
               beancount
               beanquery

@@ -22,12 +22,12 @@ There are two ways to run `limabean`, either standalone or from Clojars.  Runnin
 
 Selection of runtime is determined by the following:
 
-1. If the environment variable `LIMABEAN_CLJ_LOCAL_ROOT` is defined at runtime, that is the path to local Clojure source, and is used to run the [development version](50-development.md) using `clojure`
-2. If the environment variable `LIMABEAN_UBERJAR` is defined at runtime, that is the path to the standalone application jarfile, which is run using `java`
-3. If the environment variable `LIMABEAN_UBERJAR` was defined at buildtime, that is the path to the standalone application jarfile, which is run using `java`
-4. Otherwise, the application whose version matches `limabean` is run from Clojars using `clojure`
+1. If the environment variable `LIMABEAN_CLJ_LOCAL_ROOT` is defined at runtime, that is the path to local Clojure source, and is used to run the [development version](50-development.md)
+2. If the environment variable `LIMABEAN_UBERJAR` is defined at runtime, that is the path to the standalone application jarfile
+3. If the environment variable `LIMABEAN_UBERJAR` was defined at buildtime, that is the path to the standalone application jarfile
+4. Otherwise, the application whose version matches `limabean` is run from Clojars
 
-Note that when running standalone plugins from arbitrary sources are not supported.  Only the core plugins are available in this case.
+Even when running from a jarfile, `clojure` is used rather than `java`, in order to support plugins from arbitrary sources.
 
 ## Manual Installation
 
@@ -80,7 +80,7 @@ Native Windows is no longer supported.  Ubuntu on WSL 2 is recommended as an alt
 
 Requirements:
 
-1. Java runtime installed separately, with `java` on the user's path.  Note that the `java.sql` module at least is required, so a minimal jre may be insufficient.
+1. The [Clojure CLI](https://clojure.org/reference/clojure_cli) is required to be installed separately, and `clojure` must be on the user's path.
 
 2. The two Rust binaries `limabean` and `limabean-pod` must be installed and on the path.
 

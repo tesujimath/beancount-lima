@@ -54,8 +54,6 @@ To use a library from a local path: `io.github.tesujimath/limabean-contrib {:loc
 
 As always, run with `limabean -v` to see what is going on with the Clojure invocation.
 
-Note: it is not possible to load additional plugins when running in the standalone mode, which uses `java` rather than `clojure`.  This is essentially a constraint imposed by the Clojure tools.
-
 ## Writing plugins
 
 ### Plugin namespaces

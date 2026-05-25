@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file. This change
 
 - no errors printed if booking failure without plugins #118
 
+### Changed
+
+- add support for running plugins from arbitrary sources in standalone mode #120
+
 [commit log]: https://github.com/tesujimath/limabean/compare/0.6.0...HEAD
 
 ## [0.6.0] - 2026-05-20
