@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>io.github.tesujimath</groupId>
   <artifactId>limabean-test</artifactId>
-  <version>0.6.0</version>
+  <version>0.6.1</version>
   <name>limabean-test</name>
   <dependencies>
     <dependency>
@@ -60,6 +60,6 @@
     <url>https://github.com/tesujimath/limabean</url>
     <connection>scm:git:git://github.com/tesujimath/limabean.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/tesujimath/limabean.git</developerConnection>
-    <tag>0.6.0</tag>
+    <tag>0.6.1</tag>
   </scm>
 </project>
