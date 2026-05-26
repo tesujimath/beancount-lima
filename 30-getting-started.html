@@ -127,4 +127,10 @@ user=&gt; (show (journal (f/date&gt;=&lt; 2013 2018)))
 <li><code>LIMABEAN_POD_LOG_LEVEL</code> - custom log levels for <code>limabean-pod</code> as per <code>RUST_LOG</code> conventions, or default log levels if omitted</li>
 <li><code>LIMABEAN_DEBUG_DIR</code> - if set, is a directory where intermediate beanfiles (post-plugin, pre-booking), are dumped, for troubleshooting</li>
 </ul>
+<h2><a href="#keybindings" id="keybindings"></a>Keybindings</h2>
+<p>Readline support in the REPL is provided by <a href="https://github.com/bhauman/rebel-readline">Rebel Readline</a>, whose <a href="https://github.com/bhauman/rebel-readline#key-bindings-in-the-repl">keybindings</a> may be customised, although how to do this is not immediately apparent.  One way is to add the desired custom keybindings to <code>~/.clojure/rebel_readline.edn</code>.  For example, this sets up ALT-left/right for forward and backward word for me on macOS in my preferred Emacs mode.</p>
+<pre><code>{:key-bindings {:emacs [;; CSI format for ALT-left/right
+                        ["^[[1;3D" :backward-word] ["^[[1;3C" :forward-word]]}}
+</code></pre>
+<p>Exactly what control sequences are generated depends on the terminal being used.  One way to find out is to type into <code>od -c</code>.</p>
 </div></div></div></body></html>
