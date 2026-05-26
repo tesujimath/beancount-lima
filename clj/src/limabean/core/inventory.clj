@@ -184,16 +184,15 @@
 
   `acc-booking-fn` is a function which returns the booking method for an account."
   [postings acc-booking-fn]
-  (let [init (transient {})
-        cumulated (persistent!
-                    (reduce (fn [result p]
-                              (let [acc (:acc p)
-                                    inv (if-let [inv (get result acc)]
-                                          inv
-                                          (accumulator (acc-booking-fn acc)))]
-                                (assoc! result acc (accumulate inv p))))
-                      init
-                      postings))
+  (let [init {}
+        cumulated (reduce (fn [result p]
+                            (let [acc (:acc p)
+                                  inv (if-let [inv (get result acc)]
+                                        inv
+                                        (accumulator (acc-booking-fn acc)))]
+                              (assoc result acc (accumulate inv p))))
+                    init
+                    postings)
         accounts (sort (keys cumulated))
         inv (reduce (fn [result account]
                       (let [account-positions (positions (get cumulated

@@ -6,6 +6,7 @@
             :ns-default build},
     :cider/nrepl {:extra-deps {com.health-samurai/matcho {:mvn/version
                                                             "0.3.11"},
+                               criterium/criterium {:mvn/version "0.4.6"},
                                io.github.tesujimath/limabean-test
                                  {:local/root "../clj-test"},
                                org.clojure/test.check {:mvn/version "1.1.1"},
