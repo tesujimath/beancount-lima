@@ -1,0 +1,35 @@
+2016-03-01 open Equity:Opening-Balances
+
+2016-03-01 open Assets:Bank:Current
+
+2016-03-01 open Expenses:Groceries
+
+2016-03-01 open Expenses:Donations
+
+2016-03-01 open Expenses:Unknown
+
+2016-03-01 open Income:Unknown
+
+2016-03-01 pad Assets:Bank:Current Equity:Opening-Balances
+
+2016-04-01 balance Assets:Bank:Current                                      100 NZD
+
+2020-01-01 * ""
+  Assets:Bank:Current                                                     10.00 GBP
+  Income:Unknown
+
+2023-04-10 * "WIKIMEDIA" "WIKIMEDIA ;"
+  Assets:Bank:Current                                                    -10.00 NZD
+  Expenses:Donations
+
+2023-04-12 * "Tear Fund" ""
+  Assets:Bank:Current                                                    -20.00 NZD
+  Expenses:Donations
+
+2023-04-20 * ""
+  Assets:Bank:Current                                                    -10.00 GBP
+  Expenses:Unknown
+
+2023-05-29 * "New World Gardens North East Va" "Very hungry"
+  Expenses:Groceries                                                      70.00 NZD
+  Assets:Bank:Current

@@ -23,5 +23,9 @@
   Assets:NZ:Cash
 
 2025-04-05 * "cost total weight"
-  Assets:Shares:IBM         3 IBM { NZD }
-  Assets:NZ:Cash      -910.00 NZD
+  Assets:Shares:IBM         2 IBM { NZD }
+  Assets:NZ:Cash      -604.00 NZD
+
+2025-04-10 * "merge at cost"
+  Assets:Shares:IBM         1 IBM { 302.00 NZD, 2025-04-05 }
+  Assets:NZ:Cash              NZD
