@@ -59,30 +59,44 @@
                                    (delay (compare-nil-first merge-x
                                                              merge-y))))))))))))
 
-;; TODO where should this live?
-(defn compare-positions
-  "Compare positions for sort/merge order"
+(defn compare-positions-for-merge
+  "Compare positions for sort/merge order.
+
+   First by currency then by cost attributes."
   [p1 p2]
-  (let [c1 (:cost p1)
-        c2 (:cost p2)]
-    (compare-nil-first-or*
-      c1
-      c2
-      (delay (compare-different-or*
-               (:date c1)
-               (:date c2)
-               (delay (compare-different-or*
-                        (:cur c1)
-                        (:cur c2)
-                        (delay (compare-different-or*
-                                 (:per-unit c1)
-                                 (:per-unit c2)
-                                 (compare-nil-first-different-or*
-                                   (:label c1)
-                                   (:label c2)
-                                   (delay (compare-nil-first (:merge c1)
-                                                             (:merge
-                                                               c2)))))))))))))
+  (compare-different-or*
+    (:cur p1)
+    (:cur p2)
+    (let [c1 (:cost p1)
+          c2 (:cost p2)]
+      (compare-nil-first-or*
+        c1
+        c2
+        (delay (compare-different-or*
+                 (:date c1)
+                 (:date c2)
+                 (delay (compare-different-or*
+                          (:cur c1)
+                          (:cur c2)
+                          (delay (compare-different-or*
+                                   (:per-unit c1)
+                                   (:per-unit c2)
+                                   (compare-nil-first-different-or*
+                                     (:label c1)
+                                     (:label c2)
+                                     (delay (compare-nil-first
+                                              (:merge c1)
+                                              (:merge c2))))))))))))))
+
+(defn compare-positions-for-append
+  "Compare positions for sort/append order.
+
+   First by currency then simply p1 after p2 if there are costs."
+  [p1 p2]
+  (compare-different-or*
+    (:cur p1)
+    (:cur p2)
+    (let [c1 (:cost p1) c2 (:cost p2)] (compare-nil-first-or* c1 c2 1))))
 
 (defn- booking-rule
   "Map a booking method to the rule for combining positions, :merge or :append."
