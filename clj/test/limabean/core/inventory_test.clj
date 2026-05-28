@@ -124,3 +124,52 @@
                      :total 1800.00M,
                      :cur "NZD",
                      :date (jt/local-date 2024 2 1)}}]))))
+
+(deftest merge-position-append-test
+  (is (= (sut/merge-position [] {:units 10, :cur "IBM"} :none)
+         (mkp [{:units 10, :cur "IBM"}])))
+  (is (= (sut/merge-position (mkp [{:units 10, :cur "IBM"}])
+                             {:units 3, :cur "IBM"}
+                             :none)
+         (mkp [{:units 13, :cur "IBM"}])))
+  (is (= (sut/merge-position (mkp [{:units 10,
+                                    :cur "IBM",
+                                    :cost {:per-unit 150.00M,
+                                           :total 1500.00M,
+                                           :cur "NZD",
+                                           :date (jt/local-date 2024 2 1)}}])
+                             {:units 2, :cur "IBM"}
+                             :none)
+         (mkp [{:units 2, :cur "IBM"}
+               {:units 10,
+                :cur "IBM",
+                :cost {:per-unit 150.00M,
+                       :total 1500.00M,
+                       :cur "NZD",
+                       :date (jt/local-date 2024 2 1)}}])))
+  (is
+    (= (sut/merge-position (mkp [{:units 10,
+                                  :cur "IBM",
+                                  :cost {:per-unit 150.00M,
+                                         :total 1500.00M,
+                                         :cur "NZD",
+                                         :date (jt/local-date 2024 2 1)}}])
+                           {:units 2,
+                            :cur "IBM",
+                            :cost {:per-unit 150.00M,
+                                   :total 300.00M,
+                                   :cur "NZD",
+                                   :date (jt/local-date 2024 2 1)}}
+                           :none)
+       (mkp [{:units 10,
+              :cur "IBM",
+              :cost {:per-unit 150.00M,
+                     :total 1500.00M,
+                     :cur "NZD",
+                     :date (jt/local-date 2024 2 1)}}
+             {:units 2,
+              :cur "IBM",
+              :cost {:per-unit 150.00M,
+                     :total 300.00M,
+                     :cur "NZD",
+                     :date (jt/local-date 2024 2 1)}}]))))
