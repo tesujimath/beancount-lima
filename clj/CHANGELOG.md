@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. This change
 
 ## [Unreleased]
 
+### Fixed
+
+- reject inferred negative per-unit cost/price as errors #127
+
 ### Added
 
 - inventory/build-with-history to enable tracking inventory over time

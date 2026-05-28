@@ -8,11 +8,11 @@
 
 2025-02-01 * "price total"
   Assets:UK:Cash -197.00 GBP @ 1.9369035532994923857868020305 NZD
-  Assets:NZ:Cash -381.57 NZD
+  Assets:NZ:Cash 381.57 NZD
 
 2025-02-05 * "price total weight"
   Assets:UK:Cash -197.00 GBP @ 1.9369035532994923857868020305 NZD
-  Assets:NZ:Cash -381.57 NZD
+  Assets:NZ:Cash 381.57 NZD
 
 2025-03-01 open Assets:Shares:IBM
 

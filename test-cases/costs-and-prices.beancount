@@ -7,12 +7,12 @@
   Assets:NZ:Cash
 
 2025-02-01 * "price total"
-  Assets:UK:Cash      -197.00 GBP @@ 381.57 NZD
+  Assets:UK:Cash      -197.00 GBP @@ -381.57 NZD
   Assets:NZ:Cash
 
 2025-02-05 * "price total weight"
   Assets:UK:Cash      -197.00 GBP @ NZD
-  Assets:NZ:Cash      -381.57 NZD
+  Assets:NZ:Cash       381.57 NZD
 
 2025-03-01 * "cost per-unit"
   Assets:Shares:IBM         5 IBM { 300.00 NZD }

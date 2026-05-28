@@ -35,15 +35,15 @@
               :idx 0,
               :price {:cur "NZD",
                       :per-unit 1.9369035532994923857868020305M,
-                      :total 381.57M},
-              :span [0 220 265],
+                      :total -381.57M},
+              :span [0 220 266],
               :units -197.00M}
              {:acc "Assets:NZ:Cash",
               :cur "NZD",
               :idx 1,
-              :span [0 268 282],
-              :units -381.57M}],
-  :span [0 191 284]}
+              :span [0 269 283],
+              :units 381.57M}],
+  :span [0 191 285]}
  {:date #time/date "2025-02-05",
   :dct :txn,
   :flag "*",
@@ -54,15 +54,15 @@
               :idx 0,
               :price {:cur "NZD",
                       :per-unit 1.9369035532994923857868020305M,
-                      :total 381.57M},
-              :span [0 320 357],
+                      :total -381.57M},
+              :span [0 321 358],
               :units -197.00M}
              {:acc "Assets:NZ:Cash",
               :cur "NZD",
               :idx 1,
-              :span [0 360 391],
-              :units -381.57M}],
-  :span [0 284 393]}
+              :span [0 361 392],
+              :units 381.57M}],
+  :span [0 285 394]}
  {:acc "Assets:Shares:IBM",
   :date #time/date "2025-03-01",
   :dct :open,
@@ -80,14 +80,14 @@
                      :total 1500.00M},
               :cur "IBM",
               :idx 0,
-              :span [0 424 470],
+              :span [0 425 471],
               :units 5}
              {:acc "Assets:NZ:Cash",
               :cur "NZD",
               :idx 1,
-              :span [0 473 487],
+              :span [0 474 488],
               :units -1500.00M}],
-  :span [0 393 489]}
+  :span [0 394 490]}
  {:date #time/date "2025-04-01",
   :dct :txn,
   :flag "*",
@@ -100,14 +100,14 @@
                      :total 910.00M},
               :cur "IBM",
               :idx 0,
-              :span [0 517 565],
+              :span [0 518 566],
               :units 3}
              {:acc "Assets:NZ:Cash",
               :cur "NZD",
               :idx 1,
-              :span [0 568 582],
+              :span [0 569 583],
               :units -910.00M}],
-  :span [0 489 584]}
+  :span [0 490 585]}
  {:date #time/date "2025-04-05",
   :dct :txn,
   :flag "*",
@@ -120,14 +120,14 @@
                      :total 604.00M},
               :cur "IBM",
               :idx 0,
-              :span [0 619 658],
+              :span [0 620 659],
               :units 2}
              {:acc "Assets:NZ:Cash",
               :cur "NZD",
               :idx 1,
-              :span [0 661 692],
+              :span [0 662 693],
               :units -604.00M}],
-  :span [0 584 694]}
+  :span [0 585 695]}
  {:date #time/date "2025-04-10",
   :dct :txn,
   :flag "*",
@@ -140,11 +140,11 @@
                      :total 302.00M},
               :cur "IBM",
               :idx 0,
-              :span [0 725 783],
+              :span [0 726 784],
               :units 1}
              {:acc "Assets:NZ:Cash",
               :cur "NZD",
               :idx 1,
-              :span [0 786 817],
+              :span [0 787 818],
               :units -302.00M}],
-  :span [0 694 818]}]
+  :span [0 695 819]}]
