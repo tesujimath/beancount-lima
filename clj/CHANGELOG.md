@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file. This change
 
 ## [Unreleased]
 
+### Added
+
+- inventory/build-with-history to enable tracking inventory over time
+
 [commit log]: https://github.com/tesujimath/limabean/compare/0.6.1...HEAD
 
 ## [0.6.1] - 2026-05-25
