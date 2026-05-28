@@ -7,8 +7,10 @@
             [limabean.adapter.plugins :as plugins]
             [limabean.adapter.pod :as pod]
             [limabean.adapter.synthetic-spans :as synthetic-spans]
+            [limabean.core.inventory :as inventory]
             [limabean.core.registry :as registry]
             [limabean.core.type :as type]
+            [limabean.core.xf :as xf]
             [limabean.macros :as macros]
             [limabean.spec :as spec]))
 
@@ -178,6 +180,13 @@
     (catch Exception e
       (assoc-in m [:error :booking] {:exception (Throwable->map e)}))))
 
+(defn- build-inventory
+  "Build full inventory with history and merge into `m`."
+  [m]
+  (let [postings (eduction (xf/postings) (:directives m))
+        acc-booking-fn (partial registry/acc-booking (:registry m))]
+    (merge m (inventory/build-with-history postings acc-booking-fn))))
+
 (defn load-beanfile
   [path]
   (let [pod (pod/start path)]
@@ -192,5 +201,5 @@
       (as-> m (assoc m
                 :directives
                   (or (:booked-xf-directives m) (:booked-directives m) [])))
-      (as-> m (assoc m
-                :registry (registry/build (:directives m) (:options m)))))))
+      (as-> m (assoc m :registry (registry/build (:directives m) (:options m))))
+      (build-inventory))))

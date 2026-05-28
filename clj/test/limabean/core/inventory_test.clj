@@ -4,7 +4,7 @@
             [limabean.core.inventory :as sut]
             [clojure.test :refer [deftest is]]))
 
-;; we're testing private functions, so:
+;; private functions:
 (def compare-positions-for-merge #'sut/compare-positions-for-merge)
 (def compare-positions-for-append #'sut/compare-positions-for-append)
 
@@ -80,37 +80,38 @@
   ; and so on
 )
 
-(defn- mkp "Mark positions" [ps] (mapv #(cell/mark % :position) ps))
+(defn- mkp "Mark position" [p] (cell/mark p :position))
+(defn- mkps "Mark positions" [ps] (mapv mkp ps))
 
 (deftest merge-position-test
   (is (= (sut/merge-position [] {:units 10, :cur "IBM"} :strict)
-         (mkp [{:units 10, :cur "IBM"}])))
-  (is (= (sut/merge-position (mkp [{:units 10, :cur "IBM"}])
+         (mkps [{:units 10, :cur "IBM"}])))
+  (is (= (sut/merge-position (mkps [{:units 10, :cur "IBM"}])
                              {:units 3, :cur "IBM"}
                              :strict)
-         (mkp [{:units 13, :cur "IBM"}])))
-  (is (= (sut/merge-position (mkp [{:units 10,
-                                    :cur "IBM",
-                                    :cost {:per-unit 150.00M,
-                                           :total 1500.00M,
-                                           :cur "NZD",
-                                           :date (jt/local-date 2024 2 1)}}])
+         (mkps [{:units 13, :cur "IBM"}])))
+  (is (= (sut/merge-position (mkps [{:units 10,
+                                     :cur "IBM",
+                                     :cost {:per-unit 150.00M,
+                                            :total 1500.00M,
+                                            :cur "NZD",
+                                            :date (jt/local-date 2024 2 1)}}])
                              {:units 2, :cur "IBM"}
                              :strict)
-         (mkp [{:units 2, :cur "IBM"}
-               {:units 10,
-                :cur "IBM",
-                :cost {:per-unit 150.00M,
-                       :total 1500.00M,
-                       :cur "NZD",
-                       :date (jt/local-date 2024 2 1)}}])))
+         (mkps [{:units 2, :cur "IBM"}
+                {:units 10,
+                 :cur "IBM",
+                 :cost {:per-unit 150.00M,
+                        :total 1500.00M,
+                        :cur "NZD",
+                        :date (jt/local-date 2024 2 1)}}])))
   (is
-    (= (sut/merge-position (mkp [{:units 10,
-                                  :cur "IBM",
-                                  :cost {:per-unit 150.00M,
-                                         :total 1500.00M,
-                                         :cur "NZD",
-                                         :date (jt/local-date 2024 2 1)}}])
+    (= (sut/merge-position (mkps [{:units 10,
+                                   :cur "IBM",
+                                   :cost {:per-unit 150.00M,
+                                          :total 1500.00M,
+                                          :cur "NZD",
+                                          :date (jt/local-date 2024 2 1)}}])
                            {:units 2,
                             :cur "IBM",
                             :cost {:per-unit 150.00M,
@@ -118,42 +119,42 @@
                                    :cur "NZD",
                                    :date (jt/local-date 2024 2 1)}}
                            :strict)
-       (mkp [{:units 12,
-              :cur "IBM",
-              :cost {:per-unit 150.00M,
-                     :total 1800.00M,
-                     :cur "NZD",
-                     :date (jt/local-date 2024 2 1)}}]))))
+       (mkps [{:units 12,
+               :cur "IBM",
+               :cost {:per-unit 150.00M,
+                      :total 1800.00M,
+                      :cur "NZD",
+                      :date (jt/local-date 2024 2 1)}}]))))
 
 (deftest merge-position-append-test
   (is (= (sut/merge-position [] {:units 10, :cur "IBM"} :none)
-         (mkp [{:units 10, :cur "IBM"}])))
-  (is (= (sut/merge-position (mkp [{:units 10, :cur "IBM"}])
+         (mkps [{:units 10, :cur "IBM"}])))
+  (is (= (sut/merge-position (mkps [{:units 10, :cur "IBM"}])
                              {:units 3, :cur "IBM"}
                              :none)
-         (mkp [{:units 13, :cur "IBM"}])))
-  (is (= (sut/merge-position (mkp [{:units 10,
-                                    :cur "IBM",
-                                    :cost {:per-unit 150.00M,
-                                           :total 1500.00M,
-                                           :cur "NZD",
-                                           :date (jt/local-date 2024 2 1)}}])
+         (mkps [{:units 13, :cur "IBM"}])))
+  (is (= (sut/merge-position (mkps [{:units 10,
+                                     :cur "IBM",
+                                     :cost {:per-unit 150.00M,
+                                            :total 1500.00M,
+                                            :cur "NZD",
+                                            :date (jt/local-date 2024 2 1)}}])
                              {:units 2, :cur "IBM"}
                              :none)
-         (mkp [{:units 2, :cur "IBM"}
-               {:units 10,
-                :cur "IBM",
-                :cost {:per-unit 150.00M,
-                       :total 1500.00M,
-                       :cur "NZD",
-                       :date (jt/local-date 2024 2 1)}}])))
+         (mkps [{:units 2, :cur "IBM"}
+                {:units 10,
+                 :cur "IBM",
+                 :cost {:per-unit 150.00M,
+                        :total 1500.00M,
+                        :cur "NZD",
+                        :date (jt/local-date 2024 2 1)}}])))
   (is
-    (= (sut/merge-position (mkp [{:units 10,
-                                  :cur "IBM",
-                                  :cost {:per-unit 150.00M,
-                                         :total 1500.00M,
-                                         :cur "NZD",
-                                         :date (jt/local-date 2024 2 1)}}])
+    (= (sut/merge-position (mkps [{:units 10,
+                                   :cur "IBM",
+                                   :cost {:per-unit 150.00M,
+                                          :total 1500.00M,
+                                          :cur "NZD",
+                                          :date (jt/local-date 2024 2 1)}}])
                            {:units 2,
                             :cur "IBM",
                             :cost {:per-unit 150.00M,
@@ -161,15 +162,62 @@
                                    :cur "NZD",
                                    :date (jt/local-date 2024 2 1)}}
                            :none)
-       (mkp [{:units 10,
-              :cur "IBM",
-              :cost {:per-unit 150.00M,
-                     :total 1500.00M,
-                     :cur "NZD",
-                     :date (jt/local-date 2024 2 1)}}
-             {:units 2,
-              :cur "IBM",
-              :cost {:per-unit 150.00M,
-                     :total 300.00M,
-                     :cur "NZD",
-                     :date (jt/local-date 2024 2 1)}}]))))
+       (mkps [{:units 10,
+               :cur "IBM",
+               :cost {:per-unit 150.00M,
+                      :total 1500.00M,
+                      :cur "NZD",
+                      :date (jt/local-date 2024 2 1)}}
+              {:units 2,
+               :cur "IBM",
+               :cost {:per-unit 150.00M,
+                      :total 300.00M,
+                      :cur "NZD",
+                      :date (jt/local-date 2024 2 1)}}]))))
+
+;; private function:
+(def negate-position #'sut/negate-position)
+
+(deftest negate-position-test
+  (is (= (negate-position {:units 10, :cur "NZD"}) {:units -10, :cur "NZD"}))
+  (is (= (negate-position {:units -3.50M, :cur "USD"})
+         {:units 3.50M, :cur "USD"}))
+  (is (= (negate-position {:units 10,
+                           :cur "IBM",
+                           :cost
+                             {:per-unit 150.00, :total 1500.00, :cur "USD"}})
+         {:units -10,
+          :cur "IBM",
+          :cost {:per-unit 150.00, :total -1500.00, :cur "USD"}})))
+
+;; private function:
+(def positions-diff #'sut/positions-diff)
+
+(deftest positions-diff-test
+  (is (= (positions-diff [{:units 10, :cur "NZD"}]
+                         [{:units 15, :cur "NZD"}]
+                         :strict)
+         (mkps [{:units 5, :cur "NZD"}])))
+  (is (= (positions-diff [{:units 10,
+                           :cur "IBM",
+                           :cost {:per-unit 100, :total 1000, :cur "NZD"}}]
+                         [{:units 15,
+                           :cur "IBM",
+                           :cost {:per-unit 100, :total 1500, :cur "NZD"}}]
+                         :strict)
+         (mkps [{:units 5,
+                 :cur "IBM",
+                 :cost {:per-unit 100, :total 500, :cur "NZD"}}])))
+  (is (= (positions-diff [{:units 10,
+                           :cur "IBM",
+                           :cost {:per-unit 100, :total 1000, :cur "NZD"}}]
+                         [{:units 15,
+                           :cur "IBM",
+                           :cost {:per-unit 100, :total 1500, :cur "NZD"}}]
+                         :none)
+         (mkps [{:units -10,
+                 :cur "IBM",
+                 :cost {:per-unit 100, :total -1000, :cur "NZD"}}
+                {:units 15,
+                 :cur "IBM",
+                 :cost {:per-unit 100, :total 1500, :cur "NZD"}}]))))
