@@ -1,0 +1,26 @@
+2025-01-01 open Assets:Cash
+2025-03-01 open Assets:Shares:IBM "NONE"
+
+2025-03-01 * "cost per-unit"
+  Assets:Shares:IBM                                                           5 IBM { 300.00 NZD }
+  Assets:Cash
+
+2025-03-02 * "cost per-unit other currency"
+  Assets:Shares:IBM                                                           4 IBM { 160.00 GBP }
+  Assets:Cash
+
+2025-03-03 * "interloping share in wrong account"
+  Assets:Shares:IBM                                                           4 AAPL { 200.00 GBP }
+  Assets:Cash
+
+2025-04-01 * "cost total"
+  Assets:Shares:IBM                                                           3 IBM { # 910.00 NZD }
+  Assets:Cash
+
+2025-04-05 * "cost total weight"
+  Assets:Shares:IBM                                                           2 IBM { NZD }
+  Assets:Cash                                                           -604.00 NZD
+
+2025-04-10 * "append because NONE booking"
+  Assets:Shares:IBM                                                           1 IBM { 302.00 NZD, 2025-04-05 }
+  Assets:Cash                                                                   NZD

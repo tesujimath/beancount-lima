@@ -22,6 +22,14 @@
    (inventory/build (postings (:directives beans) filters)
                     (partial registry/acc-booking (:registry beans)))))
 
+(defn inventory-with-history
+  "Build inventory from `beans` after applying filters, if any."
+  ([beans] (inventory beans []))
+  ([beans filters]
+   (inventory/build-with-history (postings (:directives beans) filters)
+                                 (partial registry/acc-booking
+                                          (:registry beans)))))
+
 (defn rollup
   "Build a rollup for the primary currency from an inventory.
 

@@ -11,7 +11,7 @@
   Only one running total is maintained, unseparated by account."
   []
   (fn [rf]
-    (let [state (volatile! (inventory/accumulator :none))]
+    (let [state (volatile! [])]
       (fn
         ;; init
         ([] (rf))
@@ -20,10 +20,9 @@
         ;; step
         ([result p]
          (let [p (dissoc p :cost) ;; journal excludes cost
-               accumulated (inventory/accumulate @state p)
-               bal (inventory/positions accumulated)]
-           (vreset! state accumulated)
-           (rf result (cell/mark (assoc p :bal bal) :journal/entry))))))))
+               positions (inventory/merge-position @state p :none)]
+           (vreset! state positions)
+           (rf result (cell/mark (assoc p :bal positions) :journal/entry))))))))
 
 (defn build
   "Build journal from given `postings`."
