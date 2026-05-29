@@ -1,3 +1,4 @@
 {:lint-as {clojure.test.check.clojure-test/defspec clojure.test/deftest,
            limabean.macros/bind-> clojure.core/->,
-           limabean.test/with-temp-file-path clojure.core/let}}
+           limabean.test/with-temp-file-path clojure.core/let},
+ :linters {:clojure-lsp/unused-public-var {:level :off}}}
