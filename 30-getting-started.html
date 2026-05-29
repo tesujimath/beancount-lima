@@ -81,7 +81,7 @@ user=&gt; (show (journal (f/date&gt;=&lt; 2013 2018)))
 <p>Of course, the premise of Clojure as user interface means that it is simple to build whatever query is required, as <a href="user provided code">user provided code</a>(40-plugins.md#User-provided code).</p>
 <ul>
 <li><code>balances</code> - assets and liabilities</li>
-<li><code>income-statement</code> - profit and loss statement, i.e. income and expenses</li>
+<li><code>income-statement</code> - profit and loss statement, i.e. income and expenses across a date range</li>
 <li><code>inventory</code> - raw unfiltered query underlying both <code>balances</code> and <code>income-statement</code></li>
 <li><code>journal</code> - show individual postings</li>
 </ul>
@@ -89,11 +89,15 @@ user=&gt; (show (journal (f/date&gt;=&lt; 2013 2018)))
 <h2><a href="#further-examples" id="further-examples"></a>Further examples</h2>
 <p>Inventory pre-filtered to assets and liabilities</p>
 <pre><code>user=&gt; (show (balances))
+user=&gt; (show (rollup (balances)))
 </code></pre>
-<p>Just expenses and income for the calendar year 2025</p>
-<pre><code>user=&gt; (show (inventory (f/date&gt;=&lt; 2025 2026) (f/sub-acc "Expenses" "Income")))
+<p>Income statement for the calendar year 2025</p>
+<pre><code>user=&gt; (show (rollup (income-statement [2025 2026])))
 </code></pre>
-<p>If you have brought your own <code>fy</code> function via <a href="40-plugins.html">user provided code</a></p>
+<p>Income statement with certain exclusions</p>
+<pre><code>user=&gt; (show (rollup (income-statement [2025 4 2026 4] (f/none-f (f/sub-acc "Expenses:Car:Depreciation" "Expenses:Tax")))))
+</code></pre>
+<p>If you have brought your own <code>fy</code> filter function via <a href="40-plugins.html">user provided code</a></p>
 <pre><code>user=&gt; (show (inventory (fy 25) (f/sub-acc "Expenses" "Income")))
 </code></pre>
 <p>This years transactions on current account</p>
