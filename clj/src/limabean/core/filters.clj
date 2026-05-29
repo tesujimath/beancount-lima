@@ -7,20 +7,9 @@
   ```
 
   In general these filters reject anything missing the target field."
-  (:require [java-time.api :as jt]
-            [clojure.string :as str]))
-
-(defn- to-local-date
-  "Convert `args` to a `local-date` or throw user error"
-  [args]
-  (try (apply jt/local-date args)
-       (catch Exception e
-         (throw (ex-info "Bad date"
-                         (let [msg (if (.getCause e)
-                                     (.getMessage (.getCause e))
-                                     (.getMessage e))]
-                           {:user-error (format "Bad date: %s\n" msg)})
-                         e)))))
+  (:require [clojure.string :as str]
+            [java-time.api :as jt]
+            [limabean.core.coerce :as coerce]))
 
 (defn date<
   "Predicate for `:date` field to be `< args`.
@@ -33,7 +22,7 @@
     - integers year and month, with day inferred as 1
     - integers year, month, and day"
   [& args]
-  (let [end-date (to-local-date args)]
+  (let [end-date (coerce/->local-date args)]
     #(let [date (:date %)] (and date (jt/before? date end-date)))))
 
 (defn date<=
@@ -41,7 +30,7 @@
 
   args are as described in [[date<]]"
   [& args]
-  (let [end-date (to-local-date args)]
+  (let [end-date (coerce/->local-date args)]
     #(let [date (:date %)] (and date (jt/not-after? date end-date)))))
 
 (defn date>
@@ -49,7 +38,7 @@
 
   args are as described in [[date<]]"
   [& args]
-  (let [begin-date (to-local-date args)]
+  (let [begin-date (coerce/->local-date args)]
     #(let [date (:date %)] (and date (jt/after? date begin-date)))))
 
 (defn date>=
@@ -57,7 +46,7 @@
 
   args are as described in [[date<]]"
   [& args]
-  (let [begin-date (to-local-date args)]
+  (let [begin-date (coerce/->local-date args)]
     #(let [date (:date %)] (and date (jt/not-before? date begin-date)))))
 
 (defn- date-between
@@ -70,11 +59,9 @@
 
   Precisely 2, 4, or 6 args must be given,
   the first half of which are the begin date and the second half the end date,
-  and are as described in [[date<]]"
-  ([b1 e1] (date-between (to-local-date [b1]) (to-local-date [e1])))
-  ([b1 b2 e1 e2] (date-between (to-local-date [b1 b2]) (to-local-date [e1 e2])))
-  ([b1 b2 b3 e1 e2 e3]
-   (date-between (to-local-date [b1 b2 b3]) (to-local-date [e1 e2 e3]))))
+   and are as described in [[date<]]"
+  [& args]
+  (let [[b e] (apply coerce/->local-date-pair args)] (date-between b e)))
 
 (defn acc
   "Predicate for `:acc` field to be equal to one of `target-accs`."
