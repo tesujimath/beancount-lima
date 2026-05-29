@@ -16,19 +16,25 @@
   (eduction (comp (xf/postings) (xf/all-of filters)) directives))
 
 (defn inventory
-  "Build inventory from `beans` after applying filters, if any."
+  "Build inventory from `beans` after applying filters, if any.
+   Invocation without filters simply returns the pre-calculated inventory."
   ([beans] (inventory beans []))
-  ([beans filters]
-   (inventory/build (postings (:directives beans) filters)
-                    (partial registry/acc-booking (:registry beans)))))
+  ([{:keys [inventory directives registry]} filters]
+   (if (seq filters)
+     (inventory/build (postings directives filters)
+                      (partial registry/acc-booking registry))
+     inventory)))
 
-(defn inventory-with-history
-  "Build inventory from `beans` after applying filters, if any."
-  ([beans] (inventory beans []))
-  ([beans filters]
-   (inventory/build-with-history (postings (:directives beans) filters)
-                                 (partial registry/acc-booking
-                                          (:registry beans)))))
+(defn inventory-history
+  "Build inventory history from `beans` after applying filters, if any.
+   Invocation without filters simply returns the pre-calculated inventory."
+  ([beans] (inventory-history beans []))
+  ([{:keys [history directives registry]} filters]
+   (if (seq filters)
+     (:history (inventory/build-with-history (postings directives filters)
+                                             (partial registry/acc-booking
+                                                      registry)))
+     history)))
 
 (defn rollup
   "Build a rollup for the primary currency from an inventory.
@@ -45,30 +51,32 @@
 (defn balances
   "Build balances from `beans`, optionally further filtered."
   ([beans] (balances beans []))
-  ([beans filters]
-   (inventory beans
-              (conj filters
-                    (f/sub-acc (:name-assets (:options beans))
-                               (:name-liabilities (:options beans)))))))
+  ([{:keys [inventory options], :as beans} filters]
+   (let [assets-and-liabilities [(:name-assets options)
+                                 (:name-liabilities options)]]
+     (if (seq filters)
+       (limabean/inventory beans
+                           (conj filters
+                                 (apply f/sub-acc assets-and-liabilities)))
+       (inventory/sub-accs inventory assets-and-liabilities)))))
 
 (defn income-statement
-  "Build balances from `beans`, optionally further filtered.
-
-  Custom directives may be passed in after the filters using :directives.
-  "
-  ([beans] (income-statement beans []))
-  ([beans filters]
-   (inventory beans
-              (conj filters
-                    (f/sub-acc (:name-income (:options beans))
-                               (:name-expenses (:options beans)))))))
+  "Calculate income statement across a half-open date range, optionally further filtered."
+  ([beans date-range] (income-statement beans date-range []))
+  ([{:keys [options registry], :as beans} [begin-date end-date] filters]
+   (let [income-and-expenses [(:name-income options) (:name-expenses options)]
+         history (inventory-history beans filters)
+         begin (-> (inventory/history-at history begin-date)
+                   (inventory/sub-accs income-and-expenses))
+         end (-> (inventory/history-at history end-date)
+                 (inventory/sub-accs income-and-expenses))]
+     (inventory/diff begin end (partial registry/acc-booking registry)))))
 
 (defn journal
-  "Build a journal of postings from `beans` with running balance.
-
-   Custom directives may be passed in after the filters using :directives."
+  "Build a journal of postings from `beans` with running balance."
   ([beans] (journal beans []))
-  ([beans filters] (journal/build (postings (:directives beans) filters))))
+  ([{:keys [directives]} filters]
+   (journal/build (postings directives filters))))
 
 (defn load-beanfile
   "Load beans from the beanfile at path"

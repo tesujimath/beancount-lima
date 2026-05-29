@@ -5,7 +5,8 @@
             [limabean.adapter.loader :as loader]
             [limabean.adapter.logging :as logging]
             [limabean.adapter.show :as show]
-            [limabean.adapter.pod :as pod]))
+            [limabean.adapter.pod :as pod]
+            [limabean.core.coerce :as coerce]))
 
 (def ^:dynamic *beans*
   "An aggregate of the elements which were used in deriving the directives for the current beanfile.
@@ -68,9 +69,11 @@
   (limabean/balances *beans* filters))
 
 (defn income-statement
-  "Build balances from `*beans*`, optionally further filtered."
-  [& filters]
-  (limabean/income-statement *beans* filters))
+  "Calculate income statement across a half-open date range, optionally further filtered."
+  [date-range & filters]
+  (limabean/income-statement *beans*
+                             (apply coerce/->local-date-pair date-range)
+                             filters))
 
 (defn journal
   "Build a journal of postings from `*beans*` with running balance."

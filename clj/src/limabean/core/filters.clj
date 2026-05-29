@@ -7,8 +7,8 @@
   ```
 
   In general these filters reject anything missing the target field."
-  (:require [clojure.string :as str]
-            [java-time.api :as jt]
+  (:require [java-time.api :as jt]
+            [limabean.core.account :as account]
             [limabean.core.coerce :as coerce]))
 
 (defn date<
@@ -73,9 +73,7 @@
   [& target-accs]
   #(let [acc (:acc %)]
      (and acc
-          (boolean (some (fn [target-acc]
-                           (or (= acc target-acc)
-                               (str/starts-with? acc (str target-acc ":"))))
+          (boolean (some (fn [target] (account/sub-acc? target acc))
                          target-accs)))))
 
 (defn cur

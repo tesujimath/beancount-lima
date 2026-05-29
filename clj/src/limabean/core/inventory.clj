@@ -1,6 +1,7 @@
 (ns limabean.core.inventory
   "Functions to build and query an inventory."
   (:require [clojure.set :as set]
+            [limabean.core.account :as account]
             [limabean.core.cell :as cell :refer [cell]]))
 
 ;;;
@@ -206,6 +207,14 @@
   [ps cur]
   (let [by-cur (positions->units-by-currency ps)] (get by-cur cur 0M)))
 
+(defn sub-accs
+  "Discard all but non-struct sub-accounts of any of `parent-accs`"
+  [inv parent-accs]
+  (into {}
+        (keep (fn [[acc pos]]
+                (and (some #(account/sub-acc? % acc) parent-accs) [acc pos]))
+              inv)))
+
 ;;;
 ;;; History queries
 ;;;
@@ -241,11 +250,6 @@
                                                   (acc-booking-fn acc))]
                     (and (seq positions) [acc positions])))
                 accs))))
-
-(defn history-between
-  "Build an inventory whose positions are the difference between two historical inventories"
-  [history date1 date2 acc-booking-fn]
-  (diff (history-at history date1) (history-at history date2) acc-booking-fn))
 
 ;;;
 ;;; Cells

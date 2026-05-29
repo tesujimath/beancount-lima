@@ -12,6 +12,11 @@ All notable changes to this project will be documented in this file. This change
 
 - inventory/build-with-history to enable tracking inventory over time
 
+### Changed
+
+- inventory with history is now built automatically when loading beanfile
+- income-statement now requires a date range
+
 [commit log]: https://github.com/tesujimath/limabean/compare/0.6.1...HEAD
 
 ## [0.6.1] - 2026-05-25
