@@ -36,6 +36,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set version variable
+        run: echo "VERSION=$(bash ./scripts.dev/get-version.sh)" >> $GITHUB_ENV
+
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -101,14 +104,12 @@ jobs:
 
       - name: Check version from uberjar
         run: |
-          VERSION=$(bash ./scripts.dev/get-version.sh)
           java -jar ./clj/target/limabean-${VERSION}-standalone.jar --version >VERSION
           cat VERSION
           test "$(cat VERSION)" == "limabean.clj $VERSION"
 
       - name: Test uberjar using limabean standalone
         run: |
-          VERSION=$(bash ./scripts.dev/get-version.sh)
           export LIMABEAN_UBERJAR="./clj/target/limabean-${VERSION}-standalone.jar"
           unset LIMABEAN_CLJ_LOCAL_ROOT
           export LIMABEAN_CLJ_DEPS="limabean/test-plugins {:local/root \"$(pwd)/clj/test-plugins\"}"
@@ -131,6 +132,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set version variable
+        run: echo "VERSION=$(bash ./scripts.dev/get-version.sh)" >> $GITHUB_ENV
+
       - name: Setup Clojure
         uses: DeLaGuardo/setup-clojure@13
         with:
@@ -143,42 +147,7 @@ jobs:
 
       - name: Check version from jarfile
         run: |
-          VERSION=$(bash ./scripts.dev/get-version.sh)
           # this must run *outside* of the clj directory, so we're not relying on its deps.edn for dependency resolution
           clojure -J--enable-native-access=ALL-UNNAMED -Sdeps "{:mvn/local-repo \"$(pwd)/target/m2\" :deps {io.github.tesujimath/limabean {:mvn/version \"$VERSION\"}}}" -M -m limabean.main --version >VERSION
           cat VERSION
           test "$(cat VERSION)" == "limabean.clj $VERSION"
-
-  check-containerfile:
-    name: Check Containerfile
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set version variable
-        run: echo "VERSION=$(bash ./scripts.dev/get-version.sh)" >> $GITHUB_ENV
-
-      - name: Build image
-        run: |
-          podman build -f Containerfile --build-arg VERSION=$VERSION -t limabean:$VERSION
-
-      - name: Test uberjar using limabean container
-        run: |
-          ID=$(podman run --rm --detach -v .:/data --entrypoint sleep --stop-signal SIGKILL limabean:$VERSION infinity)
-
-          stop() {
-            test -n "$ID" && podman stop "$ID"
-          }
-          trap stop EXIT TERM INT
-
-          for golden in test-cases/simple.golden/{inventory,journal,rollup}; do
-             query=${golden##*/}
-             beanfile=${golden%.golden/$query}.beancount
-             # rollup is no longer a stand-alone query, must be applied to an inventory
-             if test "$query" == rollup; then
-               query="rollup (inventory)"
-             fi
-             echo "Validating $golden"
-             podman exec "$ID" limabean -v --beanfile "$beanfile" --eval "(show ($query))" | diff - $golden
-          done

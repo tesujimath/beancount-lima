@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 env:
   CARGO_TERM_COLOR: always
@@ -108,6 +109,47 @@ jobs:
           cd rust
           cargo publish --package limabean
 
+      - name: Build container image
+        if: matrix.os == 'ubuntu-latest'
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ github.event.repository.name }}
+          tags: ${{ env.VERSION }} latest
+          labels: |
+            org.opencontainers.image.source=${{ github.repositoryUrl }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+          build-args: |
+            VERSION=${{ env.VERSION }}
+          containerfiles: Containerfile
+
+      - name: Display container build outputs
+        run: |
+          echo "### Container Image :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "Image: ${{ steps.build-image.outputs.image }}" >> $GITHUB_STEP_SUMMARY
+          echo "Tags: ${{ steps.build-image.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "Tagged Image: ${{ steps.build-image.outputs.image-with-tag }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Push to the Github Container Registry
+        id: push-to-ghcr
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ghcr.io/${{ github.repository_owner }}
+
+      - name: Display container push outputs
+        run: |
+          echo "Digest: ${{ steps.push-to-ghcr.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+          echo "Registry Paths:" >> $GITHUB_STEP_SUMMARY
+          for path in ${{ join(steps.push-to-ghcr.outputs.registry-paths, ' ') }}
+          do
+            echo "- $path"
+          done
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -144,6 +186,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
+        id: release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/**/*
@@ -151,3 +194,8 @@ jobs:
           body: ${{ steps.changelog.outputs.RELEASE_NOTES }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Display release outputs
+        run: |
+          echo "### Release :package:" >> $GITHUB_STEP_SUMMARY
+          echo "Link: [${{ steps.release.outputs.id }}](${{ steps.release.outputs.url }})" >> $GITHUB_STEP_SUMMARY

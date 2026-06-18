@@ -1,37 +1,27 @@
-# Builder stage
-FROM docker.io/clojure:tools-deps AS builder
+FROM docker.io/eclipse-temurin:21
 
-RUN apt-get update && apt-get install -y curl build-essential && \
-    curl https://sh.rustup.rs -sSf | sh -s -- -y && \
-    . $HOME/.cargo/env && rustup install stable && rustup default stable
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    curl \
+    rlwrap \
+    && rm -rf /var/lib/apt/lists/*
 
-ENV PATH="/root/.cargo/bin:$PATH"
-
-WORKDIR /app
-COPY . .
-
-ARG VERSION
-ENV LIMABEAN_UBERJAR=/app/limabean-${VERSION}-standalone.jar
-
-WORKDIR /app/rust
-RUN cargo build --release
-
-WORKDIR /app/clj
-RUN clojure -T:build uber
-
-# Runtime stage
-FROM docker.io/clojure:tools-deps
+RUN curl -L -O https://github.com/clojure/brew-install/releases/latest/download/linux-install.sh \
+    && bash ./linux-install.sh \
+    && rm linux-install.sh
 
 ENV PATH="/app/bin:$PATH"
-ENV LIMABEAN_BEANFILE=accounting.beancount
-
-WORKDIR /app
-
-COPY --from=builder /app/rust/target/release/limabean bin/
-COPY --from=builder /app/rust/target/release/limabean-pod bin/
-COPY --from=builder /app/clj/target/limabean-*-standalone.jar .
+ENV LIMABEAN_UBERJAR=/app/limabean-standalone.jar
+ENV LIMABEAN_BEANFILE=main.beancount
 
 VOLUME /data
-WORKDIR /data
 
 ENTRYPOINT ["limabean"]
+RUN mkdir -p /app/bin
+WORKDIR /app
+
+ARG VERSION
+COPY clj/target/limabean-${VERSION}-standalone.jar limabean-standalone.jar
+COPY rust/target/release/limabean rust/target/release/limabean-pod ./bin
+
+WORKDIR /data
